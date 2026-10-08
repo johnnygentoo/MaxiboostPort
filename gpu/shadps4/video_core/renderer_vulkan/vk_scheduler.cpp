@@ -184,6 +184,7 @@ void Scheduler::BeginRendering(const RenderState& new_state) {
     const bool resume = resume_rendering && !is_rendering && render_state == new_state;
     resume_rendering = false;
     EndRendering();
+    CarrySuspend(false);
     is_rendering = true;
     render_state = new_state;
 
@@ -236,6 +237,7 @@ void Scheduler::BeginRendering(const RenderState& new_state) {
 
     if (workers.empty()) {
         current_cmdbuf.beginRendering(rendering_info);
+        CarryResume(true);
         return;
     }
     // The attachment infos live on this stack frame: the recorded closure keeps copies.
@@ -250,14 +252,17 @@ void Scheduler::BeginRendering(const RenderState& new_state) {
         }
         cmdbuf.beginRendering(info);
     });
+    CarryResume(true);
 }
 
 void Scheduler::EndRendering() {
     if (!is_rendering) {
         return;
     }
+    CarrySuspend(true);
     is_rendering = false;
     Record([](vk::CommandBuffer cmdbuf) { cmdbuf.endRendering(); });
+    CarryResume(false);
 }
 
 void Scheduler::TraceDirectRecording(void* caller) {
@@ -447,9 +452,12 @@ void Scheduler::MaybeSplit() {
         return;
     }
     if (is_rendering) {
+        CarrySuspend(true);
         Record([](vk::CommandBuffer cmdbuf) { cmdbuf.endRendering(); });
         is_rendering = false;
         resume_rendering = true;
+    } else {
+        CarrySuspend(false);
     }
     if (async_submit) {
         // Its recording thread ends the segment's command buffer (the pool is that thread's).
@@ -464,6 +472,7 @@ void Scheduler::MaybeSplit() {
     // Everything else (pipeline, vertex and index buffers, descriptors, push constants) every
     // draw and dispatch records itself.
     dynamic_state.Invalidate();
+    CarryResume(false);
 }
 
 void Scheduler::HandOver() {
@@ -597,9 +606,12 @@ void Scheduler::EnterDirectMode() {
     if (own_segment && async_submit && current_segment + 2 < MaxSegments &&
         !BbToggle::Disabled(BbToggle::ThreadedRecording)) {
         if (is_rendering) {
+            CarrySuspend(true);
             Record([](vk::CommandBuffer cmdbuf) { cmdbuf.endRendering(); });
             is_rendering = false;
             resume_rendering = true;
+        } else {
+            CarrySuspend(false);
         }
         // A segment nothing was handed to yet is not begun: it becomes the direct one.
         const bool untouched =
@@ -619,6 +631,7 @@ void Scheduler::EnterDirectMode() {
         direct_mode = true;
         direct_segment = true;
         dynamic_state.Invalidate();
+        CarryResume(false);
         return;
     }
     SyncRecording();
@@ -633,9 +646,12 @@ void Scheduler::EnterDirectMode() {
 
 void Scheduler::LeaveDirectSegment() {
     if (is_rendering) {
+        CarrySuspend(true);
         current_cmdbuf.endRendering();
         is_rendering = false;
         resume_rendering = true;
+    } else {
+        CarrySuspend(false);
     }
     Check(current_cmdbuf.end());
     current_cmdbuf = vk::CommandBuffer{};
@@ -646,6 +662,7 @@ void Scheduler::LeaveDirectSegment() {
     segment_bytes = 0;
     active_worker.store(current_segment % workers.size(), std::memory_order_relaxed);
     dynamic_state.Invalidate();
+    CarryResume(false);
 }
 
 void Scheduler::RecorderThread(std::stop_token stoken, u32 index) {
@@ -865,6 +882,7 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
     }
 
     EndRendering();
+    CarrySuspend(false);
     if (auto* profiler = GpuProfiler::Get(); profiler && profiler->Records(this)) {
         // Until the next submission's first timestamp: mostly the GPU waiting for it.
         profiler->Mark(0x5B317ull, [] { return std::string{"(between submissions: GPU idle)"}; });
@@ -932,6 +950,7 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
     // bbport: no semaphore query here (an ioctl per submission, ~3% of the recording thread):
     // PopPendingOperations asks when an operation waits, the GPU signal thread on every fence.
     AllocateWorkerCommandBuffers();
+    CarryResume(false);
 
     // Apply pending operations
     PopPendingOperations();
@@ -943,6 +962,7 @@ void Scheduler::SubmitAsync(SubmitInfo& info) {
         on_submit(info);
     }
     EndRendering();
+    CarrySuspend(false);
     if (auto* profiler = GpuProfiler::Get(); profiler && profiler->Records(this)) {
         profiler->Mark(0x5B317ull, [] { return std::string{"(between submissions: GPU idle)"}; });
     }
@@ -1013,6 +1033,7 @@ void Scheduler::SubmitAsync(SubmitInfo& info) {
     });
     KickRecording(true);
     AllocateWorkerCommandBuffers();
+    CarryResume(false);
     PopPendingOperations();
 }
 
