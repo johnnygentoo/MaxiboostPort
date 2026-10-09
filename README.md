@@ -15,7 +15,7 @@ directly on the PC:
   [shadPS4](https://github.com/shadps4-emu/shadPS4) and heavily extended for this game, including
   temporal upscaling with AMD FSR 3.1, FSR 4 and FSR 4.1.1;
 - memory and the GPU's work are moving to the PC model: the launcher has an experimental
-  *New memory and translation model* mode (AMD and NVIDIA GPUs); without it the game runs on the old
+  *New memory and translation model* mode; without it the game runs on the old
   memory model, as in 0.3.
 
 One step remains to the full Wine + DXVK model: make the new mode the default and remove the old
@@ -38,22 +38,25 @@ Mesa/RADV) has been tested thoroughly.
   - **Switch off (the default) — as in 0.3.** The old memory model: VRAM copies of the game's
     memory, writes tracked through page protection. With every fix made since 0.3 (motion
     vectors and the upscaler, flicker with DoF on, a damaged shader cache).
-  - **New memory and translation model — experimental, AMD and NVIDIA GPUs.** The game's memory lives
+  - **New memory and translation model — experimental.** The game's memory lives
     in system RAM and the GPU reads it where it is, as a PC game's buffers; data it reads often
-    is kept in VRAM and given back when unused (textures after 20 s, buffers after 60 s). No
-    write tracking, no copies of the whole GPU-visible memory. The PS4 command processor's work
+    is kept in VRAM and given back when unused (textures after 20 s, buffers after 60 s). The
+    layer's memory module tracks CPU writes to mirrored blocks to keep those copies coherent;
+    it does not copy the whole GPU-visible memory. The PS4 command processor's work
     is translated into Vulkan commands rather than emulated on the CPU: memory writes
     (`WRITE_DATA`, DMA) are done by the GPU in command-stream order, and fences are written by the
     GPU itself at the end of the pipeline, at the same point of the stream as the PS4's command
-    processor writes them. Where the game is CPU-bound it runs 20–25% faster
-    (measured standing in the Hunter's Dream), with fewer stutters. **It may crash**, and has
-    been tested thoroughly only on the author's PC (RX 7800 XT). On NVIDIA the game's memory is
-    given to the GPU by host memory import (`VK_EXT_external_memory_host`) or, if the driver does
-    not take it, as dma-buf chunks; at startup the game checks that the chosen way works (import,
-    GPU writes seen by the CPU and back, CPU speed) and otherwise stays on the old model — the log
-    says what was chosen. Not yet tested on NVIDIA; Intel is untested and the switch is
-    unavailable there. Without the launcher: `BB_PC_MODEL=1`; to choose the way:
-    `BB_GUEST_MEMORY=host|dmabuf`; to try it on another GPU: `BB_PC_MODEL_ANY_GPU=1`.
+    processor writes them. **It may crash**; hardware testing has been performed on an
+    RX 7800 XT, and performance depends on the scene and settings. On AMD the game's memory is kept
+    in a sparse buffer (the arena). **On NVIDIA, Intel and others** it goes through the layer's
+    memory module: the game's memory is bound in place and VRAM copies are separate buffers, with
+    no sparse rebinding. This avoids the sparse-binding path associated with reported freezes
+    on a GTX 1660 Ti. The new module is not tested on NVIDIA or Intel hardware yet. Without the
+    launcher: `BB_PC_MODEL=1`; to choose the memory path: `BB_GUEST_MEMORY=host|dmabuf`; the memory
+    module: `BB_LAYER_MEMORY=1/0`.
+
+  [0.5-pre2 changes](docs/CHANGES_0.5-pre2.md): the memory module, native GPU copy shader,
+  portable GPU completion labels, and shader-cache migration.
 
   Unused textures are freed in both modes, so VRAM no longer grows with every area visited.
 - **Unlocked frame rate.** Community patches (`patches/Bloodborne.xml`) make the simulation
@@ -93,7 +96,7 @@ Mesa/RADV) has been tested thoroughly.
 |---|---|---|
 | Scope | General PS4 emulator, many games | One game: Bloodborne v1.09 |
 | Loading | Its own ELF loader and kernel emulation at run time | The eboot is converted offline (`scripts/`) into an image with PS4 libc/Fios2 linked in; a C loader maps it and jumps into the game (loader and runtime: ~5k lines) |
-| Memory | The GPU's view of PS4 memory is kept in VRAM copies, synchronized through page-protection write tracking | By default the same model (as in 0.3); in the *New memory and translation model* mode (AMD): the game's memory in system RAM, used by the GPU in place, frequently read data in VRAM, freed when unused |
+| Memory | The GPU's view of PS4 memory is kept in VRAM copies, synchronized through page-protection write tracking | By default the same model (as in 0.3); in the *New memory and translation model* mode: the game's memory in system RAM, used by the GPU in place, frequently read data in VRAM, freed when unused |
 | Command processor | Emulated: memory writes, DMA and fences are done by the CPU while decoding | By default the same; in the new mode translated into Vulkan commands that the GPU runs in stream order, fences written after the work has really finished |
 | System libraries | Broad HLE of the PS4 OS | A small runtime (`src/runtime_*.c`) that implements exactly what Bloodborne calls: memory, threads, sync, files, audio (incl. ATRAC9), pad, saves, AppContent |
 | GPU | shadPS4 video core and shader recompiler | The same core (vendored, GPL) with ~200 marked changes (`bbport:`) plus new modules: two-stage draw pipeline, render-state and texture-set memoization, render-scale proxies, motion vectors, FSR 3.1/4/4.1.1, frame capture and GPU profiler |
@@ -112,7 +115,7 @@ the graphics side.
   implements exactly the PS4 OS functions Bloodborne calls: memory, threads, files, audio, pad,
   saves.
 - **Memory.** In the new mode, as in a PC game: the game's data in system RAM, VRAM used the way
-  a PC game uses it. The mode is still experimental and runs on AMD and NVIDIA GPUs.
+  a PC game uses it. The mode is still experimental.
 - **Graphics.** The PS4 GPU's command stream (PM4) is a recording of the game's graphics API
   calls: it is written by 99 functions of the statically linked libGnm, so decoding the stream
   and translating the calls themselves come to the same thing. GCN shaders are translated to
@@ -133,7 +136,7 @@ neither has nor includes.
 ## Requirements
 
 - Linux x86-64, a Vulkan 1.3 GPU. Tested: AMD RX 7800 XT with Mesa 26 (RADV).
-  The *New memory and translation model* mode needs an AMD or NVIDIA GPU (NVIDIA untested).
+  The *New memory and translation model* mode is not tested on NVIDIA yet.
   FSR 4 / 4.1.1 require shader Float16, Int8/Int16, integer dot products, linear compute
   derivatives and extended storage image formats; FSR 4.1.1 additionally requires
   `VK_VALVE_shader_mixed_float_dot_product`. Unsupported choices fall back to FSR 3.1
@@ -314,7 +317,7 @@ When running from source, install MangoHud separately. A diagnostic launch with
 
 Useful variables: `BB_FRAME_STATS=1` (frame statistics, including a `Memory:` line: VRAM, GTT,
 RSS, images and guest blocks in VRAM), `BB_PC_MODEL=1` (the new memory and translation model,
-AMD and NVIDIA; 0, the old model as in 0.3, is the default), `BB_ANISO=N` (anisotropic filtering of scene textures; 16 by
+0, the old model as in 0.3, is the default), `BB_ANISO=N` (anisotropic filtering of scene textures; 16 by
 default, 0 = the game's own),
 `BB_GC_IDLE_SECONDS=N` / `BB_VRAM_IDLE_SECONDS=N` (how long unused textures / buffers stay in VRAM;
 20 / 60), `BB_BREADCRUMBS=0` (no GPU breadcrumbs; with them a GPU hang names the draw or dispatch

@@ -5,6 +5,7 @@
 
 #include "bbport_copy.h"
 
+#include <atomic>
 #include <deque>
 #include <future>
 #include <map>
@@ -161,6 +162,8 @@ public:
 
     /// Commits pending sparse buffer memory binds. Must be called before every scheduler submit.
     void SubmitPendingArenaBinds(Vulkan::SubmitInfo& info);
+    /// bbport (GPU watchdog): prints how far the GPU got with the arena binds (vkQueueBindSparse).
+    void ReportArenaBinds();
 
     /// bbport BB_GUEST_IN_PLACE: the game unmapped [addr, addr + size) (a guest thread): arena
     /// blocks bound to its memory there are unbound before the next binding (GPU side).
@@ -198,11 +201,41 @@ public:
     /// in (no CPU copy, no VRAM buffer copy), when the range is contiguous there. Also the target
     /// of labels the GPU writes (Rasterizer::WriteLabelOnGpu). GPU side threads.
     std::optional<std::pair<const Buffer*, u64>> GuestChunkSource(VAddr address, u64 size);
+    /// bbport BB_LAYER_MEMORY: whether the layer's memory module binds the game's memory.
+    static bool LayerActive();
+    /// bbport BB_LAYER_MEMORY: [addr, addr + size) touches a block with a VRAM copy (it may hold the
+    /// GPU's newest data): bound through the module, never copied from the game's memory.
+    [[nodiscard]] static bool LayerMirrored(VAddr addr, u64 size);
+    /// Paged bindings in use (BB_LAYER_PAGED=0: off); GPU-written data in VRAM (BB_LAYER_GPU_WRITES).
+    static bool LayerPagedActive();
+    /// BB_LAYER_GPU_WRITES: where GPU writes may land in VRAM copies: 0 nowhere (in place), 1 (the
+    /// default) in blocks the CPU has not written since they were handed out (layer_cpu_blocks:
+    /// render targets and other GPU-only data), 2 anywhere.
+    static int LayerGpuWritesMode();
+    bool LayerGpuWriteToVram(VAddr address, u64 size);
+    bool LayerInImage(VAddr address, u64 size);
+    /// A paged binding (Shader::IsPagedBuffer): the record its shader reads ({address, size,
+    /// trash address}, see EmitContext::PagedPointer), with page table entries for the range.
+    std::pair<const Buffer*, u64> LayerPagedRecord(VAddr address, u64 size, bool is_written);
+    /// The CPU wrote [address, address + size): VRAM copies there are refreshed before paged
+    /// bindings read them.
+    void LayerNoteCpuWrite(VAddr address, u64 size);
+    /// bbport BB_LAYER_MEMORY: [address, address + size) in place as a range of its chunk's buffer,
+    /// when the layer's memory module finds it whole in one chunk.
+    /// clamp_huge: a binding of 64 MiB or more that runs on past its chunk is cut at the end of
+    /// the part in place (the descriptor range is clamped to the buffer).
+    std::optional<std::pair<const Buffer*, u64>> LayerInPlace(VAddr address, u64 size,
+                                                              bool clamp_huge = false);
     /// Whether any part of the range is.
     [[nodiscard]] bool IsAnyInPlace(VAddr addr, u64 size) const {
+        if (LayerActive() && size != 0) {
+            return !IsInVramLayer(addr, size); // bbport BB_LAYER_MEMORY: not all in one mirror
+        }
         return GuestInPlace() && size != 0 &&
                in_place_blocks.Overlaps(addr >> block_shift, ((addr + size - 1) >> block_shift) + 1);
     }
+    /// bbport BB_LAYER_MEMORY: [addr, addr + size) whole in one VRAM mirror.
+    [[nodiscard]] bool IsInVramLayer(VAddr addr, u64 size) const;
 
 private:
     struct ArenaBinds {
@@ -300,12 +333,15 @@ private:
     /// next submission (once `submitted` is done).
     void QueueCopyBacks(u64 submitted);
     void QueuePromotions(u64 submitted);
+    void ReportInPlaceBlocks(); ///< bbport BB_RESIDENCY_REPORT (diagnostics)
     /// Arena residency memory from the 64 MiB blocks: the memory and the byte offset in it.
     std::pair<vk::DeviceMemory, u64> AllocateResidency(u64 bytes);
     /// bbport: BbStats::residency_unused_bytes after the free list or the current block changed.
     void NoteResidencyUnused();
     /// bbport: idle VRAM blocks (see group_use).
     void NoteUse(VAddr address, u64 size);
+    /// bbport BB_RESIDENCY_MIX=1 (diagnostics): bindings over blocks in VRAM and in place at once.
+    void NoteResidencyMix(u64 first_block, u64 last_block, u64 size, bool is_written);
     void ProcessIdleBlocks();
     /// A VRAM slot of a block that left it: reused by the next move to VRAM.
     void ReleaseResidencySlot(vk::DeviceMemory memory, u64 offset);
@@ -324,7 +360,56 @@ private:
     const Buffer* UploadCopies(const Buffer* arena, std::span<vk::BufferCopy> copies,
                                size_t total_size_bytes);
 
-    bool SynchronizeMemoryFromImage(const Buffer* arena, VAddr device_addr, u32 size);
+    /// The image at device_addr, if any, tiled into `buffer` at `offset` (where the range is).
+    bool SynchronizeMemoryFromImage(const Buffer* buffer, u64 offset, VAddr device_addr, u32 size);
+    /// bbport BB_LAYER_MEMORY (statistics): a binding not whole in one chunk.
+    void NoteLayerMiss(VAddr address, u64 size, bool is_written);
+    /// bbport BB_LAYER_MEMORY (buffer_cache_layer.cpp): a binding through the layer's memory
+    /// module: a mirror in VRAM, or in place (empty: neither; the arena takes it).
+    std::optional<std::pair<const Buffer*, u64>> LayerBind(VAddr address, u64 size, bool is_written,
+                                                           bool is_texel_buffer);
+    /// Whether a block may get a VRAM copy (all of it loaded data, in a guest chunk).
+    bool LayerEligible(u64 block);
+    /// Every block of [first_block, end_block) in VRAM already or eligible (LayerEligible).
+    bool LayerAllKnown(u64 first_block, u64 end_block);
+    /// Candidate blocks (sorted) copied to VRAM: mirrors created or merged.
+    void LayerPromote(const std::vector<u64>& blocks);
+    u64 LayerPromoteRun(u64 first_block, u64 end_block);
+    /// Blocks [first, end) back in place (copy_back: what the GPU wrote in VRAM first).
+    /// reason (statistics): 0 written binding, 1 mixed binding, 2 command write, 3 demotion
+    /// request, 4 copy back, 5 unmap, 6 idle.
+    void LayerDemote(u64 first_block, u64 end_block, bool copy_back, int reason);
+    /// Frees retired mirrors the GPU is done with.
+    void LayerMaintain();
+    /// Mirrored blocks not bound for BB_VRAM_IDLE_SECONDS go back in place.
+    void LayerProcessIdle();
+    /// The GPU writes [address, address + size) in the submission being recorded (write ticks).
+    void NoteWriteTick(VAddr address, u64 size);
+    /// Page table entry of a block (LayerPagedRecord), its writes, and rewrites after changes.
+    u64 LayerEntry(u64 block);
+    void LayerWriteEntries(u64 first_block, u64 end_block);
+    void LayerRepublish(u64 first_block, u64 end_block);
+    /// CPU writes into blocks with VRAM copies, uploaded before paged bindings.
+    void LayerFlushUploads();
+    void LayerForgetGpuData();
+    /// The GPU's data in mirrors over [first, end) copied into the game's memory (blocks stay).
+    void LayerCopyBack(u64 first_block, u64 end_block);
+    /// Blocks of [first, end) that may go to VRAM become promotion candidates.
+    void LayerQueuePromotion(u64 first_block, u64 end_block);
+    /// Unknown blocks (LayerEligible false) made volatile in a mirror (layer_volatile).
+    void LayerMakeVolatile(const std::vector<u64>& blocks);
+    /// Write traps on blocks with VRAM copies (buffer_cache_layer.cpp): set when a block gets its
+    /// copy, removed when it goes back in place or the CPU announces a write there (then it goes
+    /// back in place too); hits are handled before the next binding.
+    void LayerArmTraps(u64 first_block, u64 end_block);
+    void LayerDisarmTraps(u64 first_block, u64 end_block, bool demote);
+    void LayerProcessTraps();
+    static u64 LayerTrapFaults();
+    /// Before a binding of a mirror over volatile blocks: their bytes in it refreshed.
+    void LayerRefreshVolatile(VAddr address, u64 size);
+    static bool GarlicInVramForLayer();
+    /// VRAM past BB_VRAM_PROMOTE_PERCENT of the budget: no new copies of loaded blocks for now.
+    bool VramPromotionsPaused();
 
     const Vulkan::Instance& instance;
     Vulkan::Scheduler& scheduler;
@@ -357,6 +442,30 @@ private:
     VAddr preupload_cursor = 0;
     u64 preupload_first_bytes = 0, preupload_again_bytes = 0; ///< BB_FRAME_STATS report
     Vulkan::Semaphore memory_semaphore;
+    /// bbport BB_LAYER_MEMORY: mirrors by start address, retired ones with the tick to wait for.
+    std::map<VAddr, std::unique_ptr<Buffer>> layer_mirrors;
+    std::vector<std::pair<std::unique_ptr<Buffer>, u64>> layer_retired;
+    u64 layer_generation = 0;
+    u64 layer_copied_back_bytes = 0; ///< statistics
+    IntervalList<> layer_published; ///< blocks whose page table entries are written
+    std::mutex layer_uploads_mutex;
+    std::vector<std::pair<VAddr, u64>> layer_pending_uploads;
+    /// CPU writes the GPU side heard of: their bytes lose their GPU-modified marks (LayerForgetGpuData).
+    std::vector<std::pair<VAddr, u64>> layer_cpu_written;
+    std::atomic<bool> layer_cpu_written_pending{false};
+    std::atomic<bool> layer_uploads_pending{false};
+    std::unique_ptr<Buffer> layer_trash; ///< where paged accesses out of range go
+    /// Blocks with bytes nobody announced (an edge shared with other data, padding between
+    /// images) in a mirror only so that the rest of a reading binding's range can be there:
+    /// refreshed from the game's memory for every binding over them. Paged bindings and the
+    /// module's readers see them in place.
+    IntervalList<> layer_volatile;
+    /// Blocks the CPU wrote since they were handed out (traps, announced writes): GPU writes there
+    /// stay in place (LayerGpuWriteToVram).
+    IntervalList<> layer_cpu_blocks;
+    u64 layer_volatile_refresh_bytes = 0; ///< statistics
+    std::atomic<u64> arena_bind_calls{0}, arena_bind_ranges{0}; ///< vkQueueBindSparse calls, ranges
+    std::atomic<u64> arena_bind_signaled{0}; ///< memory_semaphore value the last call signals
 
     struct Backing : public Interval {
         vk::DeviceMemory memory;
