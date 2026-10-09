@@ -55,8 +55,10 @@ Mesa/RADV) has been tested thoroughly.
     being checked; not tested on Intel. Without the launcher: `BB_PC_MODEL=1`; to choose the memory
     path: `BB_GUEST_MEMORY=host|dmabuf`; the memory module: `BB_LAYER_MEMORY=1/0`.
 
-  [0.5-pre3 changes](docs/CHANGES_0.5-pre3.md): the memory module on NVIDIA — VRAM copies, one VRAM
-  budget with the texture cache, watched blocks. [0.5-pre2](docs/CHANGES_0.5-pre2.md): the memory
+  [0.5-pre4 changes](docs/CHANGES_0.5-pre4.md): no stutter of the memory module (NVIDIA) while areas
+  stream in, shader compilation in the background, VRAM on 4–6 GB cards, damaged game extractions
+  reported, the settings menu as in 0.3. [0.5-pre3](docs/CHANGES_0.5-pre3.md): the memory module on
+  NVIDIA — VRAM copies, one VRAM budget with the texture cache, watched blocks. [0.5-pre2](docs/CHANGES_0.5-pre2.md): the memory
   module, native GPU copy shader, portable GPU completion labels, and shader-cache migration.
 
   Unused textures are freed in both modes, so VRAM no longer grows with every area visited.
@@ -329,7 +331,8 @@ pass), `BB_FSR4_PROFILE=1` (GPU time per FSR 4 pass), `BB_UPSCALER=taa|fsr3|fsr4
 `BB_LIVE_RES=1` (live resolution changes instead of the startup patch for outputs other than 1080p),
 `BB_PAD_RECORD=file` / `BB_PAD_REPLAY=file` (record a route with F9, replay it in scripted tests),
 `BB_GC_BUDGET_MB=N` (texture cache budget, as on integrated GPUs), `BB_VRAM_LIMIT_MB=N` (the VRAM
-budget taken as at most N MiB: checks the behaviour of cards with little VRAM), `BB_PRESENT_DUMP_TRIGGER=file`
+budget taken as at most N MiB: checks the behaviour of cards with little VRAM), `BB_ASYNC_PIPELINES=0`
+(new pipelines compile at once and the game waits; by default in the background), `BB_PRESENT_DUMP_TRIGGER=file`
 with `BB_PRESENT_DUMP_COUNT=N` (dump N consecutive presented frames),
 `BB_FSR411_VARIANT=int8|fp8|fp8emu` (FSR 4.1.1 variant; by default FP8 where the GPU has FP8
 matrices), `BB_READBACKS=0|1|2` (reads of GPU-written memory by the game: 1 by default, 2
