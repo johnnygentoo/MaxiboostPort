@@ -432,6 +432,12 @@ bool InPlaceTextures() {
 /// 615.71) the first blocks moved to VRAM held the GPU for 10 s and more, the desktop with it.
 /// BB_FIXED_ARENA=1/0 forces it on/off (tests). Valid once the BufferCache checked the chunks.
 bool FixedArena() {
+    // Only sparse rebinding needs this NVIDIA workaround. The layer has ordinary chunk
+    // buffers and VRAM mirrors, so fixing an arena that it does not use would disable all
+    // its promotions on host-import GPUs (GTX 1660 Ti: zero mirrors and 10-15 FPS).
+    if (BbGuestMemory::LayerMemory()) {
+        return false;
+    }
     static const bool on = [] {
         const char* env = std::getenv("BB_FIXED_ARENA");
         const bool fixed = env && *env ? env[0] != '0' : BbGuestMemory::HostImported();
@@ -453,8 +459,8 @@ bool MixStats() {
 }
 
 /// bbport BB_LAYER_MEMORY=1: the layer's memory module (gpu/layer) binds the game's memory: a
-/// range in place is a range of its chunk's buffer, no sparse arena. Step 2 of
-/// docs/MEMORY_MODULE_PLAN.ru.md: no VRAM copies of the game's memory yet.
+/// range in place is a range of its chunk's buffer, with separate VRAM mirrors and no sparse
+/// arena. FixedArena must not prohibit those mirrors.
 bool LayerMode() {
     return GuestInPlace() && BbGuestMemory::LayerMemory();
 }
@@ -1132,14 +1138,39 @@ std::pair<const Buffer*, u64> BufferCache::ObtainBuffer(VAddr device_addr, u32 s
     return {arena, arena->Offset(device_addr)};
 }
 
+std::optional<std::pair<const Buffer*, u64>> BufferCache::CommandWriteMirror(VAddr device_addr,
+                                                                           u32 size) {
+    if (!LayerMode() || size == 0) {
+        return std::nullopt;
+    }
+    const auto resolution = BbLayer::GpuMemory::Get().Resolve(device_addr, size);
+    if (resolution.kind != BbLayer::Resolution::Kind::Mirror) {
+        return std::nullopt;
+    }
+    // Not over volatile blocks (refreshed from the game's memory anyway) or data only the GPU has
+    // there (copied back before a demotion; a write beside it keeps the rules simple).
+    const u64 first = device_addr >> block_shift, end = ((device_addr + size - 1) >> block_shift) + 1;
+    if (layer_volatile.Overlaps(first, end) || gpu_modified_ranges.Intersects(device_addr, size)) {
+        return std::nullopt;
+    }
+    auto* mirror = static_cast<Buffer*>(resolution.span.source->owner);
+    return std::pair<const Buffer*, u64>{mirror, mirror->Offset(device_addr)};
+}
+
 std::optional<std::pair<const Buffer*, u64>> BufferCache::CommandWriteTarget(VAddr device_addr,
                                                                            u32 size) {
     if (!GuestInPlace() || size == 0) {
         return std::nullopt;
     }
     if (LayerMode()) {
-        // Written by the GPU in place: a VRAM copy of it would be stale (step 3a).
-        LayerDemote(device_addr >> block_shift, ((device_addr + size - 1) >> block_shift) + 1, true, 2);
+        // Written by the GPU in place: a VRAM copy of it would be stale (step 3a), unless the
+        // range is whole in one mirror: then the caller writes that copy too (CommandWriteMirror).
+        // Demoting it made watched blocks (BB_LAYER_WATCH) go back and forth between VRAM and in
+        // place (WRITE_DATA beside the data shaders read: 2 GiB a minute).
+        if (!CommandWriteMirror(device_addr, size)) {
+            LayerDemote(device_addr >> block_shift, ((device_addr + size - 1) >> block_shift) + 1,
+                        true, 2);
+        }
         const auto target = LayerInPlace(device_addr, size);
         if (target) {
             WriteTicks().Note(device_addr, size, scheduler.CurrentTick());
@@ -1163,8 +1194,9 @@ std::pair<const Buffer*, u64> BufferCache::ObtainBufferForImage(VAddr device_add
     // memory chunk.
     if (LayerMode()) {
         // From its mirror where the data is in VRAM (the GPU may have written it there), else
-        // in place (a mixed range: the GPU's data in mirrors copied back first, LayerBind).
-        if (const auto source = LayerBind(device_addr, size, false, false)) {
+        // in place (a mixed range: the GPU's data in mirrors copied back first, LayerBind). No
+        // mirror is made for an upload: the image holds the data in VRAM.
+        if (const auto source = LayerBind(device_addr, size, false, false, false)) {
             TraceBinding(device_addr, size, false, 6);
             return *source;
         }
@@ -1904,6 +1936,9 @@ void BufferCache::ProcessDemotions() {
         const VAddr address = block << block_shift;
         if (cpu_written) {
             dynamic_blocks.Add({block, block + 1}); // bound in place when it is next used
+            if (LayerMode()) {
+                layer_cpu_hot.Add({block, block + 1}); // the CPU's, not the GPU's: may be watched
+            }
         }
         if (LayerMode()) {
             // Its mirror's copy goes (written by code we do not hear of, or handed out again
@@ -2719,6 +2754,13 @@ void BufferCache::QueuePromotions(u64 submitted) {
     if (VramTrapsEnabled()) {
         ReportVramTraps();
     }
+    // bbport BB_LAYER_MEMORY: mirrors replaced by bigger ones go as soon as the GPU is past them,
+    // not once a second (LayerMaintain): loading a level replaced hundreds within a second.
+    if (LayerMode() && !layer_retired.empty()) {
+        std::erase_if(layer_retired, [&](const auto& retired) {
+            return scheduler.GetWorkSemaphore()->IsFree(retired.second);
+        });
+    }
     ReportInPlaceBlocks();
     if (promote_candidates.Empty()) {
         return;
@@ -3444,11 +3486,17 @@ bool BufferCache::VramPromotionsPaused() {
         checked_second = second;
         const u64 usage = instance.GetDeviceMemoryUsage();
         const u64 budget = instance.GetDeviceMemoryBudgetNow();
-        const bool now_full = budget != 0 && usage * 100 > budget * percent;
+        // Also short of the texture collector's critical mark: the collector compares all of our
+        // VRAM and can only free images, so copies past it had it evict textures in use (6 GB
+        // GTX 1660 Ti: mark 3927 MiB, 1.8 GiB of copies, 200-1250 images evicted per 5 s).
+        const u64 critical = BbStats::gc_critical_bytes.load(std::memory_order_relaxed);
+        const bool near_critical = critical != 0 && usage + PromoteCriticalMargin >= critical;
+        const bool now_full = (budget != 0 && usage * 100 > budget * percent) || near_critical;
         if (now_full != full) {
-            std::printf("Guest memory: VRAM %llu of %llu MiB in use: copies of loaded blocks "
-                        "%s\n",
+            std::printf("Guest memory: VRAM %llu of %llu MiB in use (texture collector critical at "
+                        "%llu): copies of loaded blocks %s\n",
                         (unsigned long long)(usage >> 20), (unsigned long long)(budget >> 20),
+                        (unsigned long long)(critical >> 20),
                         now_full ? "wait (read in place meanwhile)" : "resume");
         }
         full = now_full;

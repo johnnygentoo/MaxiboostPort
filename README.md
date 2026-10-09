@@ -51,12 +51,13 @@ Mesa/RADV) has been tested thoroughly.
     in a sparse buffer (the arena). **On NVIDIA, Intel and others** it goes through the layer's
     memory module: the game's memory is bound in place and VRAM copies are separate buffers, with
     no sparse rebinding. This avoids the sparse-binding path associated with reported freezes
-    on a GTX 1660 Ti. The new module is not tested on NVIDIA or Intel hardware yet. Without the
-    launcher: `BB_PC_MODEL=1`; to choose the memory path: `BB_GUEST_MEMORY=host|dmabuf`; the memory
-    module: `BB_LAYER_MEMORY=1/0`.
+    on a GTX 1660 Ti. On NVIDIA the module runs on a tester's GTX 1660 Ti, its speed is still
+    being checked; not tested on Intel. Without the launcher: `BB_PC_MODEL=1`; to choose the memory
+    path: `BB_GUEST_MEMORY=host|dmabuf`; the memory module: `BB_LAYER_MEMORY=1/0`.
 
-  [0.5-pre2 changes](docs/CHANGES_0.5-pre2.md): the memory module, native GPU copy shader,
-  portable GPU completion labels, and shader-cache migration.
+  [0.5-pre3 changes](docs/CHANGES_0.5-pre3.md): the memory module on NVIDIA — VRAM copies, one VRAM
+  budget with the texture cache, watched blocks. [0.5-pre2](docs/CHANGES_0.5-pre2.md): the memory
+  module, native GPU copy shader, portable GPU completion labels, and shader-cache migration.
 
   Unused textures are freed in both modes, so VRAM no longer grows with every area visited.
 - **Unlocked frame rate.** Community patches (`patches/Bloodborne.xml`) make the simulation
@@ -327,7 +328,8 @@ pass), `BB_FSR4_PROFILE=1` (GPU time per FSR 4 pass), `BB_UPSCALER=taa|fsr3|fsr4
 0 = unbounded), `BB_PRESENT_THREAD=0` (present on the vblank thread, as before),
 `BB_LIVE_RES=1` (live resolution changes instead of the startup patch for outputs other than 1080p),
 `BB_PAD_RECORD=file` / `BB_PAD_REPLAY=file` (record a route with F9, replay it in scripted tests),
-`BB_GC_BUDGET_MB=N` (texture cache budget, as on integrated GPUs), `BB_PRESENT_DUMP_TRIGGER=file`
+`BB_GC_BUDGET_MB=N` (texture cache budget, as on integrated GPUs), `BB_VRAM_LIMIT_MB=N` (the VRAM
+budget taken as at most N MiB: checks the behaviour of cards with little VRAM), `BB_PRESENT_DUMP_TRIGGER=file`
 with `BB_PRESENT_DUMP_COUNT=N` (dump N consecutive presented frames),
 `BB_FSR411_VARIANT=int8|fp8|fp8emu` (FSR 4.1.1 variant; by default FP8 where the GPU has FP8
 matrices), `BB_READBACKS=0|1|2` (reads of GPU-written memory by the game: 1 by default, 2

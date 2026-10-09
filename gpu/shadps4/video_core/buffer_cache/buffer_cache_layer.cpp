@@ -44,6 +44,16 @@ BbLayer::GpuMemory& Layer() {
     return BbLayer::GpuMemory::Get();
 }
 
+bool LayerTrapsOn(); // below, with the traps
+
+/// Guest code (the game's image with its linked modules): the writer behind a trap hit. A hit
+/// from our own code (the runtime touching pages before a file read into them) must not set the
+/// trap again until that write is done.
+bool IsGuestCode(u64 rip) {
+    constexpr u64 Image = 0x800000000ull, ImageSize = 128ull << 20;
+    return rip >= Image && rip < Image + ImageSize;
+}
+
 // BB_LAYER_VOLATILE=0 (tests): no volatile blocks (a range with unannounced bytes stays mixed).
 bool LayerVolatileAllowed() {
     static const bool on = [] {
@@ -56,7 +66,8 @@ bool LayerVolatileAllowed() {
 
 std::optional<std::pair<const Buffer*, u64>> BufferCache::LayerBind(VAddr address, u64 size,
                                                                     bool is_written,
-                                                                    bool is_texel_buffer) {
+                                                                    bool is_texel_buffer,
+                                                                    bool may_promote) {
     BB_SECTION(LayerBind);
     // Residency changes queued since the last packet: loads, demotions, unmaps, idle blocks.
     if (maintained_epoch != packet_epoch) {
@@ -97,6 +108,9 @@ std::optional<std::pair<const Buffer*, u64>> BufferCache::LayerBind(VAddr addres
         const size_t k = size_t(resolution.kind) * 2 + (is_written ? 1 : 0);
         // In place: whether all its blocks may go to VRAM (else: why not, by block).
         static std::array<std::atomic<u64>, 4> in_place_why{}; // eligible, asset gap, dynamic, chunk
+        // Unknown bytes, by why not watched (BB_LAYER_WATCH): watchable, the GPU's dynamic,
+        // volatile, failed before, mapping smaller than a block, written binding.
+        static std::array<std::atomic<u64>, 6> unwatched_why{};
         if (resolution.kind == Kind::InPlace) {
             int why = 0;
             for (u64 block = first; block < end && why == 0; ++block) {
@@ -107,6 +121,18 @@ std::optional<std::pair<const Buffer*, u64>> BufferCache::LayerBind(VAddr addres
                 });
                 why = !known ? 1 : dynamic_blocks.Contains(block) ? 2
                       : !Layer().ResolveInPlace(a, block_size) ? 3 : 0;
+                if (why == 1) {
+                    int prot = 0, type = -1;
+                    uintptr_t vma_end = 0;
+                    const int w = is_written ? 5
+                                  : dynamic_blocks.Contains(block) &&
+                                            !layer_cpu_hot.Contains(block, block + 1) ? 1
+                                  : layer_volatile.Contains(block, block + 1) ? 2
+                                  : layer_watch_failed.Contains(block, block + 1) ? 3
+                                  : (runtime_memory_vma_info(a, &prot, &type, &vma_end) &&
+                                     (prot & 0x2) && vma_end < a + block_size) ? 4 : 0;
+                    unwatched_why[w].fetch_add(size, std::memory_order_relaxed);
+                }
             }
             in_place_why[why].fetch_add(size, std::memory_order_relaxed);
         }
@@ -114,11 +140,18 @@ std::optional<std::pair<const Buffer*, u64>> BufferCache::LayerBind(VAddr addres
         if (BbStats::coarse_second.load() - why_printed.load() >= 2) {
             why_printed.store(BbStats::coarse_second.load());
             std::printf("Layer in place (MiB/2 s): eligible %llu, unknown bytes %llu, dynamic %llu, "
-                        "not a whole chunk block %llu\n",
+                        "not a whole chunk block %llu; unknown bytes not watched: watchable %llu, "
+                        "GPU-dynamic %llu, volatile %llu, failed %llu, mapping %llu, written %llu\n",
                         (unsigned long long)(in_place_why[0].exchange(0) >> 20),
                         (unsigned long long)(in_place_why[1].exchange(0) >> 20),
                         (unsigned long long)(in_place_why[2].exchange(0) >> 20),
-                        (unsigned long long)(in_place_why[3].exchange(0) >> 20));
+                        (unsigned long long)(in_place_why[3].exchange(0) >> 20),
+                        (unsigned long long)(unwatched_why[0].exchange(0) >> 20),
+                        (unsigned long long)(unwatched_why[1].exchange(0) >> 20),
+                        (unsigned long long)(unwatched_why[2].exchange(0) >> 20),
+                        (unsigned long long)(unwatched_why[3].exchange(0) >> 20),
+                        (unsigned long long)(unwatched_why[4].exchange(0) >> 20),
+                        (unsigned long long)(unwatched_why[5].exchange(0) >> 20));
         }
         // BB_RESIDENCY_MIX=2: also the bindings in place or mixed with the most bytes, and per
         // range its blocks in VRAM, eligible, dynamic and with unannounced bytes.
@@ -192,7 +225,10 @@ std::optional<std::pair<const Buffer*, u64>> BufferCache::LayerBind(VAddr addres
     const bool vram_allowed =
         !(is_written && (force_writes_in_place || !LayerGpuWriteToVram(address, size))) &&
                               !BbToggle::Experiment(8);
-    if (resolution.kind != Kind::Mirror && vram_allowed && GarlicInVramForLayer() &&
+    // Not for image uploads (may_promote false): the image is the GPU's copy of that data, read
+    // once per upload, and the arena did not move it either. (Loaded data mostly gets its mirror
+    // when loaded, ProcessPendingAssets: this alone did not shrink the mirrors.)
+    if (resolution.kind != Kind::Mirror && vram_allowed && may_promote && GarlicInVramForLayer() &&
         !VramPromotionsPaused()) {
         constexpr u64 VolatileMinBlocks = 4, VolatileMaxBlocks = 2;
         // A range found not movable is looked at again next frame or when something moved
@@ -207,11 +243,19 @@ std::optional<std::pair<const Buffer*, u64>> BufferCache::LayerBind(VAddr addres
         const u32 frame = static_cast<u32>(BbStats::frame_number.load(std::memory_order_relaxed));
         const bool skip = t.first == first && t.end == end && t.generation == layer_generation &&
                           t.frame == frame && t.written == is_written;
-        std::vector<u64> blocks, unknown;
+        // Blocks with unannounced bytes are watched copies for a reading binding (BB_LAYER_WATCH).
+        std::vector<u64> blocks, unknown, watch;
         for (u64 block = first; !skip && block < end && unknown.size() <= VolatileMaxBlocks;
              ++block) {
             if (!Layer().AnyValid(block, block + 1)) {
-                (LayerEligible(block) ? blocks : unknown).push_back(block);
+                if (LayerEligible(block)) {
+                    blocks.push_back(block);
+                } else if (!is_written && LayerWatchable(block)) {
+                    blocks.push_back(block);
+                    watch.push_back(block);
+                } else {
+                    unknown.push_back(block);
+                }
             }
         }
         if (!skip) {
@@ -220,7 +264,17 @@ std::optional<std::pair<const Buffer*, u64>> BufferCache::LayerBind(VAddr addres
         if (!skip && (unknown.empty() || (!is_written && end - first >= VolatileMinBlocks &&
                                 unknown.size() <= VolatileMaxBlocks && LayerVolatileAllowed() &&
                                 !BbToggle::Experiment(16)))) {
+            for (const u64 block : watch) {
+                layer_watched.Add({block, block + 1});
+            }
             LayerPromote(blocks);
+            for (const u64 block : watch) {
+                if (Layer().AnyValid(block, block + 1)) {
+                    layer_cpu_blocks.Add({block, block + 1}); // the GPU writes it in place
+                } else {
+                    layer_watched.Subtract(block, block + 1); // not moved (VRAM short)
+                }
+            }
             LayerMakeVolatile(unknown);
             resolution = Layer().Resolve(address, size);
         }
@@ -283,7 +337,9 @@ std::optional<std::pair<const Buffer*, u64>> BufferCache::LayerBind(VAddr addres
     }
     // Its blocks of known data go to VRAM at the next submission (as the arena gave VRAM to such
     // blocks when first bound): once per range while the residency is unchanged.
-    LayerQueuePromotion(first, end);
+    if (may_promote) {
+        LayerQueuePromotion(first, end);
+    }
     const auto [buffer, offset] = *in_place;
     if (is_written) {
         NoteWriteTick(address, size);
@@ -317,6 +373,76 @@ bool BufferCache::LayerEligible(u64 block) {
     return known && Layer().ResolveInPlace(address, block_size).has_value();
 }
 
+bool BufferCache::LayerWatchEnabled() {
+    // BB_LAYER_WATCH=1/0 (default 1). The reads over the bus cost far more on NVIDIA's imported
+    // host memory than on AMD's dma-buf (GTX 1660 Ti: 30-35 FPS with the module, 60-70 with the
+    // model of 0.3; RX 7800 XT: on par). It also replaces most volatile blocks, refreshed for
+    // every binding (RX 7800 XT: 1.3 GB/s of copies -> 36 MB/s). Needs the write traps
+    // (BB_LAYER_WRITE_TRAPS).
+    static const bool on = [] {
+        const char* env = std::getenv("BB_LAYER_WATCH");
+        const bool enabled = !(env && env[0] == '0');
+        if (enabled && LayerTrapsOn()) {
+            std::printf("Guest memory: blocks the CPU writes unannounced get VRAM copies too, "
+                        "uploaded again after its next write (BB_LAYER_WATCH=1)\n");
+        }
+        return enabled;
+    }();
+    return on && LayerTrapsOn();
+}
+
+bool BufferCache::LayerWatchHot() {
+    // BB_LAYER_WATCH_HOT=1 (experiment): blocks the CPU writes often (NoteCpuWrite: in 3 of 60
+    // frames) are watched too and uploaded again after every write, as the model of 0.3 uploads
+    // them. Off: they go back in place. Uploading them before bindings ended render passes
+    // (RX 7800 XT: the GPU's frame 4.8 -> 7.2 ms).
+    static const bool on = [] {
+        const char* env = std::getenv("BB_LAYER_WATCH_HOT");
+        return env && env[0] == '1';
+    }();
+    return on;
+}
+
+bool BufferCache::LayerWatchable(u64 block) {
+    // Dynamic for the GPU's writes (in place in a mixed range): never; for the CPU's (often
+    // written) only with BB_LAYER_WATCH_HOT=1.
+    const bool dynamic = dynamic_blocks.Contains(block) &&
+                         !(LayerWatchHot() && layer_cpu_hot.Contains(block, block + 1));
+    if (!LayerWatchEnabled() || dynamic || layer_volatile.Contains(block, block + 1) ||
+        layer_watch_failed.Contains(block, block + 1)) {
+        return false;
+    }
+    const VAddr address = block << block_shift;
+    if (!Layer().ResolveInPlace(address, block_size)) {
+        return false; // no source to upload from
+    }
+    // A trap must be able to catch every CPU write: the CPU cannot write it, or one mapping
+    // holds the whole block (LayerArmTraps).
+    int prot = 0, type = -1;
+    uintptr_t vma_end = 0;
+    if (!runtime_memory_vma_info(address, &prot, &type, &vma_end)) {
+        return false;
+    }
+    return !(prot & 0x2) || vma_end >= address + block_size;
+}
+
+void BufferCache::LayerRefreshWatched(u64 block) {
+    // The CPU wrote it (a trap hit): uploaded again before the next binding over it (the bound
+    // path's SynchronizeMemory; paged bindings: LayerFlushUploads), the trap set again for its
+    // next write. The GPU never writes it in VRAM: nothing of the GPU's to keep.
+    const VAddr from = block << block_shift;
+    memory_tracker->UnmarkRegionAsGpuModified(from, block_size);
+    gpu_modified_ranges.Subtract(from, block_size);
+    memory_tracker->MarkRegionAsCpuModified(from, block_size);
+    {
+        std::scoped_lock lk{layer_uploads_mutex};
+        layer_pending_uploads.emplace_back(from, block_size);
+        layer_uploads_pending.store(true, std::memory_order_release);
+    }
+    LayerArmTraps(block, block + 1);
+    ++layer_watch_refreshes;
+}
+
 void BufferCache::LayerPromote(const std::vector<u64>& blocks) {
     u64 moved = 0;
     for (size_t i = 0; i < blocks.size();) {
@@ -328,7 +454,8 @@ void BufferCache::LayerPromote(const std::vector<u64>& blocks) {
         // Only blocks still eligible and not in VRAM yet; then their run.
         u64 run_first = ~0ULL, run_end = 0;
         for (u64 block = a; block < b; ++block) {
-            if (Layer().AnyValid(block, block + 1) || !LayerEligible(block)) {
+            if (Layer().AnyValid(block, block + 1) ||
+                !(LayerEligible(block) || layer_watched.Contains(block, block + 1))) {
                 if (run_first != ~0ULL) {
                     moved += LayerPromoteRun(run_first, run_end);
                     run_first = ~0ULL;
@@ -379,7 +506,19 @@ u64 BufferCache::LayerPromoteRun(u64 first, u64 end) {
         target = static_cast<Buffer*>(touching[0].owner);
     } else {
         // A new mirror over all of it; the old ones' valid blocks are copied into it and they
-        // go once the GPU is past the commands recorded so far.
+        // go once the GPU is past the commands recorded so far. One that grows (it takes in a
+        // mirror it meets) gets room above it for as much again, up to LayerGrowthBlocks: a
+        // loader writing a file in pieces made a new mirror, and a copy of the old one, for each
+        // piece (15-27 GiB allocated for 1.3 GiB of data on loading a level, 7.4 GiB of VRAM
+        // at once; streaming areas did the same while playing).
+        // Growth at the top only: a run that fills a gap between mirrors is not a file coming in.
+        u64 top = 0;
+        for (const auto& mirror : touching) {
+            top = std::max<u64>(top, (mirror.base + mirror.size) >> block_shift);
+        }
+        if (!touching.empty() && end >= top) {
+            hi = LayerGrowthEnd(lo, hi);
+        }
         const VAddr start = lo << block_shift;
         const u64 bytes = (hi - lo) << block_shift;
         auto mirror = std::make_unique<Buffer>(instance, start, bytes, MemoryType::DeviceLocal,
@@ -425,6 +564,32 @@ u64 BufferCache::LayerPromoteRun(u64 first, u64 end) {
     return bytes;
 }
 
+u64 BufferCache::LayerGrowthEnd(u64 lo, u64 hi) {
+    // BB_LAYER_MIRROR_GROWTH_MB (64; 0: none): the most room a growing mirror gets above it.
+    static const u64 growth_bytes = [] {
+        const char* env = std::getenv("BB_LAYER_MIRROR_GROWTH_MB");
+        return (env && *env ? std::strtoull(env, nullptr, 10) : 64ull) << 20;
+    }();
+    const u64 extra = std::min(hi - lo, growth_bytes >> block_shift);
+    if (extra == 0) {
+        return hi;
+    }
+    u64 end = hi + extra;
+    // Not over the next mirror, and only blocks that can be valid here: the game's memory whole
+    // in a chunk, contiguous with the blocks below.
+    for (const auto& mirror : Layer().MirrorsIn(hi << block_shift, end << block_shift)) {
+        end = std::min(end, mirror.base >> block_shift);
+    }
+    if (end <= hi) {
+        return hi;
+    }
+    const auto prefix = Layer().ResolvePrefix(hi << block_shift, (end - hi) << block_shift);
+    if (!prefix) {
+        return hi;
+    }
+    return std::min(end, hi + (prefix->size >> block_shift));
+}
+
 static std::array<std::atomic<u64>, 7> layer_demoted_bytes{};
 
 void BufferCache::LayerDemote(u64 first, u64 end, bool copy_back, int reason) {
@@ -452,6 +617,21 @@ void BufferCache::LayerDemote(u64 first, u64 end, bool copy_back, int reason) {
             }
         }
         layer_volatile.Subtract(a, b);
+        // A watched block sent back for a GPU write (binding or command) is not watched again (it
+        // came back for every binding, ~40 MiB/s while playing; memory handed out anew does not
+        // clear it either: the game's allocator recycles some every frame); one sent back for an
+        // announced write or a request, after the third time (loading a level sends many back
+        // once). Idle or unmapped ones may be again.
+        if (reason <= 3) {
+            layer_watched.ForEachInRange(a, b, [&](const Interval& iv) {
+                for (u64 block = std::max(a, iv.start); block < std::min(b, iv.end); ++block) {
+                    if (reason <= 2 || ++layer_watch_strikes[block] >= 3) {
+                        layer_watch_failed.Add({block, block + 1});
+                    }
+                }
+            });
+        }
+        layer_watched.Subtract(a, b);
         LayerDisarmTraps(a, b, false);
         Layer().MarkInvalid(a, b);
         // In place from now on: never uploaded or watched again (writes go where the GPU reads).
@@ -504,10 +684,16 @@ void BufferCache::LayerMaintain() {
         for (const auto& range : layer_volatile) {
             volatile_blocks += range.end - range.start;
         }
-        std::printf("Layer memory: %llu volatile blocks, %llu MiB refreshed in 10 s; GPU writes in "
-                    "VRAM barred in %llu MiB the CPU wrote\n",
+        u64 watched_blocks = 0;
+        for (const auto& range : layer_watched) {
+            watched_blocks += range.end - range.start;
+        }
+        std::printf("Layer memory: %llu volatile blocks, %llu MiB refreshed in 10 s; %llu watched "
+                    "blocks, %llu uploaded again after CPU writes; GPU writes in VRAM barred in "
+                    "%llu MiB the CPU wrote\n",
                     (unsigned long long)volatile_blocks,
                     (unsigned long long)(layer_volatile_refresh_bytes >> 20),
+                    (unsigned long long)watched_blocks, (unsigned long long)layer_watch_refreshes,
                     (unsigned long long)([&] {
                         u64 blocks = 0;
                         for (const auto& range : layer_cpu_blocks) {
@@ -516,6 +702,13 @@ void BufferCache::LayerMaintain() {
                         return blocks;
                     }() << block_shift >> 20));
         layer_volatile_refresh_bytes = 0;
+        layer_watch_refreshes = 0;
+        std::printf("Layer memory: write traps in 10 s: announced %llu; the game's code on watched "
+                    "%llu, on other copies %llu; other code on watched %llu, on other copies %llu\n",
+                    (unsigned long long)layer_trap_kinds[0], (unsigned long long)layer_trap_kinds[1],
+                    (unsigned long long)layer_trap_kinds[2], (unsigned long long)layer_trap_kinds[3],
+                    (unsigned long long)layer_trap_kinds[4]);
+        layer_trap_kinds = {};
         std::printf("Layer memory: back in place (MiB): written %llu, mixed %llu, command %llu, "
                     "request %llu, copy back %llu, unmap %llu, idle %llu; GPU data copied back %llu MiB\n",
                     (unsigned long long)(layer_demoted_bytes[0].load() >> 20),
@@ -534,6 +727,7 @@ void BufferCache::LayerProcessIdle() {
     if (VramIdleSeconds() == 0) {
         return;
     }
+    LayerYieldToImages(now);
     std::vector<std::pair<u64, u64>> idle;
     Layer().ForEachValid(0, ~0ULL, [&](u64 a, u64 b) {
         for (u64 block = a; block < b;) {
@@ -548,6 +742,119 @@ void BufferCache::LayerProcessIdle() {
     for (const auto& [a, b] : idle) {
         LayerDemote(a, b, true, 6);
         BbStats::vram_idle_bytes.fetch_add((b - a) << block_shift, std::memory_order_relaxed);
+    }
+}
+
+u64 BufferCache::LayerTrimSlack(u64 wanted) {
+    // Mirrors with at least 4 MiB above their last valid block, the most first: each replaced by
+    // one ending there (its valid blocks copied over, the old one retired as in a merge).
+    constexpr u64 MinSlack = 4_MB;
+    std::vector<std::pair<u64, VAddr>> slack; // bytes, start
+    for (const auto& [start, mirror] : layer_mirrors) {
+        const u64 lo = start >> block_shift, hi = (start + mirror->SizeBytes()) >> block_shift;
+        u64 last = lo;
+        Layer().ForEachValid(lo, hi, [&](u64, u64 b) { last = std::max(last, b); });
+        if (last > lo && ((hi - last) << block_shift) >= MinSlack) {
+            slack.emplace_back((hi - last) << block_shift, start);
+        }
+    }
+    std::ranges::sort(slack, std::greater{});
+    u64 freed = 0;
+    for (const auto& [bytes, start] : slack) {
+        if (freed >= wanted) {
+            break;
+        }
+        auto node = layer_mirrors.extract(start);
+        auto* old_buffer = node.mapped().get();
+        const u64 lo = start >> block_shift;
+        const u64 hi = (start + old_buffer->SizeBytes()) >> block_shift;
+        const u64 end = hi - (bytes >> block_shift);
+        const u64 size = (end - lo) << block_shift;
+        auto mirror = std::make_unique<Buffer>(instance, start, size, MemoryType::DeviceLocal,
+                                               fmt::format("bbport mirror {:#x}+{:#x}", start, size));
+        boost::container::small_vector<vk::BufferCopy, 8> copies;
+        Layer().ForEachValid(lo, end, [&](u64 a, u64 b) {
+            const VAddr from = a << block_shift;
+            copies.push_back({old_buffer->Offset(from), mirror->Offset(from), (b - a) << block_shift});
+        });
+        if (!copies.empty()) {
+            runtime.CopyBuffer(old_buffer, mirror.get(), copies);
+        }
+        Layer().RemoveMirror(start);
+        Layer().AddMirror(start, size, mirror->Handle(), mirror->BufferDeviceAddress(), mirror.get());
+        layer_mirrors.emplace(start, std::move(mirror));
+        layer_retired.push_back({std::move(node.mapped()), scheduler.CurrentTick()});
+        BbStats::residency_alloc_bytes.fetch_add(size, std::memory_order_relaxed);
+        LayerRepublish(lo, hi); // paged bindings find the new buffer
+        ++layer_generation;
+        freed += bytes;
+    }
+    if (freed != 0) {
+        std::printf("Layer memory: VRAM short: %llu MiB of room to grow cut from %zu mirrors\n",
+                    (unsigned long long)(freed >> 20), slack.size());
+    }
+    return freed;
+}
+
+void BufferCache::LayerYieldToImages(u32 now) {
+    // VRAM short: the usage within ShrinkCriticalMargin of the texture collector's critical mark.
+    // Past it the collector evicts images used a moment ago, re-uploaded at once (stutters), and
+    // mirrors are what it cannot free. Whole mirrors not bound for BB_VRAM_PRESSURE_IDLE_SECONDS
+    // (3) go back in place first, the longest unused first, until the usage is under the mark
+    // again (a mirror only partly in place would keep all its memory).
+    if (!instance.CanReportMemoryUsage() || layer_mirrors.empty()) {
+        return;
+    }
+    const u64 critical = BbStats::gc_critical_bytes.load(std::memory_order_relaxed);
+    const u64 usage = BbStats::gc_used_bytes.load(std::memory_order_relaxed);
+    if (critical == 0 || usage + ShrinkCriticalMargin < critical) {
+        return;
+    }
+    // The room mirrors kept to grow into goes first (LayerGrowthEnd): no copy is lost.
+    const u64 wanted = usage + ShrinkCriticalMargin - critical;
+    const u64 trimmed = LayerTrimSlack(wanted);
+    if (trimmed >= wanted) {
+        return;
+    }
+    static const u32 idle_seconds = [] {
+        const char* env = std::getenv("BB_VRAM_PRESSURE_IDLE_SECONDS");
+        return env && *env ? u32(std::strtoul(env, nullptr, 10)) : 3u;
+    }();
+    if (idle_seconds == 0) {
+        return;
+    }
+    // Per mirror: the second its most recently bound 2 MiB group was bound.
+    std::vector<std::tuple<u32, VAddr, u64>> idle; // last use, start, size
+    for (const auto& [start, mirror] : layer_mirrors) {
+        const u64 size = mirror->SizeBytes();
+        const u64 last_group = std::min<u64>((start + size - 1) >> USE_GROUP_BITS, group_use.size() - 1);
+        u32 last_use = 0;
+        for (u64 group = start >> USE_GROUP_BITS; group <= last_group; ++group) {
+            last_use = std::max(last_use, group_use[group]);
+        }
+        if (now - last_use >= idle_seconds) {
+            idle.emplace_back(last_use, start, size);
+        }
+    }
+    std::ranges::sort(idle);
+    u64 freed = trimmed;
+    for (const auto& [last_use, start, size] : idle) {
+        if (freed >= wanted) {
+            break;
+        }
+        LayerDemote(start >> block_shift, (start + size) >> block_shift, true, 6);
+        freed += size;
+    }
+    if (freed != 0) {
+        BbStats::vram_idle_bytes.fetch_add(freed, std::memory_order_relaxed);
+        static u32 printed = 0;
+        if (now - printed >= 5) {
+            printed = now;
+            std::printf("Layer memory: VRAM %llu MiB, texture collector critical at %llu MiB: "
+                        "%llu MiB of mirrors unused for %u s back in place (%zu idle)\n",
+                        (unsigned long long)(usage >> 20), (unsigned long long)(critical >> 20),
+                        (unsigned long long)(freed >> 20), idle_seconds, idle.size());
+        }
     }
 }
 
@@ -999,11 +1306,23 @@ void BufferCache::LayerProcessTraps() {
         layer_trap_pending.store(false, std::memory_order_release);
     }
     for (const auto& [block, rip] : hits) {
+        const bool watched = layer_watched.Contains(block, block + 1);
+        ++layer_trap_kinds[rip == 0 ? 0 : (watched ? 1 : 2) + (IsGuestCode(rip) ? 0 : 2)];
         // The CPU uses this block: GPU writes there stay in place from now on (until it is handed
         // out again), so a VRAM copy never holds GPU data the CPU's data could meet.
         layer_cpu_blocks.Add({block, block + 1});
-        if (rip != 0) {
+        // A watched block the CPU wrote (the game's code or ours: HLE command buffers): it stays in
+        // VRAM, uploaded again; with BB_LAYER_WATCH_HOT=1 however often (as the model of 0.3
+        // uploads what the CPU wrote), else until it counts as often written (NoteCpuWrite: then
+        // a request sends it in place). An announced write may still be under way (a file read):
+        // in place as below, no trap set meanwhile. The runtime's file reads retry once their
+        // pages fault again (a trap set between its touch and the read).
+        if (rip != 0 && !(watched && LayerWatchHot())) {
             NoteCpuWrite(block << block_shift, rip); // often written: in place for good
+        }
+        if (rip != 0 && watched && Layer().AnyValid(block, block + 1)) {
+            LayerRefreshWatched(block);
+            continue;
         }
         // Written by the CPU since its copy was made: in place from now on, until it is known
         // data again. An announced write: the GPU's data beside its bytes is copied back first

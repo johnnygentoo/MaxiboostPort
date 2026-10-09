@@ -138,6 +138,10 @@ public:
     /// copy of it is taken before (IsRegionGpuModified).
     [[nodiscard]] std::optional<std::pair<const Buffer*, u64>> CommandWriteTarget(VAddr device_addr,
                                                                                 u32 size);
+    /// bbport BB_LAYER_MEMORY: the mirror holding all of a command write's range, written along
+    /// with the game's memory (the range keeps its VRAM copy); empty: none, it goes in place.
+    [[nodiscard]] std::optional<std::pair<const Buffer*, u64>> CommandWriteMirror(VAddr device_addr,
+                                                                                u32 size);
 
     /// Return true when a region is modified from the CPU
     [[nodiscard]] bool IsRegionCpuModified(VAddr addr, size_t size);
@@ -365,16 +369,26 @@ private:
     /// bbport BB_LAYER_MEMORY (statistics): a binding not whole in one chunk.
     void NoteLayerMiss(VAddr address, u64 size, bool is_written);
     /// bbport BB_LAYER_MEMORY (buffer_cache_layer.cpp): a binding through the layer's memory
-    /// module: a mirror in VRAM, or in place (empty: neither; the arena takes it).
+    /// module: a mirror in VRAM, or in place (empty: neither; the arena takes it). may_promote
+    /// false (image uploads): a mirror only where the range is in VRAM already, none made for it.
     std::optional<std::pair<const Buffer*, u64>> LayerBind(VAddr address, u64 size, bool is_written,
-                                                           bool is_texel_buffer);
+                                                           bool is_texel_buffer,
+                                                           bool may_promote = true);
     /// Whether a block may get a VRAM copy (all of it loaded data, in a guest chunk).
     bool LayerEligible(u64 block);
+    /// BB_LAYER_WATCH: whether a block with unannounced bytes may get a watched VRAM copy.
+    bool LayerWatchable(u64 block);
+    static bool LayerWatchEnabled();
+    static bool LayerWatchHot();
+    /// A watched block the CPU wrote: uploaded again before the next binding, trap set again.
+    void LayerRefreshWatched(u64 block);
     /// Every block of [first_block, end_block) in VRAM already or eligible (LayerEligible).
     bool LayerAllKnown(u64 first_block, u64 end_block);
     /// Candidate blocks (sorted) copied to VRAM: mirrors created or merged.
     void LayerPromote(const std::vector<u64>& blocks);
     u64 LayerPromoteRun(u64 first_block, u64 end_block);
+    /// The end block of a mirror over [lo, hi) that grows: room above it to grow into.
+    u64 LayerGrowthEnd(u64 lo, u64 hi);
     /// Blocks [first, end) back in place (copy_back: what the GPU wrote in VRAM first).
     /// reason (statistics): 0 written binding, 1 mixed binding, 2 command write, 3 demotion
     /// request, 4 copy back, 5 unmap, 6 idle.
@@ -383,6 +397,10 @@ private:
     void LayerMaintain();
     /// Mirrored blocks not bound for BB_VRAM_IDLE_SECONDS go back in place.
     void LayerProcessIdle();
+    /// VRAM near the texture collector's critical mark: idle mirrors go back in place.
+    void LayerYieldToImages(u32 now);
+    /// Cuts the room to grow (LayerGrowthEnd) from mirrors until `wanted` bytes are freed.
+    u64 LayerTrimSlack(u64 wanted);
     /// The GPU writes [address, address + size) in the submission being recorded (write ticks).
     void NoteWriteTick(VAddr address, u64 size);
     /// Page table entry of a block (LayerPagedRecord), its writes, and rewrites after changes.
@@ -408,8 +426,13 @@ private:
     /// Before a binding of a mirror over volatile blocks: their bytes in it refreshed.
     void LayerRefreshVolatile(VAddr address, u64 size);
     static bool GarlicInVramForLayer();
-    /// VRAM past BB_VRAM_PROMOTE_PERCENT of the budget: no new copies of loaded blocks for now.
+    /// VRAM past BB_VRAM_PROMOTE_PERCENT of the budget, or within PromoteCriticalMargin of the
+    /// texture collector's critical mark: no new copies of loaded blocks for now.
     bool VramPromotionsPaused();
+    /// Headroom below the texture collector's critical mark: copies stop at it, and past
+    /// ShrinkCriticalMargin idle mirrors go back in place (LayerProcessIdle).
+    static constexpr u64 PromoteCriticalMargin = 384_MB;
+    static constexpr u64 ShrinkCriticalMargin = 128_MB;
 
     const Vulkan::Instance& instance;
     Vulkan::Scheduler& scheduler;
@@ -463,7 +486,22 @@ private:
     /// Blocks the CPU wrote since they were handed out (traps, announced writes): GPU writes there
     /// stay in place (LayerGpuWriteToVram).
     IntervalList<> layer_cpu_blocks;
+    /// Blocks with bytes the CPU wrote unannounced, in a mirror for reading bindings anyway
+    /// (BB_LAYER_WATCH, LayerWatchable): a write trap catches the CPU's next write, the block is
+    /// uploaded again before the next binding and the trap set again. The GPU never writes them
+    /// in VRAM (layer_cpu_blocks). On NVIDIA shaders reading the game's memory over the bus were
+    /// slow where the model of 0.3 had copies in VRAM.
+    IntervalList<> layer_watched;
+    /// Watched blocks that went back in place for writes (LayerDemote): not watched again.
+    IntervalList<> layer_watch_failed;
+    std::unordered_map<u64, u8> layer_watch_strikes; ///< watched blocks sent back for requests
+    /// Dynamic blocks made so by the CPU's writes (ProcessDemotions), not by the GPU's.
+    IntervalList<> layer_cpu_hot;
     u64 layer_volatile_refresh_bytes = 0; ///< statistics
+    u64 layer_watch_refreshes = 0;        ///< statistics: watched blocks uploaded again
+    /// Statistics: trap hits announced; by the game's code on watched / other blocks; by other
+    /// code on watched / other blocks.
+    std::array<u64, 5> layer_trap_kinds{};
     std::atomic<u64> arena_bind_calls{0}, arena_bind_ranges{0}; ///< vkQueueBindSparse calls, ranges
     std::atomic<u64> arena_bind_signaled{0}; ///< memory_semaphore value the last call signals
 

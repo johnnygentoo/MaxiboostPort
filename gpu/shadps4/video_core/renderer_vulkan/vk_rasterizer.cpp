@@ -213,9 +213,15 @@ bool Rasterizer::WriteDataOnGpu(VAddr address, const void* data, u32 size) {
     if (!enabled || !VideoCore::GuestInPlace() || size == 0 || (address | size) % 4 != 0) {
         return false;
     }
+    // bbport BB_LAYER_MEMORY: a range whole in a mirror is written there too (asked first: the
+    // target demotes it otherwise).
+    const auto mirror = buffer_cache.CommandWriteMirror(address, size);
     const auto target = buffer_cache.CommandWriteTarget(address, size);
     if (!target) {
         return false;
+    }
+    if (mirror) {
+        runtime.UpdateBuffer(mirror->first, mirror->second, {static_cast<const u8*>(data), size});
     }
     runtime.UpdateBuffer(target->first, target->second, {static_cast<const u8*>(data), size});
     if (size <= sizeof(u64) && HonestLabels()) {
