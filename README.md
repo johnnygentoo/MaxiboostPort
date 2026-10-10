@@ -14,12 +14,12 @@ directly on the PC:
 - **as in DXVK**, the game's graphics are translated to Vulkan — by a renderer derived from
   [shadPS4](https://github.com/shadps4-emu/shadPS4) and heavily extended for this game, including
   temporal upscaling with AMD FSR 3.1, FSR 4 and FSR 4.1.1;
-- memory and the GPU's work are moving to the PC model: the launcher has an experimental
-  *New memory and translation model* mode; without it the game runs on the old
-  memory model, as in 0.3.
+- memory and the GPU's work follow the PC model on AMD GPUs by default (the new memory and
+  translation model); NVIDIA and other GPUs keep the old memory model of 0.3 for now. The
+  launcher's *Memory model* switches either way.
 
-One step remains to the full Wine + DXVK model: make the new mode the default and remove the old
-memory model (see below).
+One step remains to the full Wine + DXVK model: the new model on NVIDIA as well, then removing the
+old memory model (see below).
 
 > **No game files are included.** You need your own dump of Bloodborne (CUSA03173, v1.09).
 > This project is not affiliated with Sony Interactive Entertainment, FromSoftware or AMD.
@@ -34,11 +34,12 @@ Mesa/RADV) has been tested thoroughly.
 - **Native execution.** The eboot is converted offline into a flat memory image; PS4 libc and
   libSceFios2 are linked into it as native code. No CPU emulation and no per-instruction
   translation: the game code runs at full speed.
-- **Two modes** (launcher → *Mode*):
-  - **Switch off (the default) — as in 0.3.** The old memory model: VRAM copies of the game's
-    memory, writes tracked through page protection. With every fix made since 0.3 (motion
-    vectors and the upscaler, flicker with DoF on, a damaged shader cache).
-  - **New memory and translation model — experimental.** The game's memory lives
+- **Two memory models** (launcher → *Mode → Memory and translation model*; *Auto*, the default,
+  picks by GPU):
+  - **The old memory model, as in 0.3 — the default on NVIDIA, Intel and others.** VRAM copies
+    of the game's memory, writes tracked through page protection. With every fix made since 0.3
+    (motion vectors and the upscaler, flicker with DoF on, a damaged shader cache).
+  - **The new memory and translation model — the default on AMD.** The game's memory lives
     in system RAM and the GPU reads it where it is, as a PC game's buffers; data it reads often
     is kept in VRAM and given back when unused (textures after 20 s, buffers after 60 s). The
     layer's memory module tracks CPU writes to mirrored blocks to keep those copies coherent;
@@ -46,20 +47,15 @@ Mesa/RADV) has been tested thoroughly.
     is translated into Vulkan commands rather than emulated on the CPU: memory writes
     (`WRITE_DATA`, DMA) are done by the GPU in command-stream order, and fences are written by the
     GPU itself at the end of the pipeline, at the same point of the stream as the PS4's command
-    processor writes them. **It may crash**; hardware testing has been performed on an
-    RX 7800 XT, and performance depends on the scene and settings. On AMD the game's memory is kept
-    in a sparse buffer (the arena). **On NVIDIA, Intel and others** it goes through the layer's
-    memory module: the game's memory is bound in place and VRAM copies are separate buffers, with
-    no sparse rebinding. This avoids the sparse-binding path associated with reported freezes
-    on a GTX 1660 Ti. On NVIDIA the module runs on a tester's GTX 1660 Ti, its speed is still
-    being checked; not tested on Intel. Without the launcher: `BB_PC_MODEL=1`; to choose the memory
-    path: `BB_GUEST_MEMORY=host|dmabuf`; the memory module: `BB_LAYER_MEMORY=1/0`.
+    processor writes them. On AMD the game's memory is kept in a sparse buffer (the arena); on
+    NVIDIA, Intel and others it goes through the layer's memory module: bound in place, VRAM
+    copies as separate buffers, no sparse rebinding (NVIDIA's sparse binding froze the GPU for
+    seconds); `BB_LAYER_MEMORY=1/0` chooses by hand. Tested on an RX 7800 XT. On NVIDIA it can be chosen by hand (*New*); testers' results differ by scene,
+    some scenes are slower than with the old model, so it is not the default there yet. Not
+    tested on Intel. Without the launcher: `BB_PC_MODEL=1/0` (unset: by GPU, as *Auto*).
 
-  [0.5-pre4 changes](docs/CHANGES_0.5-pre4.md): no stutter of the memory module (NVIDIA) while areas
-  stream in, shader compilation in the background, VRAM on 4–6 GB cards, damaged game extractions
-  reported, the settings menu as in 0.3. [0.5-pre3](docs/CHANGES_0.5-pre3.md): the memory module on
-  NVIDIA — VRAM copies, one VRAM budget with the texture cache, watched blocks. [0.5-pre2](docs/CHANGES_0.5-pre2.md): the memory
-  module, native GPU copy shader, portable GPU completion labels, and shader-cache migration.
+  [Changes in 0.5](docs/CHANGES_0.5.md); the prereleases: [pre4](docs/CHANGES_0.5-pre4.md),
+  [pre3](docs/CHANGES_0.5-pre3.md), [pre2](docs/CHANGES_0.5-pre2.md).
 
   Unused textures are freed in both modes, so VRAM no longer grows with every area visited.
 - **Unlocked frame rate.** Community patches (`patches/Bloodborne.xml`) make the simulation
@@ -86,9 +82,9 @@ Mesa/RADV) has been tested thoroughly.
   and draws are bound and recorded on another (two-stage pipeline), with a Vulkan recording
   thread and helper threads for memory copies. Early on the single GPU thread capped the game
   at ~26 FPS; now it runs at 90–150 FPS depending on resolution and scene.
-- **Settings inside the game's own menu:** *System → Display / Game effects / Game patches*
-  (after *Screen/Sound*), built and drawn by the game itself — output resolution, upscaler,
-  preset, sharpness, FPS counter, model detail and the effect patches, in the game's language.
+- **Settings inside the game's own menu:** *System → Display / Effects* (after *Screen/Sound*),
+  built and drawn by the game itself — output resolution, upscaler, preset, sharpness, FPS
+  counter, model detail and the game's effects, in the game's language.
 - **Overlay menu** (Insert or L3+R3), styled like the game's dialogs: everything above plus the
   advanced settings, with gamepad, keyboard and mouse.
 - **GTK4 launcher** and an **AppImage** for the Steam Deck.
@@ -302,7 +298,9 @@ NVIDIA userspace driver matched to the host kernel module. Standard Linux distri
 these libraries under `/usr/lib*`; on NixOS the AppImage's internal `/nix/store` may hide them.
 In that case copy the NVIDIA libraries into an accessible directory and set
 `BB_NVIDIA_LIB_DIR=/path/to/libraries` (the NVIDIA manifest must also be accessible).
-Explicit `VK_DRIVER_FILES`/`VK_ICD_FILENAMES` overrides are preserved. Diagnose drivers inside
+With the host's NVIDIA driver the AppImage also passes the host's EGL vendor files, NVIDIA's
+first (`__EGL_VENDOR_LIBRARY_FILENAMES`; without them NVIDIA's ICD gave no `vkCreateInstance` on
+some hosts, #107; `BB_NVIDIA_EGL=0`: off). Explicit `VK_DRIVER_FILES`/`VK_ICD_FILENAMES` overrides are preserved. Diagnose drivers inside
 the package with:
 
 ```bash
@@ -358,7 +356,7 @@ Tests: `bash build.sh --test`, `python3 -m unittest discover -s tests`, and
 
 ## Roadmap
 
-- The new memory and translation model on by default once it is stable and tested on NVIDIA;
+- The new memory and translation model on by default on NVIDIA too, once it is as fast there;
   the old model is removed after that.
 - Textures as objects created at load time (less guessing by address, uploads outside the
   frame).
