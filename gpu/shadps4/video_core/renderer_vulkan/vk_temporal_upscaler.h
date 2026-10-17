@@ -114,9 +114,11 @@ public:
     /// A sampled image replaced by the upscaled frame (the display pass).
     bool RedirectSampled(VideoCore::ImageId image, const VideoCore::ImageViewInfo& info,
                          vk::ImageView& view, vk::ImageLayout& layout);
-    /// Whether RedirectSampled would replace `image` (it may record a barrier then).
+    /// Whether RedirectSampled would replace `image` (it may record a barrier then). Draws
+    /// that read one skip the rasterizer's cached texture sets: a cached set kept the game's
+    /// own image (gzport: the frame copy read the HUD-less target, a HUD flicker).
     [[nodiscard]] bool RedirectsSampled(VideoCore::ImageId image) const {
-        return display_redirect && image == ui_color;
+        return SampledRedirect(image) != SampledSource::Guest;
     }
 
     /// Presenter: the output-size display buffer standing in for the guest one at `address`.
@@ -132,6 +134,13 @@ public:
     void DumpPresented(vk::Image image, u32 width, u32 height, vk::Format format);
 
 private:
+    enum class SampledSource { Guest, Relay, Composed };
+    /// What a read of `image` samples: the guest image, the relay or the composed image. The
+    /// same memory can be sampled through another image of the texture cache (another format
+    /// of the same target): the guest address decides.
+    [[nodiscard]] SampledSource SampledRedirect(VideoCore::ImageId image) const;
+    /// Two images of the texture cache on the same guest memory (gzport).
+    [[nodiscard]] bool Same(VideoCore::ImageId a, VideoCore::ImageId b) const;
     /// bbport: views of guest images the upscaler reads, kept across frames: FSR 4 registers
     /// images by view in a registry of eight (a new view per frame filled it at Native AA).
     vk::ImageView CachedView(const VideoCore::Image& image, vk::Format format,

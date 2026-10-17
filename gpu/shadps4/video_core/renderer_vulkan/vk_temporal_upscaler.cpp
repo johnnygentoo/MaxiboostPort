@@ -2172,13 +2172,15 @@ vk::ImageView TemporalUpscaler::Mirror(vk::Image image, std::vector<MirrorView>&
 
 bool TemporalUpscaler::RedirectColor(VideoCore::ImageId color,
                                      const VideoCore::ImageViewInfo& view_info, Target& target) {
-    if (ui_phase && color == ui_color) {
+    if (ui_phase && Same(color, ui_color)) {
+        ui_read_barrier = false; // a later read waits for this draw
         target = {Mirror(vk::Image(ui_image), ui_views, view_info.format, {}),
                   vk::ImageLayout::eGeneral, ui_width, ui_height, true};
         return true;
     }
-    if (ui_phase && relay_guest && color == relay_guest) {
+    if (ui_phase && relay_guest && Same(color, relay_guest)) {
         // gzport: the copy of the finished frame, at the output size for the display pass.
+        relay_read_barrier = false;
         const auto& image = texture_cache.GetImage(color);
         if (!relay.image || relay.format != image.info.pixel_format || relay.width != ui_width ||
             relay.height != ui_height) {
@@ -2288,16 +2290,28 @@ bool TemporalUpscaler::RedirectDepth(VideoCore::ImageId depth, Target& target) {
     return true;
 }
 
+bool TemporalUpscaler::Same(VideoCore::ImageId a, VideoCore::ImageId b) const {
+    return a && b &&
+           (a == b || texture_cache.GetImage(a).info.guest_address ==
+                          texture_cache.GetImage(b).info.guest_address);
+}
+
+TemporalUpscaler::SampledSource TemporalUpscaler::SampledRedirect(VideoCore::ImageId image) const {
+    const auto same = [this](VideoCore::ImageId a, VideoCore::ImageId b) { return Same(a, b); };
+    if (relay_active && relay.valid && same(image, relay_guest)) {
+        return SampledSource::Relay;
+    }
+    // The upscaled image is read by the display pass, or (gzport) by the game's copy of the
+    // frame while the HUD is drawn.
+    if ((display_redirect || (ui_phase && relay_guest)) && same(image, ui_color)) {
+        return SampledSource::Composed;
+    }
+    return SampledSource::Guest;
+}
+
 bool TemporalUpscaler::RedirectSampled(VideoCore::ImageId image,
                                        const VideoCore::ImageViewInfo& info, vk::ImageView& view,
                                        vk::ImageLayout& layout) {
-    // gzport: the same memory can be sampled through another image of the texture cache (another
-    // format of the same target): the guest address decides.
-    const auto same = [this](VideoCore::ImageId a, VideoCore::ImageId b) {
-        return a && b &&
-               (a == b || texture_cache.GetImage(a).info.guest_address ==
-                              texture_cache.GetImage(b).info.guest_address);
-    };
     static const char* sample_trace = std::getenv("BB_DRAW_TRACE_TRIGGER");
     if (sample_trace && ui_trace_on && (ui_phase || display_redirect)) {
         const auto& sampled = texture_cache.GetImage(image);
@@ -2311,7 +2325,8 @@ bool TemporalUpscaler::RedirectSampled(VideoCore::ImageId image,
                         relay_guest ? (unsigned long long)texture_cache.GetImage(relay_guest).info.guest_address : 0ull);
         }
     }
-    if (relay_active && relay.valid && same(image, relay_guest)) {
+    const auto source = SampledRedirect(image);
+    if (source == SampledSource::Relay) {
         // gzport: the display pass reads the game's copy of the frame: its output-size relay.
         if (!relay_read_barrier) {
             relay_read_barrier = true;
@@ -2334,9 +2349,7 @@ bool TemporalUpscaler::RedirectSampled(VideoCore::ImageId image,
         layout = vk::ImageLayout::eGeneral;
         return true;
     }
-    // The upscaled image is read by the display pass, or (gzport) by the game's copy of the
-    // frame while the HUD is drawn.
-    if (!(display_redirect || (ui_phase && relay_guest)) || !same(image, ui_color)) {
+    if (source != SampledSource::Composed) {
         return false;
     }
     if (!ui_read_barrier) {
