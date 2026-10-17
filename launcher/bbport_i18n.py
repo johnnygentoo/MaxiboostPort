@@ -658,6 +658,55 @@ EN = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: co-op on The Hunter's Dream's pool with bbhost players",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Video memory on 4 GB cards and crashes: flips, the swapchain, descriptors and page faults; swapped sticks and camera inversion, save import, the version selector',
     'Большие группы команд записи и swapchain после изменений экрана': 'Large recorded command groups and the swapchain after display changes',
+    # GODZILLA (gzport)
+    '60 (патч)':
+        '60 (patch)',
+    'GODZILLA {}, версия 1.01':
+        'GODZILLA {}, version 1.01',
+    'GODZILLA добавлена в библиотеку Steam':
+        'GODZILLA added to the Steam library',
+    'GODZILLA — товарный знак Toho Co., Ltd.; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'GODZILLA is a trademark of Toho Co., Ltd.; the PS4 game was published by Bandai Namco Entertainment. This project is not affiliated with them.',
+    'XML-патчи в формате shadPS4 для версии 01.01 из папки патчей. Применяются при запуске.':
+        'shadPS4-format XML patches for version 01.01 from the patches folder. Applied at start.',
+    'eboot.bin не от версии 1.01: скопируйте eboot.bin из дампа обновления 1.01 в папку игры с заменой':
+        'eboot.bin is not from 1.01: copy eboot.bin from the dumped 1.01 update into the game folder, replacing it',
+    'gzport — нативный порт для Linux':
+        'gzport — native Linux port',
+    'Авторы bbport и bloodborne_linux, на которых построен gzport, и все, кто им помогал':
+        'The authors of bbport and bloodborne_linux, which gzport is built on, and everyone who helped them',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.01 заново':
+        'Missing from the game folder: {}. Extract the game and the 1.01 update again',
+    'В этой папке нет сохранений GODZILLA (SAVEDATA00 с DATA.BIN)':
+        'No GODZILLA saves in this folder (SAVEDATA00 with DATA.BIN)',
+    'Игра идёт с 30 FPS. 60 FPS и без ограничения: нужен патч частоты кадров, его пока нет':
+        'The game runs at 30 FPS. 60 FPS and uncapped need a frame-rate patch, not available yet',
+    'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
+        'The game, update 1.01 and DLC from your .pkg files',
+    'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
+        "The PS4's trophy key (TrophyKey in shadPS4), 32 hexadecimal digits: with it, the names and descriptions are in the game's language. Kept on this computer. Without it, only the icons are shown",
+    'Нативный порт для Linux, версия {}':
+        'Native Linux port, version {}',
+    'Нужен патч для версии 1.01, его пока нет':
+        'Needs a patch for version 1.01, not available yet',
+    'Нужно обновление 1.01: скопируйте файлы дампа обновления 1.01 в папку игры с заменой (найдена версия {})':
+        'The 1.01 update is needed: copy the dumped 1.01 update into the game folder, replacing files (found version {})',
+    'Основано на bloodborne_linux от ayozetr':
+        'Based on bloodborne_linux by ayozetr',
+    'bloodborne_linux: порт для Linux, на котором построен gzport':
+        'bloodborne_linux: the Linux port gzport is built on',
+    'Папка с сохранениями GODZILLA':
+        'Folder with GODZILLA saves',
+    'Патчи игры':
+        'Game patches',
+    'Португальский (Бразилия)':
+        'Portuguese (Brazil)',
+    'Это не GODZILLA (найдено {}): нужна GODZILLA (CUSA02046) с обновлением 1.01':
+        'This is not GODZILLA (found {}): GODZILLA (CUSA02046) with update 1.01 is needed',
+    'Тачпад, левая половина':
+        'Touchpad, left half',
+    'Тачпад, правая половина':
+        'Touchpad, right half',
 }
 
 PT_BR = {
@@ -1370,6 +1419,55 @@ PT_BR = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: cooperativo no pool do The Hunter's Dream com jogadores do bbhost",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Memória de vídeo em placas de 4 GB e travamentos: flips, swapchain, descritores e falhas de página; troca dos analógicos e inversão da câmera, importação de saves, seletor de versão',
     'Большие группы команд записи и swapchain после изменений экрана': 'Grandes grupos de comandos gravados e a swapchain após mudanças de tela',
+    # GODZILLA (gzport)
+    '60 (патч)':
+        '60 (patch)',
+    'GODZILLA {}, версия 1.01':
+        'GODZILLA {}, versão 1.01',
+    'GODZILLA добавлена в библиотеку Steam':
+        'GODZILLA adicionado à biblioteca da Steam',
+    'GODZILLA — товарный знак Toho Co., Ltd.; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'GODZILLA é uma marca registrada da Toho Co., Ltd.; o jogo de PS4 foi publicado pela Bandai Namco Entertainment. Este projeto não tem ligação com elas.',
+    'XML-патчи в формате shadPS4 для версии 01.01 из папки патчей. Применяются при запуске.':
+        'Patches XML no formato do shadPS4 para a versão 01.01, carregados da pasta de patches. Aplicados ao iniciar.',
+    'eboot.bin не от версии 1.01: скопируйте eboot.bin из дампа обновления 1.01 в папку игры с заменой':
+        'O eboot.bin não é da 1.01: copie o eboot.bin do dump da atualização 1.01 para a pasta do jogo, substituindo-o',
+    'gzport — нативный порт для Linux':
+        'gzport — port nativo para Linux',
+    'Авторы bbport и bloodborne_linux, на которых построен gzport, и все, кто им помогал':
+        'Os autores do bbport e do bloodborne_linux, sobre os quais o gzport foi construído, e todos que os ajudaram',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.01 заново':
+        'Faltam na pasta do jogo: {}. Extraia o jogo e a atualização 1.01 de novo',
+    'В этой папке нет сохранений GODZILLA (SAVEDATA00 с DATA.BIN)':
+        'Não há saves do GODZILLA nesta pasta (SAVEDATA00 com DATA.BIN)',
+    'Игра идёт с 30 FPS. 60 FPS и без ограничения: нужен патч частоты кадров, его пока нет':
+        'O jogo roda a 30 FPS. 60 FPS e sem limite precisam de um patch de taxa de quadros, ainda indisponível',
+    'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
+        'O jogo, a atualização 1.01 e as DLC dos seus arquivos .pkg',
+    'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
+        'A chave de troféus do PS4 (TrophyKey no shadPS4), 32 dígitos hexadecimais: com ela, os nomes e as descrições ficam no idioma do jogo. Fica neste computador. Sem ela, só os ícones aparecem',
+    'Нативный порт для Linux, версия {}':
+        'Port nativo para Linux, versão {}',
+    'Нужен патч для версии 1.01, его пока нет':
+        'Precisa de um patch para a versão 1.01, ainda indisponível',
+    'Нужно обновление 1.01: скопируйте файлы дампа обновления 1.01 в папку игры с заменой (найдена версия {})':
+        'É preciso a atualização 1.01: copie o dump da atualização 1.01 para a pasta do jogo, substituindo os arquivos (versão encontrada: {})',
+    'Основано на bloodborne_linux от ayozetr':
+        'Baseado no bloodborne_linux de ayozetr',
+    'bloodborne_linux: порт для Linux, на котором построен gzport':
+        'bloodborne_linux: o port para Linux sobre o qual o gzport foi construído',
+    'Папка с сохранениями GODZILLA':
+        'Pasta com saves do GODZILLA',
+    'Патчи игры':
+        'Patches do jogo',
+    'Португальский (Бразилия)':
+        'Português (Brasil)',
+    'Это не GODZILLA (найдено {}): нужна GODZILLA (CUSA02046) с обновлением 1.01':
+        'Isto não é o GODZILLA (encontrado: {}): é preciso o GODZILLA (CUSA02046) com a atualização 1.01',
+    'Тачпад, левая половина':
+        'Touchpad, metade esquerda',
+    'Тачпад, правая половина':
+        'Touchpad, metade direita',
 }
 
 
@@ -1993,6 +2091,55 @@ ES = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: cooperativo en el pool de The Hunter's Dream con jugadores de bbhost",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Memoria de vídeo en tarjetas de 4 GB y cierres: flips, swapchain, descriptores y fallos de página; intercambio de sticks e inversión de la cámara, importación de partidas, selector de versión',
     'Большие группы команд записи и swapchain после изменений экрана': 'Grupos grandes de comandos grabados y el swapchain tras cambios de pantalla',
+    # GODZILLA (gzport)
+    '60 (патч)':
+        '60 (parche)',
+    'GODZILLA {}, версия 1.01':
+        'GODZILLA {}, versión 1.01',
+    'GODZILLA добавлена в библиотеку Steam':
+        'GODZILLA añadido a la biblioteca de Steam',
+    'GODZILLA — товарный знак Toho Co., Ltd.; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'GODZILLA es una marca registrada de Toho Co., Ltd.; el juego de PS4 lo publicó Bandai Namco Entertainment. Este proyecto no está afiliado a ellas.',
+    'XML-патчи в формате shadPS4 для версии 01.01 из папки патчей. Применяются при запуске.':
+        'Parches XML en formato shadPS4 para la versión 01.01, de la carpeta de parches. Se aplican al iniciar.',
+    'eboot.bin не от версии 1.01: скопируйте eboot.bin из дампа обновления 1.01 в папку игры с заменой':
+        'eboot.bin no es de la 1.01: copia eboot.bin de la actualización 1.01 volcada en la carpeta del juego, reemplazándolo',
+    'gzport — нативный порт для Linux':
+        'gzport — port nativo para Linux',
+    'Авторы bbport и bloodborne_linux, на которых построен gzport, и все, кто им помогал':
+        'Los autores de bbport y bloodborne_linux, sobre los que se construye gzport, y todos los que les ayudaron',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.01 заново':
+        'Faltan en la carpeta del juego: {}. Vuelve a extraer el juego y la actualización 1.01',
+    'В этой папке нет сохранений GODZILLA (SAVEDATA00 с DATA.BIN)':
+        'No hay partidas de GODZILLA en esta carpeta (SAVEDATA00 con DATA.BIN)',
+    'Игра идёт с 30 FPS. 60 FPS и без ограничения: нужен патч частоты кадров, его пока нет':
+        'El juego va a 30 FPS. 60 FPS y sin límite necesitan un parche de tasa de fotogramas, aún no disponible',
+    'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
+        'El juego, la actualización 1.01 y los DLC desde tus archivos .pkg',
+    'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
+        'La clave de trofeos de PS4 (TrophyKey en shadPS4), 32 dígitos hexadecimales: con ella, los nombres y las descripciones salen en el idioma del juego. Se guarda en este equipo. Sin ella solo se ven los iconos',
+    'Нативный порт для Linux, версия {}':
+        'Port nativo para Linux, versión {}',
+    'Нужен патч для версии 1.01, его пока нет':
+        'Necesita un parche para la versión 1.01, aún no disponible',
+    'Нужно обновление 1.01: скопируйте файлы дампа обновления 1.01 в папку игры с заменой (найдена версия {})':
+        'Se necesita la actualización 1.01: copia la actualización 1.01 volcada en la carpeta del juego, reemplazando los archivos (versión encontrada: {})',
+    'Основано на bloodborne_linux от ayozetr':
+        'Basado en bloodborne_linux de ayozetr',
+    'bloodborne_linux: порт для Linux, на котором построен gzport':
+        'bloodborne_linux: el port para Linux sobre el que se construye gzport',
+    'Папка с сохранениями GODZILLA':
+        'Carpeta con partidas de GODZILLA',
+    'Патчи игры':
+        'Parches del juego',
+    'Португальский (Бразилия)':
+        'Portugués (Brasil)',
+    'Это не GODZILLA (найдено {}): нужна GODZILLA (CUSA02046) с обновлением 1.01':
+        'Esto no es GODZILLA (encontrado: {}): se necesita GODZILLA (CUSA02046) con la actualización 1.01',
+    'Тачпад, левая половина':
+        'Panel táctil, mitad izquierda',
+    'Тачпад, правая половина':
+        'Panel táctil, mitad derecha',
 }
 
 
@@ -2616,6 +2763,55 @@ IT = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: cooperativa nel pool di The Hunter's Dream con i giocatori di bbhost",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Memoria video su schede da 4 GB e crash: flip, swapchain, descrittori ed errori di pagina; scambio degli stick e inversione della telecamera, importazione dei salvataggi, selettore di versione',
     'Большие группы команд записи и swapchain после изменений экрана': 'Grandi gruppi di comandi registrati e la swapchain dopo i cambi di schermo',
+    # GODZILLA (gzport)
+    '60 (патч)':
+        '60 (patch)',
+    'GODZILLA {}, версия 1.01':
+        'GODZILLA {}, versione 1.01',
+    'GODZILLA добавлена в библиотеку Steam':
+        'GODZILLA aggiunto alla libreria di Steam',
+    'GODZILLA — товарный знак Toho Co., Ltd.; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'GODZILLA è un marchio di Toho Co., Ltd.; il gioco per PS4 è stato pubblicato da Bandai Namco Entertainment. Questo progetto non è affiliato con loro.',
+    'XML-патчи в формате shadPS4 для версии 01.01 из папки патчей. Применяются при запуске.':
+        "Patch XML in formato shadPS4 per la versione 01.01 dalla cartella delle patch. Si applicano all'avvio.",
+    'eboot.bin не от версии 1.01: скопируйте eboot.bin из дампа обновления 1.01 в папку игры с заменой':
+        "eboot.bin non è della 1.01: copia eboot.bin dall'aggiornamento 1.01 estratto nella cartella del gioco, sostituendolo",
+    'gzport — нативный порт для Linux':
+        'gzport — port nativo per Linux',
+    'Авторы bbport и bloodborne_linux, на которых построен gzport, и все, кто им помогал':
+        'Gli autori di bbport e bloodborne_linux, su cui è costruito gzport, e tutti quelli che li hanno aiutati',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.01 заново':
+        'Mancano nella cartella del gioco: {}. Estrai di nuovo il gioco e l’aggiornamento 1.01',
+    'В этой папке нет сохранений GODZILLA (SAVEDATA00 с DATA.BIN)':
+        'Nessun salvataggio di GODZILLA in questa cartella (SAVEDATA00 con DATA.BIN)',
+    'Игра идёт с 30 FPS. 60 FPS и без ограничения: нужен патч частоты кадров, его пока нет':
+        'Il gioco gira a 30 FPS. 60 FPS e senza limite richiedono una patch del frame rate, non ancora disponibile',
+    'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
+        'Il gioco, l’aggiornamento 1.01 e i DLC dai tuoi file .pkg',
+    'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
+        'La chiave dei trofei PS4 (TrophyKey in shadPS4), 32 cifre esadecimali: con essa nomi e descrizioni sono nella lingua del gioco. Resta su questo computer. Senza, si vedono solo le icone',
+    'Нативный порт для Linux, версия {}':
+        'Port nativo per Linux, versione {}',
+    'Нужен патч для версии 1.01, его пока нет':
+        'Richiede una patch per la versione 1.01, non ancora disponibile',
+    'Нужно обновление 1.01: скопируйте файлы дампа обновления 1.01 в папку игры с заменой (найдена версия {})':
+        "Serve l'aggiornamento 1.01: copia l'aggiornamento 1.01 estratto nella cartella del gioco, sostituendo i file (versione trovata {})",
+    'Основано на bloodborne_linux от ayozetr':
+        'Basato su bloodborne_linux di ayozetr',
+    'bloodborne_linux: порт для Linux, на котором построен gzport':
+        'bloodborne_linux: il port per Linux su cui è costruito gzport',
+    'Папка с сохранениями GODZILLA':
+        'Cartella con i salvataggi di GODZILLA',
+    'Патчи игры':
+        'Patch del gioco',
+    'Португальский (Бразилия)':
+        'Portoghese (Brasile)',
+    'Это не GODZILLA (найдено {}): нужна GODZILLA (CUSA02046) с обновлением 1.01':
+        'Questo non è GODZILLA (trovato {}): serve GODZILLA (CUSA02046) con l’aggiornamento 1.01',
+    'Тачпад, левая половина':
+        'Touchpad, metà sinistra',
+    'Тачпад, правая половина':
+        'Touchpad, metà destra',
 }
 
 
@@ -3239,6 +3435,55 @@ FR = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge : coopération sur le pool de The Hunter's Dream avec les joueurs de bbhost",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Mémoire vidéo sur les cartes de 4 Go et plantages : flips, swapchain, descripteurs et défauts de page ; sticks inversés et caméra inversée, import des sauvegardes, choix de version',
     'Большие группы команд записи и swapchain после изменений экрана': 'Grands groupes de commandes enregistrées et la swapchain après un changement d’affichage',
+    # GODZILLA (gzport)
+    '60 (патч)':
+        '60 (patch)',
+    'GODZILLA {}, версия 1.01':
+        'GODZILLA {}, version 1.01',
+    'GODZILLA добавлена в библиотеку Steam':
+        'GODZILLA ajouté à la bibliothèque Steam',
+    'GODZILLA — товарный знак Toho Co., Ltd.; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        "GODZILLA est une marque de Toho Co., Ltd. ; le jeu PS4 a été édité par Bandai Namco Entertainment. Ce projet n'a aucun lien avec elles.",
+    'XML-патчи в формате shadPS4 для версии 01.01 из папки патчей. Применяются при запуске.':
+        'Correctifs XML au format shadPS4 pour la version 01.01, depuis le dossier des correctifs. Appliqués au démarrage.',
+    'eboot.bin не от версии 1.01: скопируйте eboot.bin из дампа обновления 1.01 в папку игры с заменой':
+        "eboot.bin n'est pas celui de la 1.01 : copiez eboot.bin de la mise à jour 1.01 extraite dans le dossier du jeu, en le remplaçant",
+    'gzport — нативный порт для Linux':
+        'gzport — portage natif pour Linux',
+    'Авторы bbport и bloodborne_linux, на которых построен gzport, и все, кто им помогал':
+        'Les auteurs de bbport et de bloodborne_linux, sur lesquels gzport est construit, et tous ceux qui les ont aidés',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.01 заново':
+        'Absent du dossier du jeu : {}. Extrayez de nouveau le jeu et la mise à jour 1.01',
+    'В этой папке нет сохранений GODZILLA (SAVEDATA00 с DATA.BIN)':
+        'Aucune sauvegarde de GODZILLA dans ce dossier (SAVEDATA00 avec DATA.BIN)',
+    'Игра идёт с 30 FPS. 60 FPS и без ограничения: нужен патч частоты кадров, его пока нет':
+        "Le jeu tourne à 30 FPS. 60 FPS et sans limite nécessitent un correctif de fréquence d'images, pas encore disponible",
+    'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
+        'Le jeu, la mise à jour 1.01 et les DLC depuis vos fichiers .pkg',
+    'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
+        'La clé des trophées PS4 (TrophyKey dans shadPS4), 32 chiffres hexadécimaux : avec elle, les noms et descriptions sont dans la langue du jeu. Conservée sur cet ordinateur. Sans elle, seules les icônes sont visibles',
+    'Нативный порт для Linux, версия {}':
+        'Portage natif pour Linux, version {}',
+    'Нужен патч для версии 1.01, его пока нет':
+        'Nécessite un correctif pour la version 1.01, pas encore disponible',
+    'Нужно обновление 1.01: скопируйте файлы дампа обновления 1.01 в папку игры с заменой (найдена версия {})':
+        'La mise à jour 1.01 est nécessaire : copiez la mise à jour 1.01 extraite dans le dossier du jeu, en remplaçant les fichiers (version trouvée : {})',
+    'Основано на bloodborne_linux от ayozetr':
+        'Basé sur bloodborne_linux par ayozetr',
+    'bloodborne_linux: порт для Linux, на котором построен gzport':
+        'bloodborne_linux : le portage Linux sur lequel gzport est construit',
+    'Папка с сохранениями GODZILLA':
+        'Dossier des sauvegardes de GODZILLA',
+    'Патчи игры':
+        'Correctifs du jeu',
+    'Португальский (Бразилия)':
+        'Portugais (Brésil)',
+    'Это не GODZILLA (найдено {}): нужна GODZILLA (CUSA02046) с обновлением 1.01':
+        "Ce n'est pas GODZILLA (trouvé : {}) : il faut GODZILLA (CUSA02046) avec la mise à jour 1.01",
+    'Тачпад, левая половина':
+        'Pavé tactile, moitié gauche',
+    'Тачпад, правая половина':
+        'Pavé tactile, moitié droite',
 }
 
 
@@ -3862,6 +4107,55 @@ DE = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: Koop im Pool von The Hunter's Dream mit bbhost-Spielern",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Videospeicher auf 4-GB-Karten und Abstürze: Flips, Swapchain, Deskriptoren und Seitenfehler; Sticks tauschen und Kamera invertieren, Spielstände importieren, Versionsauswahl',
     'Большие группы команд записи и swapchain после изменений экрана': 'Große aufgezeichnete Befehlsgruppen und die Swapchain nach Anzeigeänderungen',
+    # GODZILLA (gzport)
+    '60 (патч)':
+        '60 (Patch)',
+    'GODZILLA {}, версия 1.01':
+        'GODZILLA {}, Version 1.01',
+    'GODZILLA добавлена в библиотеку Steam':
+        'GODZILLA wurde zur Steam-Bibliothek hinzugefügt',
+    'GODZILLA — товарный знак Toho Co., Ltd.; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'GODZILLA ist eine Marke der Toho Co., Ltd.; das PS4-Spiel wurde von Bandai Namco Entertainment veröffentlicht. Dieses Projekt steht in keiner Verbindung zu ihnen.',
+    'XML-патчи в формате shadPS4 для версии 01.01 из папки патчей. Применяются при запуске.':
+        'XML-Patches im shadPS4-Format für Version 01.01 aus dem Patches-Ordner. Werden beim Start angewendet.',
+    'eboot.bin не от версии 1.01: скопируйте eboot.bin из дампа обновления 1.01 в папку игры с заменой':
+        'Die eboot.bin ist nicht von 1.01: Kopiere die eboot.bin aus dem extrahierten Update 1.01 in den Spielordner und ersetze sie',
+    'gzport — нативный порт для Linux':
+        'gzport — nativer Linux-Port',
+    'Авторы bbport и bloodborne_linux, на которых построен gzport, и все, кто им помогал':
+        'Die Autoren von bbport und bloodborne_linux, auf denen gzport aufbaut, und alle, die ihnen geholfen haben',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.01 заново':
+        'Im Spielordner fehlt: {}. Entpacke das Spiel und das Update 1.01 erneut',
+    'В этой папке нет сохранений GODZILLA (SAVEDATA00 с DATA.BIN)':
+        'Keine GODZILLA-Spielstände in diesem Ordner (SAVEDATA00 mit DATA.BIN)',
+    'Игра идёт с 30 FPS. 60 FPS и без ограничения: нужен патч частоты кадров, его пока нет':
+        'Das Spiel läuft mit 30 FPS. 60 FPS und unbegrenzt brauchen einen Bildraten-Patch, der noch nicht verfügbar ist',
+    'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
+        'Das Spiel, Update 1.01 und DLC aus Ihren .pkg-Dateien',
+    'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
+        'Der Trophäen-Schlüssel der PS4 (TrophyKey in shadPS4), 32 Hexadezimalziffern: damit sind Namen und Beschreibungen in der Sprache des Spiels. Bleibt auf diesem Computer. Ohne ihn sind nur die Symbole zu sehen',
+    'Нативный порт для Linux, версия {}':
+        'Nativer Linux-Port, Version {}',
+    'Нужен патч для версии 1.01, его пока нет':
+        'Braucht einen Patch für Version 1.01, noch nicht verfügbar',
+    'Нужно обновление 1.01: скопируйте файлы дампа обновления 1.01 в папку игры с заменой (найдена версия {})':
+        'Das Update 1.01 wird benötigt: Kopiere das extrahierte Update 1.01 in den Spielordner und ersetze dabei die Dateien (gefundene Version {})',
+    'Основано на bloodborne_linux от ayozetr':
+        'Basiert auf bloodborne_linux von ayozetr',
+    'bloodborne_linux: порт для Linux, на котором построен gzport':
+        'bloodborne_linux: der Linux-Port, auf dem gzport aufbaut',
+    'Папка с сохранениями GODZILLA':
+        'Ordner mit GODZILLA-Spielständen',
+    'Патчи игры':
+        'Spiel-Patches',
+    'Португальский (Бразилия)':
+        'Portugiesisch (Brasilien)',
+    'Это не GODZILLA (найдено {}): нужна GODZILLA (CUSA02046) с обновлением 1.01':
+        'Das ist nicht GODZILLA (gefunden: {}): Benötigt wird GODZILLA (CUSA02046) mit Update 1.01',
+    'Тачпад, левая половина':
+        'Touchpad, linke Hälfte',
+    'Тачпад, правая половина':
+        'Touchpad, rechte Hälfte',
 }
 
 
@@ -4428,6 +4722,55 @@ ZH_CN = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge：在 The Hunter's Dream 池中与 bbhost 玩家合作",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': '4 GB 显卡的显存与崩溃：翻转、交换链、描述符和页错误；交换摇杆与视角反转、导入存档、版本选择',
     'Большие группы команд записи и swapchain после изменений экрана': '大型录制命令组以及显示变化后的交换链',
+    # GODZILLA (gzport)
+    '60 (патч)':
+        '60（补丁）',
+    'GODZILLA {}, версия 1.01':
+        'GODZILLA {}，版本 1.01',
+    'GODZILLA добавлена в библиотеку Steam':
+        'GODZILLA 已添加到 Steam 库',
+    'GODZILLA — товарный знак Toho Co., Ltd.; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'GODZILLA 是 Toho Co., Ltd. 的商标；PS4 游戏由 Bandai Namco Entertainment 发行。本项目与它们无关。',
+    'XML-патчи в формате shadPS4 для версии 01.01 из папки патчей. Применяются при запуске.':
+        '补丁文件夹中、shadPS4 格式、适用于 01.01 版本的 XML 补丁。会在游戏启动时生效。',
+    'eboot.bin не от версии 1.01: скопируйте eboot.bin из дампа обновления 1.01 в папку игры с заменой':
+        'eboot.bin 不是 1.01 版本：请将 1.01 更新转储中的 eboot.bin 复制到游戏文件夹并覆盖',
+    'gzport — нативный порт для Linux':
+        'gzport — 原生 Linux 移植版',
+    'Авторы bbport и bloodborne_linux, на которых построен gzport, и все, кто им помогал':
+        'gzport 所基于的 bbport 和 bloodborne_linux 的作者，以及所有帮助过他们的人',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.01 заново':
+        '游戏文件夹中缺少：{}。请重新解包游戏和 1.01 更新',
+    'В этой папке нет сохранений GODZILLA (SAVEDATA00 с DATA.BIN)':
+        '此文件夹中没有 GODZILLA 存档（含 DATA.BIN 的 SAVEDATA00）',
+    'Игра идёт с 30 FPS. 60 FPS и без ограничения: нужен патч частоты кадров, его пока нет':
+        '游戏以 30 FPS 运行。60 FPS 和不限帧率需要帧率补丁，目前尚无',
+    'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
+        '从你的 .pkg 文件安装游戏、1.01 更新和 DLC',
+    'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
+        'PS4 的奖杯密钥（shadPS4 中的 TrophyKey），32 位十六进制数：填写后奖杯名称和说明使用游戏语言。仅保存在本机。未填写时只显示图标',
+    'Нативный порт для Linux, версия {}':
+        '原生 Linux 移植版，版本 {}',
+    'Нужен патч для версии 1.01, его пока нет':
+        '需要适用于 1.01 版本的补丁，目前尚无',
+    'Нужно обновление 1.01: скопируйте файлы дампа обновления 1.01 в папку игры с заменой (найдена версия {})':
+        '需要 1.01 更新：请将转储出的 1.01 更新文件复制到游戏文件夹并覆盖（当前检测到版本 {}）',
+    'Основано на bloodborne_linux от ayozetr':
+        '基于 ayozetr 的 bloodborne_linux',
+    'bloodborne_linux: порт для Linux, на котором построен gzport':
+        'bloodborne_linux：gzport 所基于的 Linux 移植版',
+    'Папка с сохранениями GODZILLA':
+        'GODZILLA 存档文件夹',
+    'Патчи игры':
+        '游戏补丁',
+    'Португальский (Бразилия)':
+        '葡萄牙语（巴西）',
+    'Это не GODZILLA (найдено {}): нужна GODZILLA (CUSA02046) с обновлением 1.01':
+        '这不是 GODZILLA（检测到 {}）：需要带 1.01 更新的 GODZILLA（CUSA02046）',
+    'Тачпад, левая половина':
+        '触摸板左侧',
+    'Тачпад, правая половина':
+        '触摸板右侧',
 }
 
 # Translations by language code; Russian is the key itself. Strings missing in a translation

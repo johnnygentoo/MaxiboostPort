@@ -85,7 +85,7 @@ def configure(env, manifest_dirs=MANIFEST_DIRS, library_dirs=LIBRARY_DIRS,
     # cache. exec preserves process/signal behavior; the cache survives launch.
     key = hashlib.sha256(f"{driver}:{driver.stat().st_mtime_ns}".encode()).hexdigest()[:16]
     data_dir = Path(env.get("BB_DATA_DIR") or
-                    str(Path(env.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "bbport"))
+                    str(Path(env.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "gzport"))
     cache = data_dir / "vulkan" / "nvidia" / key
     libraries = cache / "lib"
     libraries.mkdir(parents=True, exist_ok=True)

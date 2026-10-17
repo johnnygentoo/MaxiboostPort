@@ -209,11 +209,11 @@ if __name__ == '__main__':  # self-test on a temporary file
     import tempfile
     with tempfile.TemporaryDirectory() as folder:
         vdf = Path(folder) / 'shortcuts.vdf'
-        print(add_shortcut(vdf, 'Bloodborne', '/games/bb/launcher/bb-launcher.sh', '/games/bb', 'x.png', '--play'))
+        print(add_shortcut(vdf, 'GODZILLA', '/games/gz/launcher/bb-launcher.sh', '/games/gz', 'x.png', '--play'))
         print(add_shortcut(vdf, 'Other', '/other/o', '/other', ''))
-        print(add_shortcut(vdf, 'Bloodborne', '/games/bb/launcher/bb-launcher.sh', '/games/bb', 'y.png', '--play'))
-        print(add_shortcut(vdf, 'Bloodborne', '/apps/Bloodborne.AppImage', '/apps', 'y.png', '--play'))
-        print(add_shortcut(vdf, 'Bloodborne', '/shadps4/shadps4', '/shadps4', '', 'CUSA03173'))
+        print(add_shortcut(vdf, 'GODZILLA', '/games/gz/launcher/bb-launcher.sh', '/games/gz', 'y.png', '--play'))
+        print(add_shortcut(vdf, 'GODZILLA', '/apps/GODZILLA-gzport-x86_64.AppImage', '/apps', 'y.png', '--play'))
+        print(add_shortcut(vdf, 'GODZILLA', '/shadps4/shadps4', '/shadps4', '', 'CUSA02046'))
         root = parse(vdf.read_bytes())[0]
         print([[f for f in e[2] if f[1] in ('AppName', 'Exe')] for e in root[0][2]])
         assert len(root[0][2]) == 3
