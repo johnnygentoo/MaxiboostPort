@@ -1,69 +1,76 @@
-# Bloodborne for Linux
+# GODZILLA for Linux (gzport)
 
-[![Total Download Count](https://img.shields.io/github/downloads/ayozetr/bloodborne_linux/total.svg?color=2ea44f)](https://github.com/ayozetr/bloodborne_linux/releases/latest)
-[![Latest Release](https://img.shields.io/github/v/release/ayozetr/bloodborne_linux.svg?color=8a2be2)](https://github.com/ayozetr/bloodborne_linux/releases/latest)
-[![License: GPL-2.0](https://img.shields.io/github/license/ayozetr/bloodborne_linux.svg?color=d73a49)](LICENSE)
-[![Platform: Linux | Steam Deck](https://img.shields.io/badge/platform-Linux%20%7C%20Steam%20Deck-blue.svg)](#features)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B.svg?logo=ko-fi&logoColor=white)](https://ko-fi.com/ayozetr)
+The PlayStation 4 version of *GODZILLA* (2015, Bandai Namco Entertainment) running natively on
+Linux. The game's own x86-64 code runs directly on the CPU and its graphics are translated to
+Vulkan. It is not an emulator.
 
-The PlayStation 4 version of *Bloodborne* running natively on Linux. The game's own x86-64 code
-runs directly on the CPU and its graphics are translated to Vulkan. It is not an emulator.
+gzport is built on [bloodborne_linux](https://github.com/ayozetr/bloodborne_linux), ayozetr's
+Linux fork of [bbport](https://github.com/deadinside28/bloodborne_pc), the native Bloodborne port
+by deadinside28. The runtime, the GPU translation, the upscalers and the launcher come from there;
+gzport points them at GODZILLA and drops what only Bloodborne had.
 
-This fork builds on [bbport](https://github.com/deadinside28/bloodborne_pc), the native Linux port
-by deadinside28. It adds the features of [Supermedo's Windows port](https://github.com/Supermedo/bloodborne_pc)
-(online play, DLSS, cheats) brought to Linux, plus a few of its own.
+> **No game files are included.** You need your own decrypted dump of GODZILLA, the North
+> American release `CUSA02046`, with update 1.01. This project is not affiliated with Toho Co.,
+> Ltd., Bandai Namco Entertainment or Sony Interactive Entertainment. GODZILLA is a trademark of
+> Toho Co., Ltd.
 
-> **No game files are included.** You need your own decrypted dump of Bloodborne with update
-> 1.09, from a retail release: [which ones, and which have been checked](docs/COMPATIBILITY.md).
-> This project is not affiliated with Sony Interactive Entertainment or FromSoftware.
+## Status
+
+The game boots and plays. It runs at its own 30 FPS: 60 FPS, uncapped frame rate and other game
+patches need patches for the 1.01 executable that are not written yet (`patches/Godzilla.xml`),
+and the launcher offers them once they exist.
 
 ## Features
 
-- **Online play (beta)** through [The Hunter's Dream](https://thehuntersdream.com): messages,
-  bloodstains, ghosts, bells and summons, with bbhost's players and Windows players of bbport, or
-  with your group on [a server of your own](docs/SERVER.md).
-- **Upscaling:** AMD FSR 3.1, FSR 4 and FSR 4.1.1, **NVIDIA DLSS** on GeForce RTX, and
-  native-resolution TAA.
-- **Unlocked frame rate**, capped at your display's refresh rate up to 120 FPS (above that the
-  game's own movement timing breaks), or 30/60/90 FPS. Output from 720p to 4K.
-- **Launcher** with every setting in one window, in English, Spanish, Italian, French, German,
-  Portuguese, Russian and Simplified Chinese, like the in-game menu (Insert or L3+R3).
-- **Settings in the game's own System menu** as well (Display and Effects pages), in the game's
-  language.
+- **Launcher** (GTK 4 / libadwaita) with every setting in one window, in English, Spanish,
+  Italian, French, German, Portuguese, Russian and Simplified Chinese. It shows your dump's own
+  icon and checks the game folder (the 1.01 executable, the files a whole extraction has).
+- **Upscaling:** AMD FSR 3.1, FSR 4 and FSR 4.1.1 (built from your own AMD DLL), **NVIDIA DLSS**
+  on GeForce RTX, and native-resolution TAA. Output from 720p to 4K. Settings also in the
+  in-game overlay (Insert or L3+R3).
 - **Two memory models:** the new one, where the GPU works with the game's memory as in a PC game
   (the default on AMD), and the one of 0.3 (the default elsewhere); the launcher switches them.
-- **Xbox, Switch and keyboard button prompts**, picked by the controller in use, and a gestures
-  menu without the motion-control icons.
-- **Cheats and gameplay tweaks:** never die, stealth, silent steps, enemy control, camera
-  distance, ragdoll physics and more.
-- **Trophies:** a notice in the game, in the style of the PS4's, and a Trophies page in the
-  launcher with every trophy, from your own dump. Their names and descriptions need the PS4's
-  trophy key (shadPS4's TrophyKey), which you enter in the launcher; without it, only the icons.
-- **Game effects** on and off, **mods** and community **patches**, loaded without changing the
-  game files ([how](docs/MODS.en.md)).
-- **Add to Steam** in one click (native or Flatpak Steam), and **Discord Rich Presence** with the
-  area you are in and your co-op partners.
-- **AppImage:** one file with everything inside, for any distribution and the Steam Deck. It
-  updates itself: the launcher's **About** page checks this repository's releases and installs
-  a new AppImage over the old one, or any earlier release from 0.5-linux.1 on, to go back to one
-  that worked better.
+- **Controls:** keyboard and mouse or any SDL gamepad, every button remappable, sticks swapped,
+  camera inverted, A/B swapped for Nintendo-style pads.
+- **Trophies:** a notice in the game and a Trophies page in the launcher, from your own dump
+  (`sce_sys/trophy`). Their names and descriptions need the PS4's trophy key (shadPS4's
+  TrophyKey), which you enter in the launcher; without it, only the icons.
+- **Install from PKG:** the game, its 1.01 update and add-ons from your own `.pkg` files, with the
+  update merged in.
+- **Save import** from shadPS4, another port or a decrypted PS4 export.
+- **Add to Steam** in one click (native or Flatpak Steam).
+- **Third-party patches** in shadPS4's XML format for version 01.01, from a patches folder.
+- **AppImage:** one file with everything inside, for any distribution and the Steam Deck.
+
+Not carried over from bloodborne_linux: online play (The Hunter's Dream, bbbridge, shadNet), the
+cheats page, Bloodborne's button prompts and gestures menu, loose-file mods, the self-updater and
+Discord status with Yharnam's areas. Discord Rich Presence is still there, off: set `BB_DISCORD=1`
+and `BB_DISCORD_CLIENT_ID` (a Discord application of your own named GODZILLA) to turn it on.
 
 ## Requirements
 
 - Linux x86-64 and a GPU with Vulkan 1.3: AMD or Intel with Mesa, or NVIDIA with NVIDIA's driver
   (open kernel modules included). Mesa's NVK has not been tested.
 - DLSS needs a GeForce RTX (20 series or newer) and NVIDIA's driver; it does not work with NVK.
-- About 6 GB of free memory, 10 GB for 1440p or 4K output.
+- Python 3 with PyGObject, GTK 4 and libadwaita for the launcher.
 
 ## Getting started
 
-### AppImage
+### 1. The game folder
 
-Build it with `bash build.sh && bash packaging/appimage-sharun.sh`, then run
-`dist/Bloodborne-bbport-x86_64.AppImage`. Choose your game folder (the one with `eboot.bin`) and
-press **Play**. Saves and settings go to `~/.local/share/bbport`.
+Dump the game (`CUSA02046`, version 1.00) and its 1.01 update from your PS4. The game's files are
+at the folder's root: `eboot.bin`, `sce_sys/`, `sce_module/`, `sound/` and the `*.pac` archives.
+Then merge the update into the game: copy everything from the update's dump (for example
+`CUSA02046-patch`) into the game folder, replacing files (`eboot.bin` and `sce_sys` too). Check it:
 
-### From source
+```bash
+python3 scripts/game_check.py /path/to/CUSA02046   # GODZILLA 1.01: supported
+```
+
+With `.pkg` files instead, the launcher's **Game → Install from PKG** extracts the game and the
+update and merges them for you.
+
+### 2. Build and run
 
 On Arch Linux (or CachyOS, Manjaro…):
 
@@ -73,36 +80,31 @@ sudo pacman -S --needed base-devel cmake ninja python python-gobject gtk4 libadw
     robin-map xxhash zydis miniz protobuf nlohmann-json openssl miniupnpc python-pillow ttf-dejavu
 paru -S magic_enum vulkan-memory-allocator xbyak   # from the AUR
 
-git clone --recursive https://github.com/ayozetr/bloodborne_linux
-cd bloodborne_linux
 bash build.sh
-python3 launcher/bbport_launcher.py   # or launcher/install-desktop.sh for a menu entry
+launcher/bb-launcher.sh          # or launcher/install-desktop.sh for a menu entry
 ```
 
 With [Nix](https://nixos.org), `bash build.sh` gets every dependency from `shell.nix` by itself.
 
-### Online play
+In the launcher, choose your game folder (the one with `eboot.bin`) and press **Play**. Without the
+launcher: `BB_GAME_DIR=/path/to/CUSA02046 bash run.sh`.
 
-1. In the launcher, open **Online**, turn on **Play online** and choose the co-op server:
-   - **The Hunter's Dream (with bbhost players)**: sign in with Discord, or create an account
-     with just a name and keep the recovery code it shows (it brings the account back on
-     another PC). [bbbridge](bbbridge/README.md) by MaskZeus runs with the game and talks to
-     The Hunter's Dream the way bbhost does, so you play with bbhost's players and with Windows
-     players of bbport on the same pool.
-   - **Your own server**: your group's shadNet server and your account on it
-     ([docs/SERVER.md](docs/SERVER.md), Docker and Tailscale; tested with a Linux and a Windows
-     player).
-2. **Test the connection**: every line should be green.
-3. Start the game and choose online at the title screen.
+The launcher keeps its settings in `~/.config/gzport-launcher`. From a checkout, saves, the shader
+cache and `bbport.ini` go to `user/` and the checkout itself; nothing of a Bloodborne install
+(`~/.config/bbport-launcher`, `~/.local/share/bbport`) is read or written.
 
-Everyone in a session needs game version 1.09 and the same pool. Turn cheats off when you play
-with others. shadPS4's public shadNet server no longer accepts bbport builds: it signs them out
-right after the login, and the launcher says so.
+### AppImage
 
-With your own server, co-op connects the players directly over UDP. UPnP opens the port on the router by itself; with
-ufw or firewalld on, the launcher's **Online** page says so and gives the commands: pin the
-**Co-op port** (for example 3658), open it (`sudo ufw allow 3658/udp`), and for UPnP let the
-router's answers in (`sudo ufw allow from <router> proto udp`). [More in docs/ONLINE.md](docs/ONLINE.md).
+Build it with `bash build.sh && bash packaging/appimage-sharun.sh`, then run
+`dist/GODZILLA-gzport-x86_64.AppImage`. Saves and settings go to `~/.local/share/gzport`.
+
+### Saves
+
+The game keeps its progress in `user/savedata/1/CUSA02046/SAVEDATA00/DATA.BIN`. **Import saves**
+next to the saves folder in the launcher copies one in from shadPS4
+(`~/.local/share/shadPS4/savedata/1/CUSA02046/SAVEDATA00`), another port or a decrypted export
+(Apollo Save Tool, Save Wizard); the saves already there are backed up first. A console's own USB
+copy is encrypted with that console's keys and has to be exported decrypted on the PS4.
 
 ### DLSS
 
@@ -112,69 +114,40 @@ upscaler.
 
 ### DLC
 
-The Game of the Year edition (`CUSA03173`) already includes The Old Hunters. With the base game
-(such as the US `CUSA00900`), dump your add-ons too: each one is a folder (`SPEXPANSIONDLC03`,
-`SPDLCMESSENGER00`…) with only `sce_sys` inside, because their data ships with the 1.09 update.
-Put them in one folder and pick it in the launcher (**Game → DLC folder**), or set
-`BB_DLC_DIR=/path/to/dlc` for `run.sh`; the launcher shows how many it found. Each folder must
-keep the add-on's name (its entitlement label, such as `SPEXPANSIONDLC03`). Copying them to
-`user/addcont/<title id>/`, shadPS4's layout, works too.
+Dump your add-ons too, each one a folder named by its entitlement label, put them in one folder
+and pick it in the launcher (**Game → DLC folder**), or set `BB_DLC_DIR=/path/to/dlc` for
+`run.sh`; the launcher shows how many it found.
 
 ### Add to Steam
 
-**Game → Add to Steam** puts Bloodborne in your Steam library; it starts with the launcher's
-settings. Steam has to be closed while the game is added, and the launcher offers to do that.
-Flatpak Steam runs games inside its sandbox, which has neither the game nor your drivers, so
-the shortcut starts the game outside it with `flatpak-spawn --host`. That needs the
-`org.freedesktop.Flatpak` permission for Steam, which the launcher asks for once: it lets Steam
-start programs on your system.
-
-### Button prompts
-
-The game shows PlayStation buttons. In the launcher, **Controls → Button prompts** switches them to
-Xbox, Nintendo Switch or keyboard ones; *Automatic* follows the controller in use, and the
-keyboard's when none is connected. Keyboard prompts show the keys bound in **Controls →
-Keyboard**. **Gestures menu without motion-control icons** cleans up the gestures menu. The
-prompts are put into your own game's menu files at each start, and nothing in the game folder
-changes.
-
-## Support
-
-If this fork is useful to you and you would like to support it, you can on
-[Ko-fi](https://ko-fi.com/ayozetr). The port itself is deadinside28's work (see below).
+**Game → Add to Steam** puts GODZILLA in your Steam library, with your dump's icon; it starts with
+the launcher's settings. Steam has to be closed while the game is added, and the launcher offers
+to do that. Flatpak Steam runs games inside its sandbox, which has neither the game nor your
+drivers, so the shortcut starts the game outside it with `flatpak-spawn --host`. That needs the
+`org.freedesktop.Flatpak` permission for Steam, which the launcher asks for once.
 
 ## Credits
 
 - [deadinside28/bloodborne_pc](https://github.com/deadinside28/bloodborne_pc): **bbport**, the
-  native Linux port this fork is built on, and almost all of the work behind it. Its README, with
+  native port everything here is built on, and almost all of the work behind it. Its README, with
   the technical details, is in [BBPORT.md](BBPORT.md).
+- [ayozetr/bloodborne_linux](https://github.com/ayozetr/bloodborne_linux): the Linux fork of bbport
+  gzport starts from, with its launcher, upscalers, memory models, trophies, PKG install, save
+  import and AppImage, and everyone thanked there.
 - [Supermedo/bloodborne_pc](https://github.com/Supermedo/bloodborne_pc): the Windows port, whose
-  online play, DLSS support, cheats page, Add to Steam and icon were brought to Linux here.
+  DLSS support and Add to Steam came to Linux in bloodborne_linux.
 - [shadPS4](https://github.com/shadps4-emu/shadPS4): the renderer and shader recompiler.
-- [shadp2p](https://github.com/Wozzardman/shadp2p) by Wozzardman: the network and PSN libraries
-  for online play. Servers by the [shadPS4](https://shadps4.net) team and
-  [The Hunter's Dream](https://thehuntersdream.com) by droogie and its team.
-- [bbbridge](https://github.com/MaskZeus/bbbridge) by MaskZeus (GPL-3.0-or-later): The Hunter's
-  Dream's co-op pool for bbport, built for Linux here ([bbbridge/](bbbridge/)).
 - [IFreemz/shadPS4-Bloodborne-DLSS-FSR](https://github.com/IFreemz/shadPS4-Bloodborne-DLSS-FSR):
   the DLSS bridge, and the [NVIDIA DLSS SDK](https://github.com/NVIDIA/DLSS).
 - [FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) by FireBurn and the AMD FidelityFX SDK.
-- **Dommo**: the Xbox and Switch button prompts (*DS3 Style - Modern Xbox prompts*, *DS3 Style -
-  Nintendo Switch prompts*) and the *Stripped down gesture menu*, from
-  [Nexus Mods (Bloodborne, mod 30)](https://www.nexusmods.com/bloodborne/mods/30), uploaded by
-  goomab. Only their drawn prompts are in this repository ([assets/menu_prompts](assets/menu_prompts)).
-- **Abken**: the [KBM Icons Generator](https://www.nexusmods.com/bloodborne/mods/537), which showed
-  which textures keyboard prompts need (after the idea of
-  [mod 460](https://www.nexusmods.com/bloodborne/mods/460)); bbport draws its own.
 - [quick-sharun](https://github.com/pkgforge-dev/Anylinux-AppImages) for the AppImage.
 - [ps4-pkg-extractor](https://github.com/paulomanrique/ps4-pkg-extractor) by paulomanrique
   (Unlicense), on [orbis-pkg-util](https://crates.io/crates/orbis-pkg-util): the launcher's
   *Install from PKG*.
-- Game patches by Kyo, Lance McDonald, auser1337, illusion, emoose and the Bloodborne community.
 
 Full list of components and licenses: [BBPORT.md](BBPORT.md#credits-and-licenses).
 
 ## License
 
 GNU GPL v2 or later ([LICENSE](LICENSE)). Third-party components keep their own licenses. NVIDIA
-and DLSS are trademarks of NVIDIA Corporation.
+and DLSS are trademarks of NVIDIA Corporation. GODZILLA is a trademark of Toho Co., Ltd.

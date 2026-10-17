@@ -64,10 +64,9 @@ if [[ -z ${PYTHON:-} ]]; then echo 'Install Python 3 or set PYTHON.' >&2; exit 1
 game=${BB_GAME_DIR:-../CUSA02046}
 if [[ ! -f $game/eboot.bin ]]; then echo "No eboot.bin in $game (set BB_GAME_DIR)." >&2; exit 1; fi
 original_game=$game
-# BB_PROMPTS (playstation, xbox, switch, keyboard) and BB_GESTURES_NO_MOTION=1: the menu's button
-# prompts and the gestures menu, made from the game's files (scripts/menu_prompts.py).
-ui_mods=$("$PYTHON" scripts/menu_prompts.py "$game" --out "$out" --prompts "${BB_PROMPTS:-playstation}" \
-    --gestures "${BB_GESTURES_NO_MOTION:-0}" --config "$BB_CONFIG")
+# Bloodborne's button prompts and gestures menu (scripts/menu_prompts.py) are edits of its
+# dvdroot_ps4/menu files; GODZILLA has none of them, so nothing is laid under the mods.
+ui_mods=
 game=$("$PYTHON" scripts/mods.py "$game" --out "$out" \
     --mods-dir "${BB_MODS_DIR:-$data/mods}" --config "${BB_MODS_CONFIG:-$data/mods.json}" \
     --enabled "${BB_MODS_ENABLED:-1}" --ui-mods "$ui_mods")
@@ -99,8 +98,9 @@ if [[ ${BB_AUTO_RENDER_RES:-} == 1 ]]; then
     unset BB_RENDER_RES BB_OUTPUT_RES BB_AUTO_RENDER_RES
 fi
 # BB_RENDER_RES=WxH explicitly sets the game's render resolution (a patch at start).
-# Frame rate: BB_FPS=uncap (default; delta-time patch, vblank 480 Hz, frames shown at once),
-# 60/90 (fixed-timestep patches) or 30 (unpatched). BB_PATCHES adds patch names ("a;b").
+# Frame rate: BB_FPS=30 (default: the game's own rate, unpatched), 60 or uncap (frame-rate
+# patches from patches/Godzilla.xml, once written; scripts/patches.py FPS_PRESETS). BB_PATCHES adds
+# patch names ("a;b").
 fps=${BB_FPS:-30}
 # bbport.ini output_res other than 1080p (720p for the Steam Deck, 1440p, 2160p): the whole game
 # renders at the preset's size of the output (a patch), the upscaler fills the output, the UI is
@@ -287,15 +287,12 @@ if trophies=$("$PYTHON" scripts/trophies.py prepare --game "$original_game" \
         --user "${BB_USER_DIR:-$data/user}" --language "${BB_LANGUAGE:-1}") && [[ -n $trophies ]]; then
     export BB_TROPHY_DIR=$trophies
 fi
-# Discord Rich Presence (launcher: Discord; BB_DISCORD=0 turns it off): $$ becomes the game
-# below (exec), and the helper ends with it. The game writes its area and co-op partners into
-# BB_PRESENCE_DIR (scripts/discord_presence.py), new for each start.
-if [[ ${BB_DISCORD:-1} != 0 ]]; then
-    BB_PRESENCE_DIR=$(cd -- "$out" && pwd)/presence; export BB_PRESENCE_DIR
-    rm -rf "$BB_PRESENCE_DIR" && mkdir -p "$BB_PRESENCE_DIR"
-    presence=(--pid $$ --presence-dir "$BB_PRESENCE_DIR")
-    [[ ${BB_ONLINE:-0} == 1 ]] && presence+=(--online)
-    "$PYTHON" scripts/discord_presence.py "${presence[@]}" </dev/null &
+# Discord Rich Presence, off by default: BB_DISCORD=1 with BB_DISCORD_CLIENT_ID, the id of a
+# Discord application of your own (its name is what Discord shows as played), shows "GODZILLA" and
+# the time played (scripts/discord_presence.py). $$ becomes the game below (exec), and the helper
+# ends with it.
+if [[ ${BB_DISCORD:-0} == 1 && -n ${BB_DISCORD_CLIENT_ID:-} ]]; then
+    "$PYTHON" scripts/discord_presence.py --pid $$ </dev/null &
 fi
 probe_args=("$out/boot-linked.bin" --content-profile "$out/content.bin" --patches "$out/patches.bin" --app0 "$game" --user "${BB_USER_DIR:-$data/user}" --timeout "${BB_TIMEOUT:-0}" "$@")
 if [[ -n ${mod_game:-} ]]; then

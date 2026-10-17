@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=GODZILLA
+GenericName=gzport launcher
+Comment=Launcher for gzport, the native Linux port of GODZILLA (PS4)
+Exec=@LAUNCHER@
+Icon=@ICON@
+Categories=Game;
+StartupWMClass=io.github.gzport.Launcher

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Import Bloodborne saves from another build: shadPS4, another port's folder, a PS4 save exported
+"""Import GODZILLA saves from another build: shadPS4, another port's folder, a PS4 save exported
 decrypted (Apollo Save Tool, Save Wizard), a copy on a USB stick.
 
     save_import.py --user USER_DIR [--game GAME_DIR] SOURCE
 
-Every build keeps the game's save folder SPRJ0005 the same way (userdata0000..0010 and backup*
-files, read and written by the game itself), so the files need no conversion: they are copied in
-as user 1's saves, under the game's save id (param.sfo's INSTALL_DIR_SAVEDATA, else TITLE_ID; the
-same rule as src/probe.c). The saves already there are first copied to
-USER_DIR/savedata-backups/<date>/, and the new ones are staged next to them and swapped in, so a
-failed copy leaves them as they were. A console's own USB copy (sdimg_SPRJ0005) is encrypted with
-that console's keys and cannot be read: it has to be exported decrypted on the PS4.
+GODZILLA keeps its progress in one save folder, SAVEDATA00, holding DATA.BIN (read and written by
+the game itself), so the files need no conversion: they are copied in as user 1's saves, under the
+game's save id (param.sfo's INSTALL_DIR_SAVEDATA, else TITLE_ID: CUSA02046; the same rule as
+src/probe.c). The saves already there are first copied to USER_DIR/savedata-backups/<date>/, and
+the new ones are staged next to them and swapped in, so a failed copy leaves them as they were. A
+console's own USB copy (sdimg_SAVEDATA00) is encrypted with that console's keys and cannot be
+read: it has to be exported decrypted on the PS4.
 
 Idea and rules from Awaken's BloodBorneButPc (SaveImport.cs).
 """
@@ -24,11 +24,11 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from prepare import sfo  # noqa: E402
 
-SAVE_DIR = 'SPRJ0005'
-# The game's system save, always written next to the character slots.
-SYSTEM_FILE = 'userdata0010'
-# Folders that hold no saves: game files (thousands of folders in a dump) and our own backups.
-SKIPPED = {'dvdroot_ps4', 'sce_sys', 'savedata-backups', 'shader_cache', 'mods'}
+SAVE_DIR = 'SAVEDATA00'
+# The game's save file in it.
+SAVE_FILE = 'DATA.BIN'
+# Folders that hold no saves: game files and our own backups.
+SKIPPED = {'sce_sys', 'sce_module', 'sound', 'savedata-backups', 'shader_cache', 'mods', 'trophies'}
 
 
 class SaveImportError(Exception):
@@ -36,20 +36,19 @@ class SaveImportError(Exception):
 
 
 def save_files(folder):
-    """The game's save files in folder (userdata*, backup*), sorted."""
+    """The files of a save folder (DATA.BIN and whatever the game wrote next to it), sorted; its
+    subfolders (a shadPS4 folder's sce_sys) are not the game's."""
     try:
-        return sorted(p for p in Path(folder).iterdir()
-                      if p.is_file() and p.name.startswith(('userdata', 'backup')))
+        return sorted(p for p in Path(folder).iterdir() if p.is_file() and not p.name.startswith('.'))
     except OSError:
         return []
 
 
 def is_save_folder(folder):
-    """SPRJ0005 itself, an export named after it (CUSA00207_SPRJ0005), or any folder with the
-    game's system save, holding userdata files."""
+    """SAVEDATA00 itself or an export named after it (CUSA02046_SAVEDATA00), holding DATA.BIN."""
     folder = Path(folder)
-    named = folder.name.upper().endswith(SAVE_DIR) or (folder / SYSTEM_FILE).is_file()
-    return named and any(p.name.startswith('userdata') for p in save_files(folder))
+    return folder.name.upper().endswith(SAVE_DIR) and \
+        any(p.name.upper() == SAVE_FILE for p in save_files(folder))
 
 
 def find(root, depth=7):
@@ -123,7 +122,7 @@ def import_saves(source, user_dir, game_dir=None, now=None):
     """Copies source's save files in as user 1's saves; returns (target, backup folder or None)."""
     source = Path(source).expanduser()
     if not is_save_folder(source):
-        raise SaveImportError(f'{source} has no Bloodborne save files (userdata)')
+        raise SaveImportError(f'{source} has no GODZILLA save ({SAVE_DIR} with {SAVE_FILE})')
     user_dir = Path(user_dir).expanduser()
     target = user_dir / 'savedata/1' / save_id(user_dir, game_dir) / SAVE_DIR
     if source.resolve() == target.resolve():
@@ -139,9 +138,11 @@ def import_saves(source, user_dir, game_dir=None, now=None):
     staging.mkdir()
     try:
         # Only the save files: a shadPS4 folder's sce_sys inside is its own bookkeeping, and
-        # ours (SPRJ0005.sce_sys, the save list's title and date) is kept.
+        # ours (SAVEDATA00.sce_sys, the save list's title and date) is kept. DATA.BIN keeps the
+        # game's upper-case name whatever the export wrote.
         for path in save_files(source):
-            shutil.copy2(path, staging / path.name)
+            name = SAVE_FILE if path.name.upper() == SAVE_FILE else path.name
+            shutil.copy2(path, staging / name)
         old = target.with_name(SAVE_DIR + '.old')
         shutil.rmtree(old, ignore_errors=True)
         if target.exists():
@@ -169,7 +170,7 @@ def main():
     if not found:
         reason = ('it is a PS4 USB copy (sdimg_*), encrypted with the console\'s keys: export it '
                   'decrypted on the PS4 (Apollo Save Tool) or with Save Wizard'
-                  if encrypted_ps4_save(a.source) else 'no Bloodborne saves (SPRJ0005, userdata*)')
+                  if encrypted_ps4_save(a.source) else f'no GODZILLA saves ({SAVE_DIR}, {SAVE_FILE})')
         print(f'Import failed: {reason}', file=sys.stderr)
         return 1
     try:

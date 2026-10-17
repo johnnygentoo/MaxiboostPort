@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- gzport launcher icon: three serrated, leaf-shaped dorsal plates glowing atomic blue over a dark ridge.
+     Original artwork made for this project (GPL-2.0-or-later, like the rest of the launcher);
+     no game art. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#16395a"/>
+      <stop offset="0.55" stop-color="#0a1828"/>
+      <stop offset="1" stop-color="#04080e"/>
+    </radialGradient>
+    <linearGradient id="fin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2fbff"/>
+      <stop offset="0.35" stop-color="#9bd6ff"/>
+      <stop offset="0.75" stop-color="#4fb3ff"/>
+      <stop offset="1" stop-color="#1d6db5"/>
+    </linearGradient>
+    <linearGradient id="ridge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#11273a"/>
+      <stop offset="1" stop-color="#060d15"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <clipPath id="tile">
+      <rect x="8" y="8" width="240" height="240" rx="52"/>
+    </clipPath>
+    <path id="plate" d="M0,-120 L9,-95 L28,-106 L17,-77 L40,-82 L23,-55 L42,-52 L21,-32 L31,-22 L12,-12 L9,0 L-9,0 L-12,-12 L-31,-22 L-21,-32 L-42,-52 L-23,-55 L-40,-82 L-17,-77 L-28,-106 L-9,-95 Z"/>
+    <g id="plates">
+      <use href="#plate" transform="translate(64,214) rotate(-14) scale(0.66,0.86)"/>
+      <use href="#plate" transform="translate(192,214) rotate(14) scale(0.66,0.86)"/>
+      <use href="#plate" transform="translate(128,204) scale(1.02,1.36)"/>
+    </g>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect x="8" y="8" width="240" height="240" fill="url(#sky)"/>
+    <use href="#plates" fill="#4fb3ff" opacity="0.85" filter="url(#glow)"/>
+    <use href="#plates" fill="url(#fin)"/>
+    <path d="M8,214 C60,186 196,186 248,214 L248,248 L8,248 Z" fill="url(#ridge)"/>
+    <path d="M8,214 C60,186 196,186 248,214" fill="none" stroke="#4fb3ff" stroke-opacity="0.55" stroke-width="2"/>
+  </g>
+  <rect x="9" y="9" width="238" height="238" rx="51" fill="none" stroke="#4fb3ff" stroke-opacity="0.35" stroke-width="2"/>
+</svg>

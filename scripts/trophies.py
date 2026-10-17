@@ -4,9 +4,9 @@
 
 The dump's sce_sys/trophy/trophy00.trp holds the icons (PNG) and the trophy lists (TROPCONF.ESFM,
 TROP.ESFM and TROP_xx.ESFM per language). The lists are encrypted: AES-128-CBC with a key made by
-encrypting the game's NP communication id (sce_sys/npbind.dat, NPWR05818_00) with the PS4's trophy
-key, which the player supplies (shadPS4's TrophyKey). Without it, the icons, and for Bloodborne
-PSN's English names (BLOODBORNE_ENGLISH).
+encrypting the game's NP communication id (sce_sys/npbind.dat: GODZILLA's is NPWR08361_00) with
+the PS4's trophy key, which the player supplies (shadPS4's TrophyKey). Without it, the icons only
+(for Bloodborne, NPWR05818_00, PSN's English names: BLOODBORNE_ENGLISH).
 
 `trophies.py prepare --game DIR --user DIR [--language N]` (key in BB_TROPHY_KEY) writes
 DIR/trophies/<NP communication id>/: icons/ (the PNGs, and TROPxxx.rgba for the overlay's notice:

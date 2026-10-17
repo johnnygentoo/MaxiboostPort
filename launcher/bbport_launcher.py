@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Bloodborne launcher for the native port (GTK4 / libadwaita).
+"""GODZILLA launcher for gzport, the native Linux port (GTK4 / libadwaita).
 
 Picks the game folder, edits the port's settings (bbport.ini: upscaler, preset, ...) and the
 start-up tweaks passed as environment variables to run.sh, starts and stops the game and shows
-its output. Launcher settings live in ~/.config/bbport-launcher/settings.json.
-Russian, English, Brazilian Portuguese and Simplified Chinese (bbport_i18n: the Russian
-text is the key).
+its output. Launcher settings live in ~/.config/gzport-launcher/settings.json; the packaged
+port's data in ~/.local/share/gzport (BB_DATA_DIR). Nothing of a Bloodborne install
+(bbport-launcher, ~/.local/share/bbport) is read or written.
+Texts: bbport_i18n (the Russian text is the key; English, Spanish, Italian, French, German,
+Brazilian Portuguese and Simplified Chinese).
 """
 
 import json
@@ -18,6 +20,7 @@ import subprocess
 import sys
 import threading
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from bbport_assets import fsr411_problem
 from bbport_i18n import language, set_language, system_game_language, tr
@@ -43,18 +46,16 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 PORT_DIR = Path(__file__).resolve().parent.parent  # native_probe (or the package's copy)
 sys.path.insert(0, str(PORT_DIR / 'scripts'))
-from menu_prompts import prompts_for  # noqa: E402
-from mods import discover as discover_mods  # noqa: E402
 from prepare import sfo  # noqa: E402
 import game_check  # noqa: E402
-import online  # noqa: E402
 import save_import  # noqa: E402
-from patches import external_patches  # noqa: E402
+from patches import APP_VERSION as PATCH_APP_VERSION, BUILTIN_XML, FPS_PRESETS  # noqa: E402
+from patches import EFFECTS as PATCH_EFFECTS, external_patches  # noqa: E402
 import trophies  # noqa: E402
 # Packaged (AppImage): generated files, saves and bbport.ini live in BB_DATA_DIR.
 PACKAGED = bool(os.environ.get("BB_PREBUILT"))
 DATA_DIR = Path(os.environ.get("BB_DATA_DIR", PORT_DIR))
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "bbport-launcher"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "gzport-launcher"
 CONFIG_FILE = CONFIG_DIR / "settings.json"
 MAX_LOG_LINES = 5000
 # The memory model (run.sh: BB_PC_MODEL): "auto" leaves it to the GPU (the new one on AMD, the
@@ -104,95 +105,54 @@ UPSCALERS = [("FSR 4", "fsr4"), ("FSR 4.1.1", "fsr411"), ("FSR 3", "fsr3"),
 PRESETS = [("Native AA", 0), ("Quality (x1.5)", 1), ("Balanced (x1.7)", 2),
            ("Performance (x2)", 3), ("Ultra Performance (x3)", 4)]
 OUTPUT_RES = [("1280×720 (Steam Deck)", "1280x720"), ("1920×1080", "1920x1080"), ("2560×1440", "2560x1440"), ("3840×2160", "3840x2160")]
-# Game effects (patches applied at start): bbport.ini key, title, default.
-EFFECTS = [
-    ("effect_chromatic_aberration", "Хроматическая аберрация", True),
-    ("effect_dof", "Глубина резкости (DoF)", True),
-    ("effect_motion_blur", "Размытие в движении", True),
-    ("effect_ssao", "Затенение SSAO", True),
-    ("effect_game_aa", "Собственное сглаживание игры", True),
-    ("effect_dynamic_shadows", "Тени от динамических источников", True),
-    ("effect_ssr", "Отражения SSR (не было в игре)", False),
+# Game patches applied at start (scripts/patches.py EFFECTS: a bbport.ini key and the patch of
+# patches/Godzilla.xml it turns on): bbport.ini key, title, default. A switch whose patch the file
+# does not have yet for 1.01 is shown greyed out.
+GAME_PATCHES = [
     ("skip_intro", "Пропуск заставок при запуске", False),
-    ("debug_camera", "Свободная камера (Cross + L3 / Space + Z)", False),
-    ("debug_menu", "Debug menu (левый touchpad / Tab; нужны шрифты)", False),
 ]
-# Cheats and gameplay tweaks (community patches for 1.09, applied at start): bbport.ini key, title,
-# subtitle. All off by default.
-CHEATS = [
-    ("cheat_no_death", "Бессмертие", "Урон проходит, но здоровье не опускается ниже 1"),
-    ("cheat_stealth", "Невидимость", "Враги не видят вас и не реагируют, пока вы не атакуете"),
-    ("cheat_silent", "Бесшумность", "Враги не слышат вас, но видят"),
-    ("cheat_rally_no_decay", "Rally не угасает", "Здоровье для Rally не исчезает со временем"),
-    ("cheat_enemy_control", "Управление врагом", "R3: управлять целью, L3: вернуться. "
-                                                  "Не вместе со свободной камерой"),
-]
-TWEAKS = [
-    ("tweak_no_rally", "Без Rally", "Атаки не возвращают здоровье"),
-    ("tweak_camera_distance", "Камера дальше", "Камера дальше от персонажа"),
-    ("tweak_no_camera_rotation", "Без автоповорота камеры",
-     "Камера не поворачивается сама при движении; ручное управление и захват цели работают"),
-    ("tweak_easy_run", "Бег с меньшим наклоном стика", "Бег примерно с 70% наклона стика вместо 90%"),
-    ("tweak_ragdoll", "Физика тел как в Dark Souls", "Тела и предметы разлетаются от ударов"),
-]
-# Loading and smoothness (patches from bbhost, applied at start): bbport.ini key, title, subtitle,
-# default.
-STREAMING = [
-    ("tweak_quick_reentry", "Быстрая загрузка после смерти",
-     "Загрузка после смерти или перемещения у лампы идёт, пока грузится область (2–3 с), а не "
-     "минимум 12 с", True),
-    ("tweak_fast_deflate", "Без рывка каждые ~50 с",
-     "Игра быстрее сжимает запись игрока: пропадает рывок ~23 мс примерно каждые 50 с", True),
-    ("tweak_post_processors", "Третий поток подготовки ресурсов",
-     "Во время игры работают три потока подготовки ресурсов, а не два. Экспериментально", False),
-]
-MODEL_LOD = [("Как в игре", "0"), ("Максимальная (-2)", "-2"), ("Ниже (1)", "1"),
-             ("Минимальная (2)", "2")]
-FPS_MODES = [("Без ограничения (патч)", "uncap"), ("60", "60"), ("90", "90"),
-             ("30 (как на PS4)", "30")]
+# Frame rate (BB_FPS; scripts/patches.py FPS_PRESETS). The game runs at 30 FPS; 60 and uncapped
+# need frame-rate patches for the 1.01 executable and are offered once patches/Godzilla.xml has them.
+FPS_MODES = [("30 (как на PS4)", "30"), ("60 (патч)", "60"), ("Без ограничения (патч)", "uncap")]
 PRESENT_MODES = [("Mailbox", "Mailbox"), ("FIFO (VSync)", "Fifo"),
                  ("FIFO Relaxed", "FifoRelaxed"), ("Immediate", "Immediate")]
 # A third element is a note shown under the row's title while that choice is selected: the
 # choice labels stay short, so the selected one is shown in full.
 DRAW_PIPE = [("Авто", "", "Включён при 8 и более потоках процессора"), ("Включён", "1"),
              ("Выключен", "0", "Стабильнее, но медленнее")]
-# The button prompts (scripts/menu_prompts.py): automatic follows the controller in use, the
-# keyboard without one.
-PROMPT_CHOICES = [("Автоматически (по контроллеру)", ""), ("PlayStation (оригинал)", "playstation"),
-                  ("Xbox", "xbox"), ("Nintendo Switch", "switch"), ("Клавиатура", "keyboard")]
-# The game's language: the PS4 system language ("": from the desktop's locale).
-LANGUAGES = [("Как в системе", ""), ("Английский", "1"), ("Русский", "8"), ("Японский", "0"), ("Французский", "2"),
-             ("Испанский", "3"), ("Немецкий", "4"), ("Итальянский", "5")]
-# The game's region (BB_REGION; scripts/content_profile.py): the regional text of a language, such
-# as Spanish from Spain (Europe) or Latin American Spanish (the Americas). "": the dump's param.sfo.
-REGIONS = [("Как в дампе игры", ""), ("Европа", "eu"), ("Америка", "na")]
+# The game's language: the PS4 system language ("": from the desktop's locale). The North American
+# release has English, French, Spanish and Brazilian Portuguese text (game_en/fr/ns/bp.pac).
+LANGUAGES = [("Как в системе", ""), ("Английский", "1"), ("Французский", "2"), ("Испанский", "3"),
+             ("Португальский (Бразилия)", "17")]
 LIVE_RESOLUTION = [("Авто (по видеокарте)", "auto"), ("Выключена (быстрее)", "0"), ("Включена", "1")]
 READBACKS = [("Relaxed", "", "По умолчанию"), ("Выключены", "0"), ("Precise", "2")]
 # Background pre-upload of the game's GPU memory into VRAM (BB_PREUPLOAD): auto = on with a discrete GPU.
 PREUPLOAD = [("Обычная", "", "Без лишней видеопамяти"), ("Полная", "2", "Около 3 ГБ видеопамяти сверху"),
              ("Выключена", "0")]
 
+
+def default_game_dir():
+    """From a checkout: the dump beside it or inside it (gitignored), else where run.sh looks."""
+    for folder in (PORT_DIR.parent / "CUSA02046", PORT_DIR / "CUSA02046"):
+        if (folder / "eboot.bin").is_file():
+            return folder
+    return PORT_DIR.parent / "CUSA02046"
+
+
 DEFAULTS = {
     "ui_language": "",
-    "game_dir": "" if PACKAGED else str(PORT_DIR.parent / "CUSA03173"),
+    "game_dir": "" if PACKAGED else str(default_game_dir()),
     "user_dir": "",
     "dlc_dir": "",
-    "mods_dir": "",
-    "mods_enabled": True,
     "patches_dir": "",
     "language": "",
-    "region": "",
-    "check_updates": True,
     "fullscreen": False,
     "hdr": False,
     "present_mode": "Mailbox",
     "gamepad": "",
     "gamepad_name": "",
-    "prompts": "",
-    "gestures_no_motion": False,
     "display": "",
-    "skip_network_choice": True,
-    "fps_mode": "uncap",
+    "fps_mode": "30",
     "fps_limit": 0,
     "draw_pipe": "",
     "readbacks": "",
@@ -206,24 +166,8 @@ DEFAULTS = {
     "gpu_profile": False,
     "vk_validation": False,
     "extra_env": "",
-    "discord": True,
     # The PS4's trophy key (shadPS4's TrophyKey): the trophies' names (scripts/trophies.py).
     "trophy_key": "",
-    # Co-op (Online page): off by default; shadPS4's public shadNet server and The Hunter's Dream.
-    # online_server_kind: "public" or "own" (docs/SERVER.md); unset, online.server_kind decides.
-    "online": False,
-    "online_community": online.COMMUNITY_SERVER,
-    "online_server_kind": None,
-    "online_server": online.SHADNET_SERVER,
-    "online_webapi": "",
-    "online_npid": "",
-    "online_password": "",
-    # The account of each kind of server ({"public": {"npid", "password"}, "own": ...}): the
-    # Online page swaps them when the server changes; online_npid/password are the chosen one's.
-    "online_accounts": {},
-    "online_upnp": True,
-    "online_p2p_port": 0,  # 0: a random port each time (SHADPS4_P2P_PORT)
-    "online_seamless": False,
 }
 
 # bbport.ini keys the launcher edits; the rest of the file is kept.
@@ -235,7 +179,6 @@ INI_DEFAULTS = {
     "object_motion": "1",
     "show_fps": "1",
     "output_res": "1920x1080",
-    "model_lod": "0",
     "live_resolution": "0",
     "mouse_look": "1",
     "mouse_sensitivity": "1.00",
@@ -243,9 +186,7 @@ INI_DEFAULTS = {
     "pad_swap_sticks": "0",
     "pad_invert_look_x": "0",
     "pad_invert_look_y": "0",
-    **{key: "1" if default else "0" for key, _, default in EFFECTS},
-    **{key: "0" for key, _, _ in CHEATS + TWEAKS},
-    **{key: "1" if default else "0" for key, _, _, default in STREAMING},
+    **{key: "1" if default else "0" for key, _, default in GAME_PATCHES},
 }
 
 
@@ -261,7 +202,7 @@ def load_settings():
 def save_settings(settings):
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG_FILE.touch(mode=0o600)
-    CONFIG_FILE.chmod(0o600)  # it holds the shadNet password
+    CONFIG_FILE.chmod(0o600)  # it holds the trophy key
     CONFIG_FILE.write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
@@ -307,6 +248,38 @@ def save_ini(values, lines):
 
 def patches_dir(settings):
     return Path(settings.get("patches_dir") or DATA_DIR / "patches").expanduser()
+
+
+def builtin_patches():
+    """The patch names patches/Godzilla.xml has for the supported version (scripts/patches.py
+    reports and skips the others)."""
+    try:
+        root = ET.parse(BUILTIN_XML).getroot()
+    except (OSError, ET.ParseError):
+        return set()
+    return {meta.get("Name") for meta in root.iter("Metadata") if meta.get("AppVer") == PATCH_APP_VERSION}
+
+
+def patch_available(key, have=None):
+    """Whether the game patch switch `key` (GAME_PATCHES) has its patch in patches/Godzilla.xml."""
+    have = builtin_patches() if have is None else have
+    return all(name in have for name in PATCH_EFFECTS.get(key, ()) if name)
+
+
+def fps_modes(have=None):
+    """The frame-rate choices whose patches exist; 30 (the game's own rate) always."""
+    have = builtin_patches() if have is None else have
+    return [mode for mode in FPS_MODES if all(name in have for name in FPS_PRESETS.get(mode[1], ()))]
+
+
+def game_icon(game_dir):
+    """The game's own icon (sce_sys/icon0.png of the player's dump, never in the repository), else
+    the launcher's."""
+    if game_dir:
+        icon = Path(game_dir).expanduser() / "sce_sys" / "icon0.png"
+        if icon.is_file():
+            return icon
+    return PORT_DIR / "launcher" / "godzilla.svg"
 
 
 def dlc_addons(dlc, title_id):
@@ -381,24 +354,6 @@ def fsr411_build_command(upscaler, loader=None):
 # Trophy grades (scripts/trophies.py) as the Trophies page names them.
 TROPHY_GRADES = {"P": "Платиновый", "G": "Золотой", "S": "Серебряный", "B": "Бронзовый"}
 
-# The Online page's shadNet server choice (online.server_kind).
-SERVER_KINDS = [
-    ("Публичный сервер shadPS4", "public", "srv.shadps4.net:31313"),
-    ("Свой сервер", "own", "shadnet-p2p: на вашем ПК или VPS"),
-]
-# The Hunter's Dream, with bbhost's players: bbbridge on this PC (scripts/online.py, run.sh).
-THD_KIND = ("The Hunter's Dream (с игроками bbhost)", "thd",
-            "Вход через Discord; мост bbbridge запускается вместе с игрой")
-SERVER_GUIDE_URL = f"{bbport_update.REPOSITORY_URL}/blob/main/docs/SERVER.md"
-
-
-def bridge_cli():
-    """bbbridge-cli (bbbridge/, built by build.sh), or BB_BRIDGE_CLI (the AppImage's copy); None
-    when this build has none."""
-    path = Path(os.environ.get("BB_BRIDGE_CLI") or binaries_dir() / "bbbridge" / "bbbridge-cli")
-    return path if path.is_file() else None
-
-
 def pkg_extractor():
     """pkgextract for Install from PKG (scripts/pkg_install.py): BB_PKGEXTRACT (the AppImage's
     copy), build.sh's, else on PATH; None without it."""
@@ -406,14 +361,6 @@ def pkg_extractor():
         if candidate and Path(candidate).is_file():
             return str(candidate)
     return shutil.which("pkgextract")
-
-
-def online_module():
-    """The online module beside the GPU library (gpu/bbnet; a build without its libraries has none),
-    or BB_NET_MODULE (the AppImage's copy)."""
-    if os.environ.get("BB_NET_MODULE"):
-        return Path(os.environ["BB_NET_MODULE"]).is_file()
-    return (binaries_dir() / "gpu" / "libbbnet.so").is_file()
 
 
 def game_environment(s):
@@ -424,16 +371,13 @@ def game_environment(s):
         env["BB_USER_DIR"] = s["user_dir"]
     if s.get("dlc_dir"):
         env["BB_DLC_DIR"] = str(Path(s["dlc_dir"]).expanduser())
-    env["BB_MODS_DIR"] = str(Path(s.get("mods_dir") or DATA_DIR / "mods").expanduser())
-    env["BB_MODS_CONFIG"] = str(DATA_DIR / "mods.json")
-    env["BB_MODS_ENABLED"] = "1" if s.get("mods_enabled", True) else "0"
-    # Button prompts (scripts/menu_prompts.py): automatic follows the controller in use.
-    env["BB_PROMPTS"] = s.get("prompts") or prompts_for(gamepad_type(s))
-    env["BB_GESTURES_NO_MOTION"] = "1" if s.get("gestures_no_motion") else "0"
+    # Loose-file mods (scripts/mods.py) replace files under Bloodborne's dvdroot_ps4; GODZILLA's
+    # files are .pac archives at the folder's root, so none are laid over the game. The menu's
+    # button prompts (scripts/menu_prompts.py) edit Bloodborne's menu files: run.sh skips them.
+    env["BB_MODS_ENABLED"] = "0"
     env["BB_PATCHES_DIR"] = str(patches_dir(s))
     env["BB_PATCHES_CONFIG"] = str(DATA_DIR / "patches.json")
     env["BB_LANGUAGE"] = s["language"] or str(system_game_language())
-    env["BB_REGION"] = s.get("region", "")
     # The in-game menu speaks the launcher's language until one is chosen in it (menu_language).
     env["BB_MENU_LANGUAGE"] = language()
     env["BB_FULLSCREEN"] = "1" if s["fullscreen"] else "0"
@@ -442,10 +386,10 @@ def game_environment(s):
         env["BB_GAMEPAD"] = s["gamepad"]
     if s.get("display"):
         env["BB_DISPLAY"] = s["display"]
-    env["BB_SKIP_NETWORK_CHOICE"] = "1" if s.get("skip_network_choice", True) else "0"
     if s["hdr"]:
         env["BB_HDR"] = "1"
-    env["BB_FPS"] = s["fps_mode"]
+    # Only a preset whose patches exist (an older choice falls back to the game's 30 FPS).
+    env["BB_FPS"] = s["fps_mode"] if s["fps_mode"] in [value for _, value in fps_modes()] else "30"
     if s["fps_limit"] > 0:
         env["BB_FPS_LIMIT"] = str(s["fps_limit"])
     if s["draw_pipe"]:
@@ -478,11 +422,8 @@ def game_environment(s):
         env["BB_GPU_PROFILE"] = "1"
     if s["vk_validation"]:
         env["BB_VK_VALIDATION"] = "1"
-    env["BB_DISCORD"] = "1" if s.get("discord", True) else "0"
     if s.get("trophy_key", "").strip():
         env["BB_TROPHY_KEY"] = s["trophy_key"].strip()
-    if s.get("online") and online_module():
-        env.update(online.environment(s))
     for item in s["extra_env"].split():
         if "=" in item:
             key, value = item.split("=", 1)
@@ -542,8 +483,8 @@ CONTROLS = [
     ("l3", "L3", "Z", "leftstick"),
     ("r3", "R3", "C, Mouse Middle", "rightstick"),
     ("options", "Options", "Return", "start"),
-    ("touchpad", "Тачпад, левая половина (жесты)", "Tab", "back, touchpad"),
-    ("touchpad_right", "Тачпад, правая половина (личные вещи)", "Backspace", ""),
+    ("touchpad", "Тачпад, левая половина", "Tab", "back, touchpad"),
+    ("touchpad_right", "Тачпад, правая половина", "Backspace", ""),
     ("up", "Крестовина вверх", "I, Wheel Up", "dpup"),
     ("down", "Крестовина вниз", "K, Wheel Down", "dpdown"),
     ("left", "Крестовина влево", "J", "dpleft"),
@@ -647,8 +588,6 @@ THANKS = (
         _github("Mrsuss60", "Вылеты при загрузке некоторых карт и меню жестов с клавиатуры"),
         _github("SrShadowy", "Экранная клавиатура для имени персонажа и уведомление о компиляции "
                              "шейдеров"),
-        _github("droogie", "Быстрая загрузка после смерти и перемещения (bbhost) и сервер "
-                           "The Hunter's Dream"),
         _github("Wozzardman", "Сетевые библиотеки игры по сети и сервер для своего кооператива"),
         _github("IFreemz", "Основа поддержки DLSS и модель FSR 4 без шлейфов за персонажами"),
         _github("FireBurn", "Апскейлер FSR 3.1"),
@@ -667,7 +606,6 @@ THANKS = (
         _github("pmwork-personal", "Сверхширокие мониторы без растянутой картинки"),
         _github("Jhony-Jhansen", "Движение с клавиатуры: круглая диагональ и последняя нажатая клавиша"),
         _github("AndiMajore", "Отладка вылетов: процесс ждёт отладчик (BB_FAULT_WAIT)"),
-        _github("MaskZeus", "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost"),
         _github("Awakenchan", "Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки "
                               "страниц; смена стиков и инверсия камеры, импорт сохранений, "
                               "выбор версии"),
@@ -683,12 +621,8 @@ THANKS = (
         _github("Monochrome0907", "Нашёл, при каких эффектах зависают загрузки на NVIDIA"),
     )),
     ("Другие благодарности", (
-        ("Dommo, goomab", "Иконки кнопок Xbox и Switch (Nexus Mods)",
-         "https://www.nexusmods.com/bloodborne/mods/30"),
-        ("Abken", "Показал, какие текстуры нужны иконкам клавиатуры (Nexus Mods)",
-         "https://www.nexusmods.com/bloodborne/mods/537"),
-        ("Kyo, Lance McDonald, auser1337, illusion, emoose", "Патчи игры: высокий FPS, разрешение и другое",
-         "https://github.com/ayozetr/bloodborne_linux#credits"),
+        ("ayozetr", "bloodborne_linux: порт для Linux, на котором построен gzport",
+         "https://github.com/ayozetr/bloodborne_linux"),
         ("shadPS4", "Рендерер и компилятор шейдеров", "https://github.com/shadps4-emu/shadPS4"),
         ("pkgforge-dev", "Инструмент для сборки AppImage",
          "https://github.com/pkgforge-dev/Anylinux-AppImages"),
@@ -700,7 +634,7 @@ THANKS = (
 
 class LauncherWindow(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Bloodborne")
+        super().__init__(application=app, title="GODZILLA")
         self.set_default_size(760, 820)
         self.settings = load_settings()
         set_language(self.settings.get("ui_language", ""))
@@ -708,10 +642,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.process = None
         self.stream = None
         self.fsr411_build = None  # tools/fsr4cap/build_assets.sh while it runs
-        self.latest = None  # bbport_update.latest_release() once checked
-        self.releases = []  # bbport_update.releases(), the version selector's choices
-        self.installing = None  # the release being (or just) installed
-        self.update_state = "idle"  # idle, checking, downloading, installed
         self.build()
         self.connect("close-request", self.on_close)
 
@@ -719,6 +649,16 @@ class LauncherWindow(Adw.ApplicationWindow):
         """(Re)creates the window's content in the current launcher language."""
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
+        # The brand: the game's icon from the player's dump (or the launcher's) and its name.
+        brand = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER, css_classes=["gz-brand"])
+        self.brand_icon = Gtk.Image(pixel_size=28)
+        brand.append(self.brand_icon)
+        names = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+        names.append(Gtk.Label(label="GODZILLA", xalign=0, css_classes=["gz-title"]))
+        names.append(Gtk.Label(label=tr("gzport — нативный порт для Linux"), xalign=0,
+                               css_classes=["gz-subtitle"]))
+        brand.append(names)
+        header.pack_start(brand)
         self.stack = Adw.ViewStack()
         switcher = Adw.ViewSwitcher(stack=self.stack, policy=Adw.ViewSwitcherPolicy.NARROW)
         header.set_title_widget(switcher)
@@ -735,10 +675,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         log_text = self.log_text() if hasattr(self, "log_view") else ""
         self.stack.add_titled_with_icon(self.build_settings_page(), "settings", tr("Настройки"),
                                         "preferences-system-symbolic")
-        self.stack.add_titled_with_icon(self.build_online_page(), "online", tr("Онлайн"),
-                                        "network-workgroup-symbolic")
-        self.stack.add_titled_with_icon(self.build_cheats_page(), "cheats", tr("Читы"),
-                                        "applications-games-symbolic")
         self.stack.add_titled_with_icon(self.build_trophies_page(), "trophies", tr("Трофеи"),
                                         "starred-symbolic")
         self.stack.connect("notify::visible-child-name", lambda *_: self.stack.get_visible_child_name()
@@ -753,10 +689,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.update_user_status()
         self.update_dlc_status()
         self.update_upscaler_status()
-        self.show_update_state()
-        if self.settings.get("check_updates", True) and self.latest is None and \
-                self.update_state == "idle":
-            self.on_check_update(None, quiet=True)
 
     def update_launch_button(self):
         running = self.process is not None
@@ -790,7 +722,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         game = Adw.PreferencesGroup(title=tr("Игра"))
         # The game from your own PS4 packages: extracted, the update merged, the add-ons apart.
         self.pkg_row = Adw.ActionRow(title=tr("Установить из PKG"),
-                                     subtitle=tr("Игра, обновление 1.09 и DLC из ваших файлов .pkg"))
+                                     subtitle=tr("Игра, обновление 1.01 и DLC из ваших файлов .pkg"))
         self.pkg_button = Gtk.Button(label=tr("Выбрать .pkg…"), valign=Gtk.Align.CENTER)
         self.pkg_button.connect("clicked", self.on_install_pkg)
         self.pkg_row.add_suffix(self.pkg_button)
@@ -820,7 +752,7 @@ class LauncherWindow(Adw.ApplicationWindow):
                                       self.on_reset_user)
         self.user_row.add_suffix(self.user_reset)
         game.add(self.user_row)
-        # Dumped add-ons (one folder each); their data ships with the 1.09 update.
+        # Dumped add-ons (one folder each), linked where the runtime looks for them (run.sh).
         self.dlc_row = Adw.ActionRow(title=tr("Папка DLC"))
         self.dlc_status = Gtk.Image()
         self.dlc_row.add_suffix(self.dlc_status)
@@ -831,12 +763,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         game.add(self.dlc_row)
         self.language_row = combo_row(tr("Язык системы"), None, LANGUAGES, self.settings["language"])
         game.add(self.language_row)
-        self.region_row = combo_row(
-            tr("Регион игры"),
-            tr("Вариант текста у языков с региональными версиями: испанский Испании (Европа) или "
-               "Латинской Америки (Америка)"),
-            REGIONS, self.settings.get("region", ""))
-        game.add(self.region_row)
         steam = Adw.ActionRow(title=tr("Добавить в Steam"),
                               subtitle=tr("Игра в библиотеке Steam запускается сразу, с настройками "
                                           "этого лаунчера"))
@@ -845,11 +771,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         steam.add_prefix(themed_icon("steam-symbolic"))
         steam.add_suffix(steam_button)
         game.add(steam)
-        self.discord_row = Adw.SwitchRow(title=tr("Статус в Discord"),
-                                         subtitle=tr("«Играет в Bloodborne» в профиле Discord, онлайн или офлайн"),
-                                         active=self.settings.get("discord", True))
-        self.discord_row.add_prefix(themed_icon("discord-symbolic"))
-        game.add(self.discord_row)
         page.add(game)
 
         # Auto: the new memory model on AMD, the 0.3 one elsewhere; or either by hand.
@@ -859,28 +780,9 @@ class LauncherWindow(Adw.ApplicationWindow):
         mode.add(self.memory_model_row)
         page.add(mode)
 
-        self.mods_group = Adw.PreferencesGroup(
-            title=tr("Моды"), description=tr(
-                "Распакуйте каждый мод в отдельную папку (с dvdroot_ps4 или сразу с chr/, parts/ и т. п.). "
-                "При совпадении файлов побеждает мод ниже в списке. Применяется при запуске."))
-        self.mods_enabled_row = Adw.SwitchRow(title=tr("Загружать моды"),
-                                               active=self.settings["mods_enabled"])
-        self.mods_group.add(self.mods_enabled_row)
-        self.mods_folder_row = Adw.ActionRow(title=tr("Папка модов"))
-        self.mods_folder_row.add_suffix(flat_button("folder-open-symbolic", tr("Выбрать папку модов"),
-                                                    self.on_choose_mods))
-        self.mods_folder_row.add_suffix(flat_button("system-file-manager-symbolic", tr("Открыть папку модов"),
-                                                    lambda _b: open_folder(self, self.mods_dir())))
-        self.mods_folder_row.add_suffix(flat_button("view-refresh-symbolic", tr("Обновить список"),
-                                                    self.on_refresh_mods))
-        self.mods_group.add(self.mods_folder_row)
-        self.mod_list = FolderList(self.mods_group)
-        self.refresh_mods()
-        page.add(self.mods_group)
-
         self.patches_group = Adw.PreferencesGroup(
             title=tr("Сторонние патчи"),
-            description=tr("XML-патчи в формате shadPS4 для версии 01.09 из папки патчей. "
+            description=tr("XML-патчи в формате shadPS4 для версии 01.01 из папки патчей. "
                            "Применяются при запуске."))
         self.patches_folder_row = Adw.ActionRow(title=tr("Папка патчей"))
         self.patches_folder_row.add_suffix(flat_button("folder-open-symbolic", tr("Выбрать папку патчей"),
@@ -933,13 +835,8 @@ class LauncherWindow(Adw.ApplicationWindow):
                                                 lambda _button: self.fill_gamepads()))
         self.fill_gamepads()
         controls.add(self.gamepad_row)
-        # Xbox / Switch prompts and the gestures menu: Dommo's mods (Nexus, Bloodborne mod 30);
-        # keyboard prompts show the keys bound below.
-        self.prompts_row = combo_row(tr("Иконки кнопок"), tr("Применяется при запуске игры"),
-                                     PROMPT_CHOICES, self.settings["prompts"])
-        controls.add(self.prompts_row)
         # Nintendo-style controllers (issue #3): cross on the east button (A there), circle on
-        # the south one; the Xbox and Switch prompts follow (menu_prompts.py).
+        # the south one.
         self.ab_swap_row = Adw.SwitchRow(
             title=tr("Поменять местами A и B"),
             subtitle=tr("Для контроллеров в стиле Nintendo: подтверждение на A, отмена на B. "
@@ -948,9 +845,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.ab_swap_syncing = False
         self.ab_swap_row.connect("notify::active", lambda *_: self.on_ab_swap())
         controls.add(self.ab_swap_row)
-        self.gestures_row = Adw.SwitchRow(title=tr("Меню жестов без значков управления движением"),
-                                          active=self.settings["gestures_no_motion"])
-        controls.add(self.gestures_row)
         # Controller sticks (runtime_pad.c): swapped, camera stick inverted.
         self.stick_rows = {}
         for key, title in (("pad_swap_sticks", tr("Поменять стики местами")),
@@ -1043,41 +937,29 @@ class LauncherWindow(Adw.ApplicationWindow):
         upscaler.add(self.show_fps_row)
         page.add(upscaler)
 
-        effects = Adw.PreferencesGroup(title=tr("Эффекты игры"),
-                                       description=tr("Патчи игры, применяются при запуске"))
-        self.lod_row = combo_row(tr("Детализация моделей"), None, MODEL_LOD,
-                                 self.ini.get("model_lod", "0"))
-        effects.add(self.lod_row)
+        # Built-in patches (patches/Godzilla.xml): a switch is live once its patch exists for 1.01.
+        have = builtin_patches()
+        effects = Adw.PreferencesGroup(title=tr("Патчи игры"),
+                                       description=tr("Применяется при запуске игры"))
         self.effect_rows = {}
-        for key, title, default in EFFECTS:
+        for key, title, default in GAME_PATCHES:
             row = Adw.SwitchRow(title=tr(title),
                                 active=self.ini.get(key, "1" if default else "0") == "1")
-            if key == "debug_menu":
-                row.set_subtitle(tr("Нужна папка adhoc из мода Nexus #253 (шрифты adhoc/font) — в "
-                                    "dvdroot_ps4 игры или модом; без неё патч не применяется"))
+            if not patch_available(key, have):
+                row.set_sensitive(False)
+                row.set_subtitle(tr("Нужен патч для версии 1.01, его пока нет"))
             self.effect_rows[key] = row
             effects.add(row)
-        # The title's "play online / play offline": the port has no PSN.
-        self.skip_network_row = Adw.SwitchRow(
-            title=tr("Пропускать выбор «по сети / вне сети»"),
-            subtitle=tr("Игра сразу открывает главное меню в режиме вне сети (патч игры)"),
-            active=self.settings.get("skip_network_choice", True))
-        effects.add(self.skip_network_row)
         page.add(effects)
 
-        streaming = Adw.PreferencesGroup(title=tr("Загрузки и плавность"),
-                                         description=tr("Патчи игры из bbhost, применяются при запуске"))
-        self.streaming_rows = {}
-        for key, title, subtitle, default in STREAMING:
-            row = Adw.SwitchRow(title=tr(title), subtitle=tr(subtitle),
-                                active=self.ini.get(key, "1" if default else "0") == "1")
-            self.streaming_rows[key] = row
-            streaming.add(row)
-        page.add(streaming)
-
         frames = Adw.PreferencesGroup(title=tr("Частота кадров"))
-        self.fps_row = combo_row(tr("Режим"), tr("Какой патч частоты кадров применить к игре"),
-                                 FPS_MODES, self.settings["fps_mode"])
+        modes = fps_modes(have)
+        self.fps_row = combo_row(
+            tr("Режим"),
+            tr("Какой патч частоты кадров применить к игре") if len(modes) > 1 else
+            tr("Игра идёт с 30 FPS. 60 FPS и без ограничения: нужен патч частоты кадров, его пока нет"),
+            modes, self.settings["fps_mode"])
+        self.fps_row.set_sensitive(len(modes) > 1)
         frames.add(self.fps_row)
         self.limit_row = Adw.SpinRow.new_with_range(0, 480, 1)
         self.limit_row.set_title(tr("Ограничение FPS"))
@@ -1262,7 +1144,7 @@ class LauncherWindow(Adw.ApplicationWindow):
             self.alert(tr("Импорт сохранений"), tr("Сначала закройте игру"))
             return
         shadps4 = Path.home() / ".local/share/shadPS4"
-        self.choose_folder(tr("Папка с сохранениями Bloodborne"),
+        self.choose_folder(tr("Папка с сохранениями GODZILLA"),
                            shadps4 if shadps4.is_dir() else Path.home(), self.confirm_import_saves)
 
     def confirm_import_saves(self, folder):
@@ -1272,7 +1154,7 @@ class LauncherWindow(Adw.ApplicationWindow):
                 "Это копия с PS4 на флешке (sdimg_*): она зашифрована ключами консоли. Экспортируйте "
                 "сохранение без шифрования на PS4 (Apollo Save Tool) или через Save Wizard")
                 if save_import.encrypted_ps4_save(folder)
-                else tr("В этой папке нет сохранений Bloodborne (SPRJ0005, userdata)"))
+                else tr("В этой папке нет сохранений GODZILLA (SAVEDATA00 с DATA.BIN)"))
             return
         source, when = found[0]
         dialog = Adw.AlertDialog(heading=tr("Импортировать сохранения?"), body=tr(
@@ -1350,32 +1232,42 @@ class LauncherWindow(Adw.ApplicationWindow):
         path = self.game_dir()
         ok = bool(self.settings["game_dir"]) and (path / "eboot.bin").is_file()
         self.game_row.set_subtitle(str(path) if self.settings["game_dir"] else tr("не выбрана"))
-        # The title ID of the release in the folder (CUSA00900, CUSA03173, ...), from its param.sfo.
+        # The title ID of the release in the folder (CUSA02046), from its param.sfo.
         try:
             title_id = str(sfo((path / "sce_sys/param.sfo").read_bytes()).get("TITLE_ID", "")) if ok else ""
         except (OSError, ValueError, IndexError):
             title_id = ""
         self.game_row.set_title(tr("Папка игры ({})").format(title_id) if title_id else tr("Папка игры"))
-        # Other versions of the game start and then crash in its code (issues #7, #13, #14).
+        # The port's hooks and patches are those of the 1.01 executable (scripts/game_check.py):
+        # the base game 1.00 needs its update merged in.
         problem = self.game_problem(path) if ok else None
         if not ok:
             tooltip = tr("Нет eboot.bin в папке")
         elif problem:
             kind, title, version = problem
+            missing = ", ".join(game_check.missing_files(path)) or ", ".join(game_check.REQUIRED_FILES)
             tooltip = {
-                "missing_update": tr("Нужно обновление 1.09: скопируйте файлы дампа обновления 1.09 в папку игры с заменой (найдена версия {})").format(version),
-                "wrong_eboot": tr("eboot.bin не от версии 1.09: скопируйте eboot.bin из дампа обновления 1.09 в папку игры с заменой"),
-                "patched_eboot": tr("eboot.bin с вшитым патчем 60 FPS от Lance McDonald: из-за него игра падает в меню жестов. Скопируйте чистый eboot.bin из дампа обновления 1.09 в папку игры с заменой"),
-                "other_title": tr("Это не магазинное издание Bloodborne (найдено {}): нужен Bloodborne любого региона с обновлением 1.09").format(title),
+                "missing_update": tr("Нужно обновление 1.01: скопируйте файлы дампа обновления 1.01 в папку игры с заменой (найдена версия {})").format(version),
+                "wrong_eboot": tr("eboot.bin не от версии 1.01: скопируйте eboot.bin из дампа обновления 1.01 в папку игры с заменой"),
+                "other_title": tr("Это не GODZILLA (найдено {}): нужна GODZILLA (CUSA02046) с обновлением 1.01").format(title),
                 "unreadable": tr("eboot.bin не читается как расшифрованный исполняемый файл PS4: сделайте дамп заново"),
-                "damaged_files": tr("Файлы игры повреждены при распаковке: шейдеры не распаковываются, игра зависнет на загрузке. Распакуйте игру и обновление 1.09 заново исправленным инструментом (issue #81)"),
-            }[kind]
+                "damaged_files": tr("В папке игры нет: {}. Распакуйте игру и обновление 1.01 заново").format(missing),
+            }.get(kind) or game_check.explain(kind, title, version)
             self.game_row.set_subtitle(f"{path}\n{tooltip}")
         else:
-            tooltip = tr("Bloodborne {}, версия 1.09").format(title_id or "")
+            tooltip = tr("GODZILLA {}, версия 1.01").format(title_id or "")
         self.game_status.set_from_icon_name("object-select-symbolic" if ok and not problem else "dialog-warning-symbolic")
         self.game_status.set_tooltip_text(tooltip)
         self.launch_button.set_sensitive(ok or self.process is not None)
+        self.show_game_icon()
+
+    def show_game_icon(self):
+        """The header's and the About page's icon: the game's own from its folder, or the
+        launcher's."""
+        icon = str(game_icon(self.settings["game_dir"]))
+        self.brand_icon.set_from_file(icon)
+        if hasattr(self, "about_icon"):
+            self.about_icon.set_from_file(icon)
 
     def on_install_pkg(self, _button):
         """The packages, then the folder to install into; scripts/pkg_install.py does the rest."""
@@ -1539,13 +1431,8 @@ class LauncherWindow(Adw.ApplicationWindow):
         s = self.settings
         s["gamepad"] = combo_value(self.gamepad_row)
         s["gamepad_name"] = self.gamepad_row.names[self.gamepad_row.get_selected()]
-        s["prompts"] = combo_value(self.prompts_row)
-        s["gestures_no_motion"] = self.gestures_row.get_active()
         s["display"] = combo_value(self.display_row)
-        s["skip_network_choice"] = self.skip_network_row.get_active()
         s["language"] = combo_value(self.language_row)
-        s["region"] = combo_value(self.region_row)
-        s["check_updates"] = self.check_updates_row.get_active()
         s["fullscreen"] = self.fullscreen_row.get_active()
         s["present_mode"] = combo_value(self.present_row)
         s["hdr"] = self.hdr_row.get_active()
@@ -1563,12 +1450,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         s["gpu_profile"] = self.profile_row.get_active()
         s["vk_validation"] = self.validation_row.get_active()
         s["extra_env"] = self.extra_row.get_text().strip()
-        s["mods_enabled"] = self.mods_enabled_row.get_active()
-        s["discord"] = self.discord_row.get_active()
         s["trophy_key"] = self.trophy_key_row.get_text().strip()
-        s["online"] = self.online_row.get_active()
-        s.update(self.online_settings())
-        self.save_mod_profile()
         self.save_patch_profile()
         save_settings(s)
         self.ini.update({
@@ -1579,15 +1461,12 @@ class LauncherWindow(Adw.ApplicationWindow):
             "object_motion": "1" if self.motion_row.get_active() else "0",
             "show_fps": "1" if self.show_fps_row.get_active() else "0",
             "output_res": combo_value(self.output_row),
-            "model_lod": combo_value(self.lod_row),
             "live_resolution": combo_value(self.live_row),
             "mouse_look": "1" if self.mouse_look_row.get_active() else "0",
             "mouse_sensitivity": f"{self.mouse_sensitivity_row.get_value():.2f}",
             "mouse_invert_y": "1" if self.mouse_invert_row.get_active() else "0",
             **{key: "1" if row.get_active() else "0" for key, row in self.stick_rows.items()},
             **{key: "1" if row.get_active() else "0" for key, row in self.effect_rows.items()},
-            **{key: "1" if row.get_active() else "0" for key, row in self.cheat_rows.items()},
-            **{key: "1" if row.get_active() else "0" for key, row in self.streaming_rows.items()},
         })
         save_ini(self.ini, self.ini_lines)
         self.ini, self.ini_lines = load_ini()
@@ -1598,7 +1477,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     # --- Steam ---------------------------------------------------------------------------
 
     def on_add_to_steam(self, _button):
-        """Bloodborne in the Steam library: a non-Steam game that runs --play (no window)."""
+        """GODZILLA in the Steam library: a non-Steam game that runs --play (no window)."""
         steam = bbport_steam.steam_folder()
         configs = bbport_steam.user_configs(steam) if steam else []
         flatpak = bool(steam) and bbport_steam.is_flatpak(steam)
@@ -1675,70 +1554,31 @@ class LauncherWindow(Adw.ApplicationWindow):
         # Packaged: the AppImage itself; from a checkout: the launcher script.
         target = os.environ.get("APPIMAGE") or str(PORT_DIR / "launcher" / "bb-launcher.sh")
         exe, start_dir, options = bbport_steam.shortcut_command(target, str(PORT_DIR), "--play", steam)
-        icon = str(PORT_DIR / "launcher" / "bloodborne.png")
+        icon = str(self.steam_icon())
         try:
             for config in configs:
-                bbport_steam.add_shortcut(config / "shortcuts.vdf", "Bloodborne", exe,
+                bbport_steam.add_shortcut(config / "shortcuts.vdf", "GODZILLA", exe,
                                           start_dir, icon, options)
         except (OSError, ValueError) as error:
             self.alert("Steam", tr("Не удалось добавить игру в Steam: {}").format(error))
             return
         if restart:
             bbport_steam.start_steam(bbport_steam.is_flatpak(steam))
-        self.toasts.add_toast(Adw.Toast(title=tr("Bloodborne добавлен в библиотеку Steam"), timeout=6))
+        self.toasts.add_toast(Adw.Toast(title=tr("GODZILLA добавлена в библиотеку Steam"), timeout=6))
 
-    # --- mods ----------------------------------------------------------------------------
-
-    def mods_dir(self):
-        return Path(self.settings.get("mods_dir") or DATA_DIR / "mods").expanduser()
-
-    def save_mod_profile(self):
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        rows = self.mod_list.rows
-        profile = {"order": [name for name, _ in rows],
-                   "disabled": [name for name, row in rows if not row.get_active()]}
-        (DATA_DIR / "mods.json").write_text(json.dumps(profile, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-
-    def refresh_mods(self):
-        self.mod_list.clear()
-        self.mods_folder_row.set_subtitle(str(self.mods_dir()))
-        try:
-            profile = json.loads((DATA_DIR / "mods.json").read_text(encoding='utf-8'))
-        except (OSError, ValueError):
-            profile = {}
-        available = discover_mods(self.mods_dir())
-        order = list(dict.fromkeys(n for n in [*profile.get("order", []), *available] if n in available))
-        for name in order:
-            row = Adw.SwitchRow(title=name, active=name not in profile.get("disabled", []))
-            row.add_suffix(flat_button("go-up-symbolic", tr("Загрузить раньше"),
-                                        lambda _b, n=name: self.move_mod(n, -1)))
-            row.add_suffix(flat_button("go-down-symbolic", tr("Загрузить позже"),
-                                        lambda _b, n=name: self.move_mod(n, 1)))
-            self.mod_list.add(name, row)
-        if not order:
-            self.mods_folder_row.set_subtitle(f"{self.mods_dir()} — {tr('Модов нет')}")
-
-    def move_mod(self, name, direction):
-        rows = self.mod_list.rows
-        index = next(i for i, (n, _) in enumerate(rows) if n == name)
-        target = index + direction
-        if 0 <= target < len(rows):
-            rows[index], rows[target] = rows[target], rows[index]
-            self.save_mod_profile()
-            self.refresh_mods()
-
-    def on_refresh_mods(self, _button):
-        self.save_mod_profile()
-        self.refresh_mods()
-
-    def on_choose_mods(self, _button):
-        self.save_mod_profile()
-
-        def chosen(path):
-            self.settings["mods_dir"] = path
-            self.refresh_mods()
-            self.store()
-        self.choose_folder(tr("Папка модов"), self.mods_dir(), chosen)
+    def steam_icon(self):
+        """The shortcut's icon: a copy of the game's icon0.png kept with the launcher's settings
+        (the dump may move), else the launcher's own."""
+        icon = game_icon(self.settings["game_dir"])
+        if icon.suffix == ".png":
+            copy = CONFIG_DIR / "steam-icon.png"
+            try:
+                CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(icon, copy)
+                return copy
+            except OSError:
+                pass
+        return icon
 
     # --- third-party patches -------------------------------------------------------------
 
@@ -1796,349 +1636,31 @@ class LauncherWindow(Adw.ApplicationWindow):
             self.store()
         self.choose_folder(tr("Папка патчей"), patches_dir(self.settings), chosen)
 
-    # --- log page ------------------------------------------------------------------------
-
-    # --- online page ---------------------------------------------------------------------
-
-    def build_online_page(self):
-        s = self.settings
-        page = Adw.PreferencesPage()
-        play = Adw.PreferencesGroup(description=tr(
-            "Сообщения, пятна крови и призраки приходят с The Hunter's Dream; колокола и призывы "
-            "идут через сервер shadNet. Игра по сети совместима с версией для Windows: нужны версия "
-            "игры 1.09 и тот же сервер"))
-        self.online_row = Adw.SwitchRow(title=tr("Играть онлайн"),
-                                        subtitle=tr("Выключено: игра остаётся офлайн, как раньше"),
-                                        active=s["online"])
-        play.add(self.online_row)
-        if not online_module():
-            self.online_row.set_sensitive(False)
-            self.online_row.set_subtitle(tr("Эта сборка без модуля онлайна (libbbnet.so): игра только офлайн"))
-        page.add(play)
-
-        game = Adw.PreferencesGroup(title=tr("Игровой сервер (сообщения, пятна крови, призраки)"))
-        self.community_row = Adw.EntryRow(title=tr("Игровой сервер"), text=s["online_community"])
-        game.add(self.community_row)
-        page.add(game)
-
-        coop = Adw.PreferencesGroup(title=tr("Сервер кооператива (колокола и призывы)"))
-        kinds = SERVER_KINDS + ([THD_KIND] if bridge_cli() else [])
-        kind = online.server_kind(s)
-        self.server_kind_row = combo_row(tr("Сервер shadNet"), None, kinds,
-                                         kind if kind in (k[1] for k in kinds) else "public")
-        coop.add(self.server_kind_row)
-        own = s["online_server"] if s["online_server"] != online.SHADNET_SERVER else ""
-        self.server_row = Adw.EntryRow(title=tr("Адрес сервера (host:port)"), text=own)
-        self.webapi_row = Adw.EntryRow(title=tr("Адрес WebAPI (пусто: порт 31315 сервера)"),
-                                       text=s["online_webapi"])
-        self.seamless_row = Adw.SwitchRow(
-            title=tr("Бесшовный кооператив (экспериментально)"),
-            subtitle=tr("Призывы между разными локациями. Только если на сервере "
-                        "BloodborneSeamlessCoop=true, и у всех игроков так же"),
-            active=s["online_seamless"])
-        guide = Adw.ActionRow(title=tr("Как запустить свой сервер"), subtitle=SERVER_GUIDE_URL,
-                              activatable=True)
-        guide.add_suffix(Gtk.Image(icon_name="adw-external-link-symbolic"))
-        guide.connect("activated", lambda _row: self.open_uri(SERVER_GUIDE_URL))
-        for row in (self.server_row, self.webapi_row, self.seamless_row, guide):
-            coop.add(row)
-        self.own_server_rows = (self.server_row, self.webapi_row, self.seamless_row)
-        page.add(coop)
-
-        # The Hunter's Dream: a Discord sign-in through bbbridge; its account is the online ID.
-        self.thd_group = Adw.PreferencesGroup(
-            title=tr("Учётная запись The Hunter's Dream"),
-            description=tr("Вход через Discord: учётная запись The Hunter's Dream (та же, что у "
-                           "bbhost) становится вашим Online ID. Пароль не хранится"))
-        # Or, as in bbhost, an account held by this PC: a name, and a recovery code to get it
-        # back on another PC.
-        self.thd_account_row = Adw.ActionRow(title=tr("Учётная запись"))
-        self.thd_button = Gtk.Button(label=tr("Войти через Discord"), valign=Gtk.Align.CENTER)
-        self.thd_button.connect("clicked", self.on_discord_sign_in)
-        self.thd_account_row.add_suffix(self.thd_button)
-        self.thd_group.add(self.thd_account_row)
-        self.thd_name_row = Adw.EntryRow(title=tr("Имя новой учётной записи (без Discord)"))
-        self.thd_create_button = Gtk.Button(label=tr("Создать"), valign=Gtk.Align.CENTER)
-        self.thd_create_button.connect("clicked", lambda _b: self.bridge_account("create"))
-        self.thd_name_row.add_suffix(self.thd_create_button)
-        self.thd_group.add(self.thd_name_row)
-        self.thd_code_row = Adw.EntryRow(title=tr("Код восстановления (имя выше)"))
-        self.thd_recover_button = Gtk.Button(label=tr("Восстановить"), valign=Gtk.Align.CENTER)
-        self.thd_recover_button.connect("clicked", lambda _b: self.bridge_account("recover"))
-        self.thd_code_row.add_suffix(self.thd_recover_button)
-        self.thd_group.add(self.thd_code_row)
-        page.add(self.thd_group)
-
-        account = Adw.PreferencesGroup(
-            title=tr("Учётная запись"),
-            description=tr("Имя учётной записи shadNet, не email. Зарегистрируйтесь на "
-                           "shadnet.shadps4.net или спросите владельца частного сервера. Пароль "
-                           "хранится на этом компьютере вместе с настройками лаунчера"))
-        self.account_kind = combo_value(self.server_kind_row)
-        self.online_accounts = {kind: dict(zip(("npid", "password"), online.account(s, kind)))
-                                for kind in ("public", "own", "thd")}
-        npid, password = online.account(s, self.account_kind)
-        self.npid_row = Adw.EntryRow(title=tr("Online ID (NPID)"), text=npid)
-        self.password_row = Adw.PasswordEntryRow(title=tr("Пароль"), text=password)
-        account.add(self.npid_row)
-        account.add(self.password_row)
-        self.server_kind_row.connect("notify::selected", lambda *_: self.swap_account())
-        self.account_group = account
-        page.add(account)
-
-        connection = Adw.PreferencesGroup(
-            title=tr("Соединение"),
-            description=tr("У всех в сессии должны быть одна версия игры (1.09) и один сервер. "
-                           "Читы меняют игру и для других игроков: выключайте их при совместной игре"))
-        self.upnp_row = Adw.SwitchRow(title=tr("UPnP (открыть порт на роутере автоматически)"),
-                                      subtitle=tr("Выключите при Tailscale или другом VPN"),
-                                      active=s["online_upnp"])
-        connection.add(self.upnp_row)
-        self.p2p_port_row = Adw.SpinRow.new_with_range(0, 65535, 1)
-        self.p2p_port_row.set_title(tr("Порт кооператива (UDP)"))
-        self.p2p_port_row.set_subtitle(tr("0: случайный при каждом запуске. Закрепите его, чтобы "
-                                          "открыть в брандмауэре или на роутере вручную"))
-        self.p2p_port_row.set_value(int(s["online_p2p_port"] or 0))
-        connection.add(self.p2p_port_row)
-        # ufw and firewalld drop the peers' packets and, for UPnP, the router's answers: UPnP opens
-        # the port on the router only.
-        self.firewall_rows = []
-        gateway = online.default_gateway()
-        for firewall in online.active_firewalls():
-            warning = Adw.ActionRow(title=tr("Включён брандмауэр: {}").format(firewall),
-                                    subtitle_selectable=True)
-            warning.add_prefix(Gtk.Image(icon_name="dialog-warning-symbolic"))
-            self.firewall_rows.append((warning, firewall, gateway))
-            connection.add(warning)
-        self.p2p_port_row.connect("notify::value", lambda *_: self.show_firewall_rows())
-        self.show_firewall_rows()
-        test = Adw.ActionRow(title=tr("Проверить соединение"))
-        self.test_button = Gtk.Button(label=tr("Проверить"), valign=Gtk.Align.CENTER)
-        self.test_button.connect("clicked", self.on_test_connection)
-        test.add_suffix(self.test_button)
-        connection.add(test)
-        self.test_rows = []
-        self.connection_group = connection
-        page.add(connection)
-        self.server_kind_row.connect("notify::selected", lambda *_: self.show_server_kind())
-        self.show_server_kind()
-        return page
-
-    def online_settings(self):
-        """The Online page's settings (the keys of DEFAULTS)."""
-        return {
-            "online_community": self.community_row.get_text().strip(),
-            "online_server_kind": combo_value(self.server_kind_row),
-            "online_server": self.server_row.get_text().strip(),
-            "online_webapi": self.webapi_row.get_text().strip(),
-            "online_npid": self.npid_row.get_text().strip(),
-            "online_password": self.password_row.get_text(),
-            "online_upnp": self.upnp_row.get_active(),
-            "online_p2p_port": int(self.p2p_port_row.get_value()),
-            "online_seamless": self.seamless_row.get_active(),
-            "online_accounts": self.kept_accounts(),
-        }
-
-    def kept_accounts(self):
-        self.keep_account()
-        return {kind: dict(kept) for kind, kept in self.online_accounts.items()}
-
-    def keep_account(self):
-        """The account typed in, as the one of the server chosen in the page."""
-        self.online_accounts[self.account_kind] = {"npid": self.npid_row.get_text().strip(),
-                                                   "password": self.password_row.get_text()}
-
-    def swap_account(self):
-        """Another kind of server chosen: its own account in the fields, the other one kept."""
-        kind = combo_value(self.server_kind_row)
-        if kind == self.account_kind:
-            return
-        self.keep_account()
-        self.account_kind = kind
-        kept = self.online_accounts.get(kind, {})
-        self.npid_row.set_text(kept.get("npid", ""))
-        self.password_row.set_text(kept.get("password", ""))
-
-    def show_server_kind(self):
-        kind = combo_value(self.server_kind_row)
-        for row in self.own_server_rows:
-            row.set_visible(kind == "own")
-        # The Hunter's Dream: the bridge reaches the internet, the game only the bridge on this PC.
-        thd = kind == "thd"
-        self.thd_group.set_visible(thd)
-        self.account_group.set_visible(not thd)
-        for row in (self.upnp_row, self.p2p_port_row, *(row for row, _f, _g in self.firewall_rows)):
-            row.set_visible(not thd)
-        if thd:
-            accounts = online.bridge_accounts(self.user_dir())
-            if accounts and self.npid_row.get_text().strip() not in accounts:
-                self.npid_row.set_text(accounts[0])
-            name = self.npid_row.get_text().strip()
-            self.thd_account_row.set_subtitle(name if name in accounts else tr("Вход не выполнен"))
-
-    def bridge_account(self, action):
-        """bbbridge-cli --create NAME / --recover NAME CODE: an account held by this PC, without
-        Discord. A new one's recovery code is shown once to be kept."""
-        cli = bridge_cli()
-        name = self.thd_name_row.get_text().strip()
-        code = self.thd_code_row.get_text().strip()
-        if not cli or not name or (action == "recover" and not code):
-            return
-        config, _overrides = online.write_bridge_files(self.user_dir())
-        args = ["--create", name] if action == "create" else ["--recover", name, code]
-        buttons = (self.thd_button, self.thd_create_button, self.thd_recover_button)
-        for button in buttons:
-            button.set_sensitive(False)
-
-        def done(output):
-            for button in buttons:
-                button.set_sensitive(True)
-            if output.strip() != "ok":
-                self.thd_account_row.set_subtitle(
-                    tr("Не удалось войти: {}").format(output.strip().removeprefix("failed: ")))
-                return False
-            self.npid_row.set_text(name)
-            self.thd_account_row.set_subtitle(name)
-            self.thd_code_row.set_text("")
-            recovery = online.bridge_recovery_code(self.user_dir(), name)
-            self.alert(tr("Учётная запись The Hunter's Dream"), tr(
-                "Вход выполнен: {}. Сохраните код восстановления: только с ним эту учётную запись "
-                "можно вернуть на другом компьютере.\n\n{}").format(name, recovery))
-            return False
-
-        def work():
-            try:
-                run = subprocess.run([str(cli), "--config", str(config), *args], cwd=config.parent,
-                                     stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
-                output = run.stdout.strip().splitlines()[-1] if run.stdout.strip() else f"failed: {run.returncode}"
-            except (OSError, subprocess.TimeoutExpired) as error:
-                output = f"failed: {error}"
-            GLib.idle_add(done, output)
-        threading.Thread(target=work, daemon=True).start()
-
-    def on_discord_sign_in(self, _button):
-        """bbbridge-cli --link-discord: it prints a code to approve on The Hunter's Dream's page,
-        then the online ID it signed in as."""
-        cli = bridge_cli()
-        if not cli:
-            return
-        config, _overrides = online.write_bridge_files(self.user_dir())
-        self.thd_button.set_sensitive(False)
-        self.thd_account_row.set_subtitle(tr("Ожидание входа…"))
-
-        def on_line(line):
-            line = line.strip()
-            if line.startswith("Open ") and " and enter the code " in line:
-                uri, code = line[len("Open "):].split(" and enter the code ", 1)
-                self.thd_account_row.set_subtitle(tr("Откройте {} и введите код {}").format(uri, code))
-                self.open_uri(uri)
-            elif line.startswith("signed in as "):
-                name = line[len("signed in as "):]
-                self.npid_row.set_text(name)
-                self.thd_account_row.set_subtitle(name)
-                self.toasts.add_toast(Adw.Toast(title=tr("Вход выполнен: {}").format(name)))
-            elif line.startswith("failed: "):
-                self.thd_account_row.set_subtitle(tr("Не удалось войти: {}").format(line[len("failed: "):]))
-            return False
-
-        def work():
-            try:
-                with subprocess.Popen([str(cli), "--config", str(config), "--link-discord"],
-                                      cwd=config.parent, stdin=subprocess.DEVNULL,
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as process:
-                    for line in process.stdout:
-                        GLib.idle_add(on_line, line)
-            except OSError as error:
-                GLib.idle_add(on_line, f"failed: {error}")
-            GLib.idle_add(lambda: self.thd_button.set_sensitive(True) and False)
-        threading.Thread(target=work, daemon=True).start()
-
-    def show_firewall_rows(self):
-        port = int(self.p2p_port_row.get_value())
-        for row, firewall, gateway in self.firewall_rows:
-            port_rule, router_rule = online.firewall_commands(firewall, gateway, port or online.P2P_PORT)
-            lines = [tr("UPnP открывает порт только на роутере; брандмауэр этого компьютера всё "
-                        "равно блокирует кооператив. Откройте порт: {}").format(port_rule)]
-            if not port:
-                lines.insert(0, tr("Закрепите порт кооператива выше (например, {}): случайный "
-                                   "порт в брандмауэре не открыть").format(online.P2P_PORT))
-            if router_rule:
-                lines.append(tr("Для UPnP нужны ответы роутера: {}").format(router_rule))
-            row.set_subtitle(GLib.markup_escape_text("\n".join(lines)))
-
-    def on_test_connection(self, _button):
-        server, webapi, community = online.addresses(self.online_settings())
-        names = {"game": tr("Игровой сервер"), "shadnet": tr("Сервер shadNet"),
-                 "stun": tr("UDP сервера shadNet (призывы)"), "webapi": "WebAPI",
-                 "login": tr("Вход в shadNet")}
-        login_errors = {"wrong name or password": tr("неверное имя или пароль"),
-                        "no such account": tr("такой учётной записи нет на этом сервере"),
-                        "already signed in": tr("эта учётная запись уже в сети (игра запущена?)")}
-        account = (self.npid_row.get_text().strip(), self.password_row.get_text())
-        for row in self.test_rows:
-            self.connection_group.remove(row)
-        self.test_rows = []
-        self.test_button.set_sensitive(False)
-        self.test_button.set_label(tr("Проверка…"))
-
-        def show(results):
-            for name, address, ok, detail in results:
-                if name == "stun" and ok:
-                    status = tr("отвечает; ваш публичный адрес: {}").format(detail)
-                elif name == "stun" and detail == "timeout":
-                    status = tr("не отвечает: призывы не соединятся")
-                elif name == "login":
-                    status = tr("вход выполнен") if ok else login_errors.get(
-                        detail, tr("вход не удался ({})").format(detail))
-                else:
-                    status = tr("доступен") if ok else f'{tr("недоступен")} ({detail})'
-                # Plain text: an error such as "<urlopen error ...>" is not Pango markup.
-                row = Adw.ActionRow(title=GLib.markup_escape_text(f"{names[name]}: {address}"),
-                                    subtitle=GLib.markup_escape_text(status))
-                row.add_prefix(Gtk.Image(icon_name="object-select-symbolic" if ok else "dialog-warning-symbolic"))
-                self.connection_group.add(row)
-                self.test_rows.append(row)
-            self.test_button.set_sensitive(True)
-            self.test_button.set_label(tr("Проверить"))
-            return False
-
-        def work():
-            # The Hunter's Dream: the bridge starts with the game, so only the game server is checked.
-            results = (online.check(server, webapi, community, account)[:1]
-                       if combo_value(self.server_kind_row) == "thd"
-                       else online.check(server, webapi, community, account))
-            GLib.idle_add(show, results)
-        threading.Thread(target=work, daemon=True).start()
-
     # --- about page ----------------------------------------------------------------------
 
     def build_about_page(self):
         page = Adw.PreferencesPage()
         about = Adw.PreferencesGroup(title=tr("О программе"))
-        app = Adw.ActionRow(title="bbport Linux",
-                            subtitle=tr("Версия {}").format(bbport_update.VERSION))
-        app.add_prefix(Gtk.Image(file=str(PORT_DIR / "launcher" / "bloodborne.png"), pixel_size=48))
+        app = Adw.ActionRow(title="GODZILLA · gzport",
+                            subtitle=tr("Нативный порт для Linux, версия {}").format(bbport_update.VERSION))
+        self.about_icon = Gtk.Image(pixel_size=48)
+        app.add_prefix(self.about_icon)
         about.add(app)
+        license_file = PORT_DIR / "LICENSE"
         for title, subtitle, url, icon in (
-                (tr("Этот проект"), bbport_update.REPOSITORY_URL, bbport_update.REPOSITORY_URL,
-                 "github-symbolic"),
+                (tr("Основано на bloodborne_linux от ayozetr"), bbport_update.BASE_URL,
+                 bbport_update.BASE_URL, "github-symbolic"),
                 (tr("Основано на bbport от deadinside28"), bbport_update.UPSTREAM_URL,
                  bbport_update.UPSTREAM_URL, "github-symbolic"),
-                (tr("Порт для Windows от Supermedo"), bbport_update.WINDOWS_URL,
-                 bbport_update.WINDOWS_URL, "github-symbolic"),
                 (tr("Лицензия"), tr("GNU GPL v2 или новее · Файлы игры не входят."),
-                 bbport_update.LICENSE_URL, "application-certificate-symbolic")):
-            row = Adw.ActionRow(title=title, subtitle=subtitle, activatable=True)
+                 license_file.as_uri() if license_file.is_file() else None,
+                 "application-certificate-symbolic")):
+            row = Adw.ActionRow(title=title, subtitle=subtitle, activatable=url is not None)
             row.add_prefix(themed_icon(icon))
-            row.add_suffix(Gtk.Image(icon_name="adw-external-link-symbolic"))
-            row.connect("activated", lambda _row, link=url: self.open_uri(link))
+            if url:
+                row.add_suffix(Gtk.Image(icon_name="adw-external-link-symbolic"))
+                row.connect("activated", lambda _row, link=url: self.open_uri(link))
             about.add(row)
-        support = Adw.ActionRow(title=tr("Поддержать проект"), subtitle="ko-fi.com/ayozetr",
-                                activatable=True)
-        support.add_prefix(Gtk.Image(icon_name="emblem-favorite-symbolic"))
-        support.add_suffix(Gtk.Image(icon_name="adw-external-link-symbolic"))
-        support.connect("activated", lambda _row: self.open_uri(bbport_update.KOFI_URL))
-        about.add(support)
         thanks = Adw.ActionRow(title=tr("Благодарности"), subtitle=tr("Без них ничего этого не было бы"),
                                activatable=True)
         thanks.add_prefix(Gtk.Image(icon_name="system-users-symbolic"))
@@ -2146,45 +1668,10 @@ class LauncherWindow(Adw.ApplicationWindow):
         thanks.connect("activated", lambda _row: self.show_thanks())
         about.add(thanks)
         page.add(about)
-
-        updates = Adw.PreferencesGroup(title=tr("Обновления"))
-        self.check_updates_row = Adw.SwitchRow(
-            title=tr("Проверять обновления при запуске"),
-            subtitle=tr("Спрашивает GitHub о последнем выпуске; ничего не скачивается без вашего "
-                        "согласия"),
-            active=self.settings.get("check_updates", True))
-        self.check_updates_row.connect("notify::active", lambda *_: self.store())
-        updates.add(self.check_updates_row)
-        self.update_row = Adw.ActionRow(title=tr("Последняя версия"))
-        self.update_button = Gtk.Button(valign=Gtk.Align.CENTER)
-        self.update_button.connect("clicked", self.on_update_button)
-        self.update_row.add_suffix(self.update_button)
-        updates.add(self.update_row)
-        # Another released version, an older one too (back to one that worked better).
-        self.version_row = Adw.ComboRow(
-            title=tr("Другая версия"),
-            subtitle=tr("Например, предыдущая, если новая работает хуже. Настройки и сохранения не "
-                        "затрагиваются"),
-            model=Gtk.StringList.new([tr("Список появится после проверки обновлений")]))
-        self.version_button = Gtk.Button(label=tr("Установить"), valign=Gtk.Align.CENTER)
-        self.version_button.connect("clicked", self.on_install_version)
-        self.version_row.add_suffix(self.version_button)
-        self.version_row.connect("notify::selected", lambda *_: self.show_update_state())
-        updates.add(self.version_row)
-        # What changed in the version installed: its release notes on GitHub.
-        notes_url = f"{bbport_update.REPOSITORY_URL}/releases/tag/{bbport_update.VERSION}"
-        notes = Adw.ActionRow(title=tr("Что нового в этой версии"),
-                              subtitle=tr("Изменения версии {} на GitHub").format(bbport_update.VERSION),
-                              activatable=True)
-        notes.add_prefix(Gtk.Image(icon_name="text-x-generic-symbolic"))
-        notes.add_suffix(Gtk.Image(icon_name="adw-external-link-symbolic"))
-        notes.connect("activated", lambda _row: self.open_uri(notes_url))
-        updates.add(notes)
-        page.add(updates)
         # The game's owners, under everything, as plain text.
         owners = Adw.PreferencesGroup()
-        owners.add(Gtk.Label(label=tr("Bloodborne принадлежит Sony Interactive Entertainment и "
-                                      "FromSoftware."),
+        owners.add(Gtk.Label(label=tr("GODZILLA — товарный знак Toho Co., Ltd.; игра для PS4 издана "
+                                      "Bandai Namco Entertainment. Этот проект с ними не связан."),
                              wrap=True, justify=Gtk.Justification.CENTER,
                              css_classes=["dim-label", "caption"]))
         page.add(owners)
@@ -2202,7 +1689,8 @@ class LauncherWindow(Adw.ApplicationWindow):
                 row.connect("activated", lambda _row, link=url: self.open_uri(link))
                 group.add(row)
             page.add(group)
-        page.set_description(tr("Без них ничего этого не было бы"))
+        page.set_description(tr("Авторы bbport и bloodborne_linux, на которых построен gzport, "
+                                "и все, кто им помогал"))
         dialog = Adw.PreferencesDialog(title=tr("Благодарности"))
         dialog.add(page)
         dialog.present(self)
@@ -2210,167 +1698,13 @@ class LauncherWindow(Adw.ApplicationWindow):
     def open_uri(self, uri):
         Gtk.UriLauncher.new(uri).launch(self, None, None, None)
 
-    def show_update_state(self, progress=None):
-        """The update row and its button for the current state."""
-        latest, state = self.latest, self.update_state
-        newer = isinstance(latest, dict) and bbport_update.is_newer(latest["tag"])
-        appimage = bbport_update.running_appimage()
-        button, sensitive = tr("Проверить сейчас"), True
-        if state == "checking":
-            subtitle, sensitive = tr("Проверка…"), False
-        elif state == "downloading":
-            subtitle, button, sensitive = progress or tr("Загрузка…"), tr("Обновить"), False
-        elif state == "installed":
-            subtitle, button = tr("Версия {} установлена: перезапустите лаунчер").format(
-                self.installing["tag"]), tr("Перезапустить")
-        elif isinstance(latest, str):
-            subtitle = tr("Не удалось проверить: {}").format(latest)
-        elif latest is None:
-            subtitle = tr("Установлена версия {}").format(bbport_update.VERSION)
-        elif not newer:
-            subtitle = tr("Установлена последняя версия ({})").format(bbport_update.VERSION)
-        elif appimage and latest["appimage"]:
-            subtitle, button = tr("Доступна версия {} (установлена {})").format(
-                latest["tag"], bbport_update.VERSION), tr("Обновить")
-        else:
-            subtitle, button = tr("Доступна версия {} (установлена {})").format(
-                latest["tag"], bbport_update.VERSION), tr("Открыть страницу")
-        self.update_row.set_subtitle(subtitle)
-        self.update_button.set_label(button)
-        self.update_button.set_sensitive(sensitive)
-        self.update_button.remove_css_class("suggested-action")
-        if button in (tr("Обновить"), tr("Перезапустить")):
-            self.update_button.add_css_class("suggested-action")
-        chosen = self.chosen_version()
-        self.version_row.set_sensitive(bool(self.releases))
-        self.version_button.set_sensitive(
-            chosen is not None and chosen["tag"] != bbport_update.VERSION and state == "idle")
-
-    def show_versions(self):
-        """The version selector's choices: every installable release, the running one marked."""
-        labels = [tr("{} (установлена)").format(r["tag"]) if r["tag"] == bbport_update.VERSION
-                  else f"{r['tag']} · {r['date']}" for r in self.releases]
-        self.version_row.set_model(Gtk.StringList.new(
-            labels or [tr("Список появится после проверки обновлений")]))
-        current = next((i for i, r in enumerate(self.releases)
-                        if r["tag"] == bbport_update.VERSION), 0)
-        self.version_row.set_selected(current)
-        self.show_update_state()
-
-    def chosen_version(self):
-        index = self.version_row.get_selected()
-        return self.releases[index] if self.releases and 0 <= index < len(self.releases) else None
-
-    def on_install_version(self, _button):
-        release = self.chosen_version()
-        if release is None or release["tag"] == bbport_update.VERSION:
-            return
-        if not bbport_update.running_appimage():
-            self.open_uri(release["url"])  # a git checkout: the release page
-            return
-        older = not bbport_update.is_newer(release["tag"])
-        dialog = Adw.AlertDialog(
-            heading=tr("Установить версию {}?").format(release["tag"]),
-            body=(tr("Это более старая версия, чем установленная ({}). Вернуться можно тем же "
-                     "списком или кнопкой «Обновить». Настройки и сохранения не затрагиваются")
-                  if older else tr("Установлена версия {}. Настройки и сохранения не затрагиваются"))
-            .format(bbport_update.VERSION))
-        dialog.add_response("cancel", tr("Отмена"))
-        dialog.add_response("install", tr("Установить"))
-        dialog.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
-        dialog.connect("response", lambda _d, response:
-                       response == "install" and self.install_update(release))
-        dialog.present(self)
-
-    def on_update_button(self, _button):
-        latest = self.latest
-        if self.update_state == "installed":
-            self.restart_launcher()
-        elif isinstance(latest, dict) and bbport_update.is_newer(latest["tag"]):
-            if bbport_update.running_appimage() and latest["appimage"]:
-                self.install_update(latest)
-            else:
-                self.open_uri(latest["url"])
-        else:
-            self.on_check_update(None)
-
-    def on_check_update(self, _button, quiet=False):
-        self.update_state = "checking"
-        self.show_update_state()
-
-        def done(result, releases):
-            self.latest, self.update_state = result, "idle"
-            if releases is not None:
-                self.releases = releases
-            self.show_versions()
-            if quiet and isinstance(result, dict) and bbport_update.is_newer(result["tag"]):
-                toast = Adw.Toast(title=tr("Доступна версия {}").format(result["tag"]),
-                                  button_label=tr("Подробнее"), timeout=8)
-                toast.connect("button-clicked", lambda *_: self.stack.set_visible_child_name("about"))
-                self.toasts.add_toast(toast)
-            return False
-
-        def work():
-            try:
-                result = bbport_update.latest_release()
-            except (OSError, ValueError) as error:
-                result = str(getattr(error, "reason", None) or error)
-            try:
-                releases = bbport_update.releases()
-            except (OSError, ValueError):
-                releases = None  # the selector keeps what it had
-            GLib.idle_add(done, result, releases)
-        threading.Thread(target=work, daemon=True).start()
-
-    def install_update(self, release):
-        """Downloads release's AppImage over the running one (bbport_update.install)."""
-        target = bbport_update.running_appimage()
-        self.installing = release
-        self.update_state = "downloading"
-        self.show_update_state()
-
-        def progress(done, total):
-            text = tr("Загрузка… {} %").format(done * 100 // total) if total else \
-                tr("Загрузка… {} МБ").format(done >> 20)
-            GLib.idle_add(self.show_update_state, text)
-
-        def finished(error):
-            self.update_state = "idle" if error else "installed"
-            self.show_update_state()
-            if error:
-                self.toasts.add_toast(Adw.Toast(title=tr("Не удалось обновить: {}").format(error)))
-            return False
-
-        def work():
-            try:
-                bbport_update.install(release["appimage"], target, progress)
-                error = None
-            except OSError as failure:
-                error = str(getattr(failure, "reason", None) or failure)
-            GLib.idle_add(finished, error)
-        threading.Thread(target=work, daemon=True).start()
-
-    def restart_launcher(self):
-        if self.process is not None:
-            self.toasts.add_toast(Adw.Toast(title=tr("Сначала закройте игру")))
-            return
-        target = bbport_update.running_appimage()
-        env = {k: v for k, v in os.environ.items()
-               if k not in ("APPDIR", "APPIMAGE", "ARGV0", "OWD", "LD_LIBRARY_PATH", "PYTHONHOME",
-                            "PYTHONPATH")}
-        # The new launcher starts once this one has exited: with the same application ID while
-        # this one runs, it would only raise this window and quit.
-        subprocess.Popen(["sh", "-c", 'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; exec "$2"',
-                          "sh", str(os.getpid()), str(target)], env=env, start_new_session=True)
-        self.close()  # on_close saves the settings
-
     # --- trophies page -------------------------------------------------------------------
 
     def build_trophies_page(self):
         page = Adw.PreferencesPage()
         key = Adw.PreferencesGroup(title=tr("Ключ трофеев"), description=tr(
             "Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и "
-            "описания на языке игры. Хранится на этом компьютере. Без него они на английском"))
+            "описания на языке игры. Хранится на этом компьютере. Без него видны только значки"))
         self.trophy_key_row = Adw.PasswordEntryRow(title=tr("Ключ трофеев"),
                                                    text=self.settings.get("trophy_key", ""),
                                                    show_apply_button=True)
@@ -2441,27 +1775,7 @@ class LauncherWindow(Adw.ApplicationWindow):
             GLib.idle_add(show, directory, problem)
         threading.Thread(target=work, daemon=True).start()
 
-    # --- cheats page ---------------------------------------------------------------------
-
-    def build_cheats_page(self):
-        page = Adw.PreferencesPage()
-        self.cheat_rows = {}
-        for title, description, items in (
-                (tr("Читы"), tr("Патчи игры версии 1.09, применяются при запуске. Для обычного "
-                                "прохождения и игры по сети оставьте их выключенными"), CHEATS),
-                (tr("Изменения игрового процесса"), None, TWEAKS)):
-            group = Adw.PreferencesGroup(title=title, description=description)
-            for key, name, subtitle in items:
-                row = Adw.SwitchRow(title=tr(name), subtitle=tr(subtitle),
-                                    active=self.ini.get(key, "0") == "1")
-                self.cheat_rows[key] = row
-                group.add(row)
-            page.add(group)
-        # Enemy control and the free camera use the same buttons: one at a time.
-        control, camera = self.cheat_rows["cheat_enemy_control"], self.effect_rows["debug_camera"]
-        control.connect("notify::active", lambda row, _p: row.get_active() and camera.set_active(False))
-        camera.connect("notify::active", lambda row, _p: row.get_active() and control.set_active(False))
-        return page
+    # --- log page ------------------------------------------------------------------------
 
     def build_log_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -2502,7 +1816,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     def on_export_log(self, _button):
         text = self.log_text()
         dialog = Gtk.FileDialog(title=tr("Экспорт журнала"))
-        dialog.set_initial_name(f"bbport-{time.strftime('%Y%m%d_%H%M%S')}.log")
+        dialog.set_initial_name(f"gzport-{time.strftime('%Y%m%d_%H%M%S')}.log")
 
         def finish(dialog, result):
             try:
@@ -2535,30 +1849,9 @@ class LauncherWindow(Adw.ApplicationWindow):
         if self.process:
             self.stop_game()
             return
-        npid = self.npid_row.get_text().strip()
-        if online_module() and not self.online_row.get_active() and npid and hasattr(Adw, "AlertDialog"):
-            dialog = Adw.AlertDialog(heading="Bloodborne", body=tr(
-                "Учётная запись для игры онлайн указана, но «Играть онлайн» выключено"))
-            dialog.add_response("cancel", tr("Отмена"))
-            dialog.add_response("offline", tr("Играть офлайн"))
-            dialog.add_response("online", tr("Играть онлайн"))
-            dialog.set_response_appearance("online", Adw.ResponseAppearance.SUGGESTED)
-
-            def on_response(_dialog, response):
-                if response != "cancel":
-                    self.online_row.set_active(response == "online")
-                    self.start_game()
-            dialog.connect("response", on_response)
-            dialog.present(self)
-            return
         self.start_game()
 
     def start_game(self):
-        if self.online_row.get_active() and "@" in self.npid_row.get_text():
-            self.alert("Bloodborne", tr("Online ID — это имя учётной записи (NPID), "
-                                        "зарегистрированное на сервере, а не адрес email"))
-            self.stack.set_visible_child_name("online")
-            return
         self.store()
         self.log_view.get_buffer().set_text("")
         launcher = Gio.SubprocessLauncher.new(
@@ -2572,7 +1865,6 @@ class LauncherWindow(Adw.ApplicationWindow):
             self.toasts.add_toast(Adw.Toast(title=tr("Не удалось запустить: {}").format(error.message)))
             return
         self.stream = Gio.DataInputStream.new(self.process.get_stdout_pipe())
-        self.server_refused = False
         self.read_line()
         self.process.wait_async(None, self.on_exit)
         self.update_launch_button()
@@ -2589,12 +1881,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         if line is None:
             return
         self.append_log(line + "\n")
-        # The shadNet server refused this build (the game itself only says it is signed out).
-        if line.startswith("Online: the shadNet server ") and not self.server_refused:
-            self.server_refused = True
-            self.alert(tr("Игра по сети"), tr(
-                "Сервер shadNet не принимает bbport, игра осталась офлайн. Для игры по сети "
-                "используйте свой сервер (страница «Онлайн»)."))
         self.read_line()
 
     def stop_game(self):
@@ -2879,7 +2165,7 @@ class LauncherWindow(Adw.ApplicationWindow):
 
 class LauncherApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="io.github.bbport.Launcher",
+        super().__init__(application_id="io.github.gzport.Launcher",
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
 
     def do_startup(self):
@@ -2906,7 +2192,7 @@ def play():
     # No window sets the launcher's language here, and the in-game menu takes it (BB_MENU_LANGUAGE).
     set_language(settings.get("ui_language", ""))
     if not (Path(settings["game_dir"]).expanduser() / "eboot.bin").is_file():
-        print("bbport: choose the game folder in the launcher first", file=sys.stderr)
+        print("gzport: choose the game folder in the launcher first", file=sys.stderr)
         return 1
     os.chdir(PORT_DIR)
     env = game_environment(settings)
