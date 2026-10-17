@@ -16,16 +16,23 @@ translation, the upscalers and the launcher come from there; gvport points them 
 
 ## Status
 
-**Early bring-up.** The executable and its bundled modules (libc, Fios2) load and link, and work
-on reaching the title screen is in progress; the game is not playable yet.
+**Playable offline.** The game boots through its intro movie, agreements and title screen to the
+main menu (offline), and Free Battle matches play at 60 FPS with sound, the HUD and the CPU
+opponents. Tested on Linux with an AMD Radeon RX 7800 XT (Mesa/RADV) and a DualSense: ten minutes
+of back-to-back battles without an error. The other offline modes, saving over a long session
+and a full play-through are not verified yet.
 
-- **Offline modes first.** GUNDAM VERSUS is an online-focused fighting game and ships PSN's
-  toolkit (libSceNpToolkit2); the port answers as a console that is not signed in to PSN, so the
-  offline modes are what it aims at first.
-- **Couch co-op** with two controllers (two local players, each on their own SDL gamepad) is a
-  goal of the port.
-- **60 FPS**, the game's own rate. Higher frame rates and other output sizes need patches for the
-  1.13 executable that are not written yet.
+- **PS4 Pro mode** (default; `BB_NEO=0`: a base PS4): the game renders its scene at 1920x1080 as
+  on a PS4 Pro, instead of the base console's 1440x1080 stretched to the screen.
+- **Other output sizes** (1440p, 4K) are scaled from the game's 1080p frame by the GPU library;
+  the game does not render natively at them yet (its frame size is not mapped).
+- **Memory model:** "Auto" is the model of 0.3 on every GPU: with the new one each of the
+  frame's compute-queue waits is a GPU round trip, and battles ran at ~30 FPS.
+- **Offline only.** GUNDAM VERSUS is an online-focused fighting game and ships PSN's toolkit
+  (libSceNpToolkit2); the port answers as a console that is not signed in to PSN.
+- **No local multiplayer in the game.** GUNDAM VERSUS has one local player; its 2v2 and 3v3
+  modes are online only. The port logs further gamepads in as users 2-4 (the groundwork for
+  playing two instances against each other), but no mode of the game takes a second local player.
 - **Upscalers (FSR 3.1/4, DLSS, TAA) are off**: they need the game's scene color, depth and
   motion, and the frame of GUNDAM VERSUS is not mapped yet.
 
