@@ -51,7 +51,7 @@ def boot_image(out):
 def resolution_writes(size,image):
     """Writes that make the game render at size (w, h); the original bytes are checked first."""
     w,h=size
-    if not (640<=w<=7680 and 360<=h<=4320) or w%2 or h%2:
+    if not (256<=w<=7680 and 144<=h<=4320) or w%2 or h%2:
         raise ValueError(f'unsupported render size {w}x{h}')
     writes=[]
     for wa,ha in RESOLUTION_SITES:

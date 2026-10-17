@@ -440,6 +440,7 @@ bool TemporalUpscaler::OnFrameStart() {
     scene_done = false;
     scene_done_target = last_target = {};
     ui_read_barrier = false;
+    relay_read_barrier = false;
     done_this_frame = false;
     ldr_target = {};
     scene_color = {};
@@ -1491,6 +1492,22 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
     if (color && !FrameCapture::IsDisplayBuffer(texture_cache.GetImage(color).info.guest_address)) {
         ++frame_draws;
     }
+    // BB_DRAW_TRACE_TRIGGER=<file>: creating the file prints every draw the upscaler sees for the
+    // next four frames (its shader, target and the composition's state).
+    static const char* draw_trace = std::getenv("BB_DRAW_TRACE_TRIGGER");
+    static u64 trace_until = 0;
+    const u64 frame = BbStats::frame_number.load(std::memory_order_relaxed);
+    if (draw_trace && trace_until < frame && std::remove(draw_trace) == 0) trace_until = frame + 4;
+    if (frame <= trace_until && color) {
+        const auto& image = texture_cache.GetImage(color);
+        std::printf("Draw trace %llu: vs %llx -> %#llx %ux%u fmt %u depth %d | ui_phase %d scene_done %d "
+                    "ldr %d ui_color %d relay %d ready %d\n",
+                    (unsigned long long)frame, (unsigned long long)vs_hash,
+                    (unsigned long long)image.info.guest_address, image.info.size.width,
+                    image.info.size.height, u32(image.info.pixel_format), depth ? 1 : 0,
+                    int(ui_phase), int(scene_done), int(color == ldr_target),
+                    int(color == ui_color), int(color == relay_guest), int(camera_motion.Ready()));
+    }
     if (!Scaled() && vs_hash == ui_trigger_vs) done_this_frame = true;
     // bbport (issue #67, patch by bmy): a UI draw without a color target (a Scaleform mask, color
     // writes off) writes the stencil the UI's next draws test, so it must go into the UI's
@@ -2270,10 +2287,30 @@ bool TemporalUpscaler::RedirectDepth(VideoCore::ImageId depth, Target& target) {
 bool TemporalUpscaler::RedirectSampled(VideoCore::ImageId image,
                                        const VideoCore::ImageViewInfo& info, vk::ImageView& view,
                                        vk::ImageLayout& layout) {
-    if (relay_active && image == relay_guest && relay.valid) {
+    // gzport: the same memory can be sampled through another image of the texture cache (another
+    // format of the same target): the guest address decides.
+    const auto same = [this](VideoCore::ImageId a, VideoCore::ImageId b) {
+        return a && b &&
+               (a == b || texture_cache.GetImage(a).info.guest_address ==
+                              texture_cache.GetImage(b).info.guest_address);
+    };
+    static const char* sample_trace = std::getenv("BB_DRAW_TRACE_TRIGGER");
+    if (sample_trace && ui_trace_on && (ui_phase || display_redirect)) {
+        const auto& sampled = texture_cache.GetImage(image);
+        static u32 printed = 0;
+        if (printed < 40 && sampled.info.size.width >= 1280) {
+            ++printed;
+            std::printf("Sample trace: %#llx %ux%u fmt %u (ui_color %#llx, relay %#llx)\n",
+                        (unsigned long long)sampled.info.guest_address, sampled.info.size.width,
+                        sampled.info.size.height, u32(sampled.info.pixel_format),
+                        ui_color ? (unsigned long long)texture_cache.GetImage(ui_color).info.guest_address : 0ull,
+                        relay_guest ? (unsigned long long)texture_cache.GetImage(relay_guest).info.guest_address : 0ull);
+        }
+    }
+    if (relay_active && relay.valid && same(image, relay_guest)) {
         // gzport: the display pass reads the game's copy of the frame: its output-size relay.
-        if (!ui_read_barrier) {
-            ui_read_barrier = true;
+        if (!relay_read_barrier) {
+            relay_read_barrier = true;
             scheduler.EndRendering();
             const vk::ImageMemoryBarrier2 b{
                 .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -2295,7 +2332,7 @@ bool TemporalUpscaler::RedirectSampled(VideoCore::ImageId image,
     }
     // The upscaled image is read by the display pass, or (gzport) by the game's copy of the
     // frame while the HUD is drawn.
-    if (!(display_redirect || (ui_phase && relay_guest)) || image != ui_color) {
+    if (!(display_redirect || (ui_phase && relay_guest)) || !same(image, ui_color)) {
         return false;
     }
     if (!ui_read_barrier) {

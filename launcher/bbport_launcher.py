@@ -103,9 +103,9 @@ UI_LANGUAGES = [("Как в системе", ""), ("Русский", "ru"), ("En
                 ("Español", "es"), ("Italiano", "it"), ("Français", "fr"), ("Deutsch", "de"),
                 ("简体中文", "zh_CN")]
 # The temporal upscalers need the game's scene color, depth and motion (the GPU library knows them
-# for Bloodborne only): shown, but off for GODZILLA until its frame is mapped (run.sh sets
-# BB_UPSCALER=off). Other outputs render natively instead.
-UPSCALERS_AVAILABLE = False
+# from the game profile (gpu/games): GODZILLA's camera, scene and HUD are mapped (experimental).
+# Without an upscaler, other outputs render natively.
+UPSCALERS_AVAILABLE = True
 UPSCALERS = [("FSR 4", "fsr4"), ("FSR 4.1.1", "fsr411"), ("FSR 3", "fsr3"),
              ("DLSS (NVIDIA RTX)", "dlss"),
              ("TAA (нативное сглаживание)", "taa"), ("Выключен", "off")]

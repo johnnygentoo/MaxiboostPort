@@ -233,6 +233,9 @@ private:
     VideoCore::ImageId scene_done_target{}, last_target{};
     VideoCore::ImageId relay_guest{};
     bool relay_active = false;
+    /// The relay's own read barrier of the frame (ui_read_barrier is the composed image's: the
+    /// copy pass reads that one after the HUD draws, later in the same frame).
+    bool relay_read_barrier = false;
     /// Draws of the frame other than the display pass: a frame without any shows the game's last
     /// frame again, composed as it was.
     u32 frame_draws = 0;
