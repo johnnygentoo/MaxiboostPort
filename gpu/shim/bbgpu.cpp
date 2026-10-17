@@ -41,6 +41,7 @@ extern "C" {
 int runtime_memory_is_mapped(uintptr_t address, uint64_t size);
 int runtime_memory_write_backing(uintptr_t address, const void* data, uint64_t size);
 void runtime_memory_read_backing(uintptr_t address, void* data, uint64_t size);
+int runtime_neo_mode(void);
 uint64_t runtime_memory_clamp(uintptr_t address, uint64_t size);
 int runtime_memory_region(uintptr_t address, uintptr_t* start, uintptr_t* end, int* mapped);
 const uint64_t* runtime_memory_generation(void);
@@ -226,7 +227,7 @@ u64 PS4_SYSV_ABI sceKernelReadTsc() { return Common::FencedRDTSC(); }
 u64 PS4_SYSV_ABI sceKernelGetProcessTime() { return runtime_process_time_us(); }
 u64 PS4_SYSV_ABI sceKernelGetProcessTimeCounter() { return runtime_process_time_counter(); }
 u64 PS4_SYSV_ABI sceKernelGetProcessTimeCounterFrequency() { return 1'000'000'000; }
-s32 PS4_SYSV_ABI sceKernelIsNeoMode() { return 0; } // base PS4
+s32 PS4_SYSV_ABI sceKernelIsNeoMode() { return runtime_neo_mode(); } // BB_NEO=1: a PS4 Pro
 s32 PS4_SYSV_ABI sceKernelGetCompiledSdkVersion(s32* ver) {
     if (!ver) return ORBIS_KERNEL_ERROR_EINVAL;
     *ver = s32(g_sdk_version);

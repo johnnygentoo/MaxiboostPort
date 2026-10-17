@@ -1,6 +1,6 @@
 /* Process and module queries of a retail PS4 (GUNDAM VERSUS asks them; Bloodborne and GODZILLA did
  * not):
- *   - a base PS4, not a PS4 Pro (sceKernelIsNeoMode 0), six game cores;
+ *   - a base PS4, or a PS4 Pro with BB_NEO=1 (sceKernelIsNeoMode), six game cores;
  *   - modules the game loads at run time from its own sce_module folder were linked into the
  *     image beforehand (scripts/link_modules.py) or are served by the runtime (libSceNpToolkit2),
  *     so loading one only hands out a handle; system modules are not there;
@@ -19,7 +19,14 @@
 #define KERNEL_EFAULT ((int32_t)0x8002000e)
 #define KERNEL_EINVAL ((int32_t)0x80020016)
 
-static ABI int32_t is_neo_mode(void) { return 0; }
+/* BB_NEO=1: a PS4 Pro (the game's Pro mode). GUNDAM VERSUS renders its scene at 1440x1080 on a
+ * base PS4 and at 1920x1080 on a Pro. The GPU library asks the same (runtime_neo_mode). */
+int runtime_neo_mode(void) {
+    static int neo=-1;
+    if (neo<0) { const char *v=getenv("BB_NEO"); neo=v && v[0]=='1'; if (neo) puts("Runtime: PS4 Pro mode (BB_NEO=1)"); }
+    return neo;
+}
+static ABI int32_t is_neo_mode(void) { return runtime_neo_mode(); }
 static ABI int32_t cpu_mode(void) { return 0; } /* six cores for the game */
 static ABI uint64_t get_gpi(void) { return 0; }
 static ABI int32_t set_gpo(uint32_t value) { (void)value; return 0; }

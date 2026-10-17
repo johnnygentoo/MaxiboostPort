@@ -10,6 +10,12 @@ import sys
 import tempfile
 import unittest
 
+import patches
+
+# GUNDAM VERSUS' frame size is not mapped yet (scripts/patches.py RESOLUTION_SITES): run.sh makes no
+# resolution patch, so the startup-patch path these tests drive stays off until it is.
+NEEDS_RESOLUTION_PATCH = unittest.skipUnless(patches.RESOLUTION_SITES, 'the frame size of GUNDAM VERSUS is not mapped yet')
+
 
 class RestartResolutionTests(unittest.TestCase):
     def run_restarts(self, explicit=False, live=False, ini_extra='', caps=None, bare_path=False):
@@ -83,6 +89,7 @@ class RestartResolutionTests(unittest.TestCase):
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=30)
             return [json.loads(line) for line in (data / 'environments').read_text().splitlines()]
 
+    @NEEDS_RESOLUTION_PATCH
     def test_outputs_other_than_1080p_patch_the_render_size_and_restarts_recompute_it(self):
         rows = self.run_restarts()
         # FSR 3 renders the game at the output / the preset's scale: 720p Quality, 720p Ultra
@@ -97,6 +104,7 @@ class RestartResolutionTests(unittest.TestCase):
         self.assertTrue(all(row['BB_OUTPUT_RES'] is None for row in rows))
         self.assertTrue(all(row['BB_AUTO_RENDER_RES'] is None for row in rows))
 
+    @NEEDS_RESOLUTION_PATCH
     def test_live_resolution_setting_and_gpu_check(self):
         # Only the first launch matters here: the probe rewrites bbport.ini for the restarts.
         self.assertIsNone(self.run_restarts(ini_extra='live_resolution=1\n')[0]['BB_RENDER_RES'])
@@ -108,6 +116,7 @@ class RestartResolutionTests(unittest.TestCase):
         self.assertEqual(self.run_restarts(ini_extra='live_resolution=auto\n', caps=0)[0]['BB_RENDER_RES'],
                          '854x480')
 
+    @NEEDS_RESOLUTION_PATCH
     def test_live_resolution_without_sed_or_grep(self):
         # A missing sed ended run.sh (exit 127) before the game in the AppImage on NixOS.
         self.assertEqual(self.run_restarts(ini_extra='live_resolution=0\n', caps=1,

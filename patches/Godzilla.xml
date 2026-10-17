@@ -1,9 +1,0 @@
-<?xml version="1.0"?>
-<!-- gzport's built-in patches for GODZILLA (CUSA02046) 1.01, in the shadPS4/GoldHEN format.
-     Addresses are PS4 virtual addresses (eboot base 0x400000). The render size is patched by
-     scripts/patches.py (resolution_writes), which checks the bytes it replaces. -->
-<Patch>
-    <TitleID>
-        <ID>CUSA02046</ID>
-    </TitleID>
-</Patch>

@@ -58,6 +58,10 @@ uintptr_t runtime_eventflag_resolve(const char *name);
 uintptr_t runtime_fiber_resolve(const char *name);
 uintptr_t runtime_process_resolve(const char *name);
 uintptr_t runtime_usbd_resolve(const char *name);
+int runtime_neo_mode(void);
+/* Couch co-op (runtime_pad.c): users logged in (ids[4], -1 after the last) and new logins. */
+int runtime_users_logged_in(int32_t ids[4]);
+int runtime_users_next_login(void);
 uintptr_t runtime_process_resolve_data(const char *name);
 void runtime_fiber_report(void);
 uintptr_t runtime_ngs2_resolve(const char *name);

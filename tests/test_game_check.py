@@ -33,9 +33,9 @@ class GameCheckTests(unittest.TestCase):
         (path / 'sce_sys/param.sfo').write_bytes(param_sfo({'APP_VER': version, 'TITLE_ID': title}))
         (path / 'eboot.bin').write_bytes(fixture() if eboot is None else eboot)
         if files:
-            (path / 'system.pac').write_bytes(b'pac')
-            (path / 'game_en.pac').write_bytes(b'pac')
-            (path / 'sound').mkdir(exist_ok=True)
+            (path / 'archives').mkdir(exist_ok=True)
+            (path / 'sce_discmap.plt').write_bytes(b'plt')
+            (path / 'img').mkdir(exist_ok=True)
         return path
 
     def setUp(self):
@@ -46,41 +46,41 @@ class GameCheckTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_base_game_by_its_version(self):
-        self.assertEqual(game_check.problem(self.game('CUSA02046', '01.00')),
-                         ('missing_update', 'CUSA02046', '01.00'))
+        self.assertEqual(game_check.problem(self.game('CUSA08790', '01.00')),
+                         ('missing_update', 'CUSA08790', '01.00'))
 
     def test_base_game_by_its_executable(self):
-        game = self.game('CUSA02046', '01.01')
+        game = self.game('CUSA08790', '01.13')
         with mock.patch.object(game_check, 'BASE_IMAGE', game_check.image_sha256(game)):
             self.assertEqual(game_check.problem(game)[0], 'missing_update')
 
     def test_update_metadata_with_an_old_executable(self):
-        self.assertEqual(game_check.problem(self.game('CUSA02046', '01.01'))[0], 'wrong_eboot')
+        self.assertEqual(game_check.problem(self.game('CUSA08790', '01.13'))[0], 'wrong_eboot')
 
     def test_other_title(self):
         self.assertEqual(game_check.problem(self.game('CUSA03173', '01.09'))[0], 'other_title')
 
     def test_unreadable_executable(self):
-        self.assertEqual(game_check.problem(self.game('CUSA02046', '01.01', b'junk'))[0], 'unreadable')
+        self.assertEqual(game_check.problem(self.game('CUSA08790', '01.13', b'junk'))[0], 'unreadable')
 
     def test_supported_image_passes(self):
-        game = self.game('CUSA02046', '01.01')
+        game = self.game('CUSA08790', '01.13')
         with mock.patch.object(game_check, 'SUPPORTED_IMAGE', game_check.image_sha256(game)):
             self.assertIsNone(game_check.problem(game))
 
     def test_incomplete_folder(self):
-        game = self.game('CUSA02046', '01.01', files=False)
+        game = self.game('CUSA08790', '01.13', files=False)
         with mock.patch.object(game_check, 'SUPPORTED_IMAGE', game_check.image_sha256(game)):
             self.assertEqual(game_check.problem(game)[0], 'damaged_files')
         self.assertEqual(game_check.missing_files(game), list(game_check.REQUIRED_FILES))
 
     def test_skip_switch(self):
         os.environ['BB_SKIP_GAME_CHECK'] = '1'
-        self.assertIsNone(game_check.problem(self.game('CUSA02046', '01.00')))
+        self.assertIsNone(game_check.problem(self.game('CUSA08790', '01.00')))
 
     def test_every_problem_is_explained(self):
         for kind in ('missing_update', 'wrong_eboot', 'other_title', 'unreadable', 'damaged_files'):
-            self.assertIn('CUSA02046', game_check.explain(kind, 'CUSA02046', '01.00'))
+            self.assertIn('CUSA08790', game_check.explain(kind, 'CUSA08790', '01.00'))
 
 
 if __name__ == '__main__':

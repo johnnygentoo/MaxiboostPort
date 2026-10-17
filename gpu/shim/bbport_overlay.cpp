@@ -605,9 +605,9 @@ void Menu() {
             }
         }
         Hint(BbSettings::MenuText(
-            "Effects are enabled and disabled by game patches at startup (patches/Godzilla.xml). "
+            "Effects are enabled and disabled by game patches at startup (patches/Gundam.xml). "
             "Motion blur and shadows from dynamic lights place a significant load on the GPU.",
-            "Эффекты включаются и выключаются патчами игры при запуске (patches/Godzilla.xml). "
+            "Эффекты включаются и выключаются патчами игры при запуске (patches/Gundam.xml). "
             "Размытие в движении и тени от динамических источников заметно нагружают GPU."));
     }
 

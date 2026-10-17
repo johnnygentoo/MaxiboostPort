@@ -60,12 +60,13 @@ if [[ -z ${PYTHON:-} ]]; then
     fi
 fi
 if [[ -z ${PYTHON:-} ]]; then echo 'Install Python 3 or set PYTHON.' >&2; exit 1; fi
-# BB_GAME_DIR: the game's folder (eboot.bin, sce_module, ...); default next to this directory.
-game=${BB_GAME_DIR:-../CUSA02046}
+# BB_GAME_DIR: the game's folder (eboot.bin, sce_module, ...); default the merged dump (base game
+# with the 1.13 update) in this directory.
+game=${BB_GAME_DIR:-CUSA08790-full}
 if [[ ! -f $game/eboot.bin ]]; then echo "No eboot.bin in $game (set BB_GAME_DIR)." >&2; exit 1; fi
 original_game=$game
 # Bloodborne's button prompts and gestures menu (scripts/menu_prompts.py) are edits of its
-# dvdroot_ps4/menu files; GODZILLA has none of them, so nothing is laid under the mods.
+# dvdroot_ps4/menu files; GUNDAM VERSUS has none of them, so nothing is laid under the mods.
 ui_mods=
 game=$("$PYTHON" scripts/mods.py "$game" --out "$out" \
     --mods-dir "${BB_MODS_DIR:-$data/mods}" --config "${BB_MODS_CONFIG:-$data/mods.json}" \
@@ -98,7 +99,7 @@ if [[ ${BB_AUTO_RENDER_RES:-} == 1 ]]; then
 fi
 # BB_RENDER_RES=WxH explicitly sets the game's render resolution (a patch at start).
 # Frame rate: BB_FPS=60 (default: the game's own rate, unpatched) or uncap (a frame-rate patch
-# from patches/Godzilla.xml, once written; scripts/patches.py FPS_PRESETS). BB_PATCHES adds patch
+# from patches/Gundam.xml, once written; scripts/patches.py FPS_PRESETS). BB_PATCHES adds patch
 # names ("a;b").
 fps=${BB_FPS:-60}
 # bbport.ini output_res other than 1080p (720p for the Steam Deck, 1440p, 2160p), or a temporal
@@ -153,8 +154,8 @@ fi
 # VRAM), 0 = off. BB_GUEST_GPU_MEMORY=1 puts guest direct memory in GPU-visible dma-buf chunks
 # (BB_GUEST_IN_PLACE below implies it: it commits all allocated memory up front and rules out BB_UFFD).
 export BB_PREUPLOAD=${BB_PREUPLOAD:-1}
-# Memory model and translation. BB_PC_MODEL=1 (the launcher's "Memory model": "Auto" gives it to
-# AMD GPUs, the 0.3 model to the others; BB_PC_MODEL=1/0 by hand) selects how a PC release would
+# Memory model and translation. BB_PC_MODEL=1 (the launcher's "Memory model": "Auto" gives every
+# GPU the 0.3 model for GUNDAM VERSUS, below; BB_PC_MODEL=1/0 by hand) selects how a PC release would
 # work: the GPU uses the game's memory where it is (GPU-visible system memory) and keeps the data
 # it reads often in VRAM, the command processor's work is translated rather than emulated
 # (BB_GUEST_IN_PLACE=1 and what depends on it). AMD keeps the game's memory in a sparse arena;
@@ -170,16 +171,13 @@ gpu_vendor= gpu_name=
 if [[ -z ${BB_PC_MODEL:-} || ( ${BB_AUTO_NOHIZ:-1} != 0 && -z ${RADV_DEBUG:-} ) ]]; then
     IFS=$'\t' read -r gpu_vendor gpu_name < <("$caps" --device 2> /dev/null) || true
 fi
-# Memory model left to the port: the new one on AMD (0x1002), the 0.3 one elsewhere (NVIDIA's
-# path through the memory module is still being measured with testers).
+# Memory model left to the port: the 0.3 one on every GPU. GUNDAM VERSUS' compute queues wait
+# (WAIT_REG_MEM) for fences of the frame's earlier work; the new model writes those once the GPU
+# has really finished it, so each wait is a GPU round trip: a battle ran at ~30 FPS on an
+# RX 7800 XT with it, 60 with the 0.3 model (which renders it the same).
 if [[ -z ${BB_PC_MODEL:-} ]]; then
-    if [[ $gpu_vendor == 0x1002 ]]; then
-        export BB_PC_MODEL=1
-        echo "Memory model: new (AMD GPU${gpu_name:+, $gpu_name}; BB_PC_MODEL=0: the 0.3 model)"
-    else
-        export BB_PC_MODEL=0
-        echo "Memory model: the 0.3 one (${gpu_name:-GPU unknown}; BB_PC_MODEL=1: the new one)"
-    fi
+    export BB_PC_MODEL=0
+    echo "Memory model: the 0.3 one (${gpu_name:-GPU unknown}; BB_PC_MODEL=1: the new one, slower in this game)"
 fi
 # GCN 3-5 under RADV (Polaris, Vega and their APUs): with HiZ, depth compression showed black
 # halos and missing geometry (issues #54, #99); RADV_DEBUG=nohiz fixed it at some cost. Set
@@ -197,6 +195,10 @@ if [[ ${BB_AS_0_3:-0} == 1 ]]; then
     export BB_GUEST_IN_PLACE=0 BB_HOST_COPY_WAITS=all BB_PRODUCER_CHECK=1
 fi
 export BB_GUEST_IN_PLACE=${BB_GUEST_IN_PLACE:-${BB_PC_MODEL:-0}}
+# PS4 Pro mode (sceKernelIsNeoMode): GUNDAM VERSUS is "PS4 Pro Enhanced" (param.sfo); on a Pro it
+# renders its scene at 1920x1080 instead of the base PS4's 1440x1080 stretched to the screen.
+# Holds 60 FPS on an RX 7800 XT. BB_NEO=0: the base PS4.
+export BB_NEO=${BB_NEO:-1}
 # MangoHud (launcher switch: MANGOHUD=1) must be drawn once. Two overlays on top of each other
 # showed doubled, offset text: the Steam Deck's performance overlay (mangoapp, game mode) plus the
 # in-game layer, or the AppImage's bundled layer plus a system MangoHud (the layer names differ,
@@ -222,9 +224,13 @@ export BB_UFFD=${BB_UFFD:-0}
 # the copy: while an area loads the game reused that memory before the GPU thread got to it
 # ("Unimplemented PM4 type 0" a few seconds after loading a save). 0 decodes guest memory.
 export BB_COPY_GPU_BUFFERS=${BB_COPY_GPU_BUFFERS:-1}
-# A guest write next to small GPU outputs the GPU is still writing (counters, compute results,
-# up to BB_GPU_WRITE_TWINS_MAX bytes per page) does not wait for the GPU (BufferCache twins).
-export BB_GPU_WRITE_TWINS=${BB_GPU_WRITE_TWINS:-1} BB_GPU_WRITE_TWINS_MAX=${BB_GPU_WRITE_TWINS_MAX:-65536}
+# BB_GPU_WRITE_TWINS=1: a guest write next to small GPU outputs the GPU is still writing (counters,
+# compute results, up to BB_GPU_WRITE_TWINS_MAX bytes per page) does not wait for the GPU
+# (BufferCache twins). Off for GUNDAM VERSUS: it builds command buffers in pages beside its GPU
+# counters, and twins tell the game's writes from the GPU's byte by byte, so a header whose low
+# bytes equalled the old ones came back half old (0xc0034802 as 0xbf034802): bad packets, then a
+# crash in a battle after 1-3 minutes. Without them it holds 60 FPS all the same.
+export BB_GPU_WRITE_TWINS=${BB_GPU_WRITE_TWINS:-0} BB_GPU_WRITE_TWINS_MAX=${BB_GPU_WRITE_TWINS_MAX:-65536}
 if [[ -z ${BB_VBLANK_HZ:-} ]]; then
     case $fps in uncap) export BB_VBLANK_HZ=480 ;; 90) export BB_VBLANK_HZ=90 ;; *) export BB_VBLANK_HZ=60 ;; esac
 fi
@@ -288,7 +294,7 @@ if trophies=$("$PYTHON" scripts/trophies.py prepare --game "$original_game" \
     export BB_TROPHY_DIR=$trophies
 fi
 # Discord Rich Presence, off by default: BB_DISCORD=1 with BB_DISCORD_CLIENT_ID, the id of a
-# Discord application of your own (its name is what Discord shows as played), shows "GODZILLA" and
+# Discord application of your own (its name is what Discord shows as played), shows "GUNDAM VERSUS" and
 # the time played (scripts/discord_presence.py). $$ becomes the game below (exec), and the helper
 # ends with it.
 if [[ ${BB_DISCORD:-0} == 1 && -n ${BB_DISCORD_CLIENT_ID:-} ]]; then

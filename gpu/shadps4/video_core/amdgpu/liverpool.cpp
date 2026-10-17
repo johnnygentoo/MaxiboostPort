@@ -2645,8 +2645,10 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
             } else {
                 const auto wait_start = std::chrono::steady_clock::now();
                 bool wait_told = false;
+                u32 polls = 0;
                 while (!mem_semaphore->Signaled()) {
-                    if (!wait_told && std::chrono::steady_clock::now() - wait_start > std::chrono::seconds(2)) {
+                    if (!wait_told && (++polls & 4095) == 0 &&
+                        std::chrono::steady_clock::now() - wait_start > std::chrono::seconds(2)) {
                         wait_told = true;
                         std::printf("GPU: compute queue %u waits on a memory semaphore\n", vqid);
                         std::fflush(stdout);
@@ -2664,10 +2666,13 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
             const auto* wait_reg_mem = reinterpret_cast<const PM4CmdWaitRegMem*>(header);
             ASSERT(wait_reg_mem->engine.Value() == PM4CmdWaitRegMem::Engine::Me);
             // bbport: a compute wait unmet for a long time says what it waits for (once each).
+            // (the clock is read every 4096 polls: the poll itself is the hot loop of a waiting queue)
             const auto wait_start = std::chrono::steady_clock::now();
             bool wait_told = false;
+            u32 polls = 0;
             while (!wait_reg_mem->Test(regs.reg_array)) {
-                if (!wait_told && std::chrono::steady_clock::now() - wait_start > std::chrono::seconds(2)) {
+                if (!wait_told && (++polls & 4095) == 0 &&
+                    std::chrono::steady_clock::now() - wait_start > std::chrono::seconds(2)) {
                     wait_told = true;
                     const bool memory = wait_reg_mem->mem_space.Value() == PM4CmdWaitRegMem::MemSpace::Memory;
                     std::printf("GPU: compute queue %u waits on %s %#llx: (value %#x & %#x) function %u ref %#x\n",

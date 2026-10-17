@@ -4,7 +4,7 @@ Patch addresses are PS4 virtual addresses (eboot base 0x400000); the loader's
 image places eboot vaddr 0 at image offset 0. Only literal writes are supported
 (bytes, bytes16/32/64, float32/64, utf8, utf16); pattern ("mask") patches are rejected.
 
-The built-in patches are patches/Godzilla.xml (GODZILLA 1.01). Frame rate and effect switches
+The built-in patches are patches/Gundam.xml (GUNDAM VERSUS 1.13). Frame rate and effect switches
 name patches in it; a name the file does not have yet is reported and skipped, so the port runs
 the game as it is until the patch is written.
 """
@@ -17,25 +17,16 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 EBOOT_BASE=0x400000
-APP_VERSION='01.01'
-BUILTIN_XML=Path(__file__).resolve().parent.parent/'patches/Godzilla.xml'
-# BB_FPS presets: patch names from patches/Godzilla.xml. The game runs at 60 FPS (flip rate 0).
-FPS_PRESETS={'60':[],'uncap':['Uncap FPS']}
-# The game renders at 1920x1080. Other output sizes are rendered natively: a patch sets the
-# frame size the game builds its targets and display buffers from (resolution_writes); the
-# HUD scales with it. Upscaler presets need the game's scene, depth and motion: not yet.
+APP_VERSION='01.13'
+BUILTIN_XML=Path(__file__).resolve().parent.parent/'patches/Gundam.xml'
+# BB_FPS presets: patch names from patches/Gundam.xml. The game runs at 60 FPS (flip rate 0).
+FPS_PRESETS={'60':[]}
+# The game renders at 1920x1080. The places in the 1.13 executable that set its frame size are not
+# mapped yet (RESOLUTION_SITES): until they are, every output size shows the 1080p frame scaled
+# by the presenter, and no resolution patch is made.
 OUTPUT_SIZE=(1920,1080)
-# Where the 1.01 executable keeps its frame size (image offsets; 1920 then 1080 at each):
-#  0x1c9d31  mov esi,1920 / mov edx,1080  (0x1c9d36): the main color texture's size
-#  0x175542  the default display configuration (mov [rdi],1920 / mov [rdi+4],1080)
-#  0x175634  the display object's size ([rbx+0x250] / [rbx+0x254])
-#  0x4ee6d8  mode 3 of the display mode table (id, width, height)
-#  0x66d114.. seven render target descriptions in .data (G-buffer, scene, post targets)
-RESOLUTION_SITES=[(0x1c9d31,0x1c9d36),(0x175542,0x175549),(0x175634,0x17563e),(0x4ee6d8,0x4ee6dc)]+\
-    [(a,a+4) for a in (0x66d114,0x66d134,0x66d154,0x66d174,0x66d194,0x66d1b4,0x66d234)]
-# The display setup clamps anything above 1920x1080 back to it (0x175be1): its two branches.
-RESOLUTION_CLAMP=[(0x175be6,bytes.fromhex('770d'),bytes.fromhex('6690')),
-                  (0x175bf3,bytes.fromhex('7211'),bytes.fromhex('eb11'))]
+RESOLUTION_SITES=[]
+RESOLUTION_CLAMP=[]
 
 
 def boot_image(out):
@@ -56,11 +47,11 @@ def resolution_writes(size,image):
     writes=[]
     for wa,ha in RESOLUTION_SITES:
         if struct.unpack_from('<I',image,wa)[0]!=1920 or struct.unpack_from('<I',image,ha)[0]!=1080:
-            raise ValueError(f'the executable has no 1920x1080 at {wa:#x}: not GODZILLA 1.01')
+            raise ValueError(f'the executable has no 1920x1080 at {wa:#x}: not GUNDAM VERSUS 1.13')
         writes+=[(wa,struct.pack('<I',w)),(ha,struct.pack('<I',h))]
     for at,original,patched in RESOLUTION_CLAMP:
         if image[at:at+len(original)]!=original:
-            raise ValueError(f'unexpected display clamp at {at:#x}: not GODZILLA 1.01')
+            raise ValueError(f'unexpected display clamp at {at:#x}: not GUNDAM VERSUS 1.13')
         writes.append((at,patched))
     return writes
 
@@ -76,6 +67,8 @@ def scaled_sizes(settings):
     """(render, output): the size the game renders at (the output, divided by the upscaler
     preset's scale with a temporal upscaler) and the output. None when both are 1920x1080 (the
     game's own size, no patch)."""
+    if not RESOLUTION_SITES:
+        return None  # the frame size is not mapped yet: the presenter scales the 1080p frame
     out=output_size(settings)
     scale=1.0
     if settings.get('upscaler','off') in TEMPORAL_UPSCALERS:
@@ -127,7 +120,7 @@ def available(xml, names, app_version):
     have={meta.get('Name') for meta in ET.parse(xml).getroot().iter('Metadata')
           if meta.get('AppVer')==app_version}
     for name in names:
-        if name not in have: print(f'Patches: {name!r} not available for GODZILLA {app_version} yet',file=sys.stderr)
+        if name not in have: print(f'Patches: {name!r} not available for GUNDAM VERSUS {app_version} yet',file=sys.stderr)
     return [n for n in names if n in have]
 
 
@@ -173,7 +166,7 @@ def compile_patches(xml, names, app_version, segments):
 
 # Third-party patch files (shadPS4/GoldHEN XML) in the data directory's patches/ folder.
 # A file for any retail release applies when it has the same executable (game_check.py).
-GAME_IDS={'CUSA02046'}
+GAME_IDS={'CUSA08790'}
 
 
 def same_app_version(value, app_version):
@@ -247,7 +240,7 @@ def main():
     p.add_argument('--app-version',default=APP_VERSION)
     p.add_argument('--out',type=Path,default=Path(__file__).resolve().parent.parent/'out')
     p.add_argument('--settings',type=Path,default=Path(__file__).resolve().parent.parent/'bbport.ini')
-    p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('BB_GAME_DIR','CUSA02046')))
+    p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('BB_GAME_DIR','CUSA08790-full')))
     p.add_argument('--render-res',default='',help='render resolution WxH (the game renders natively at it)')
     p.add_argument('--output-res',default='',help='output resolution WxH')
     p.add_argument('--print-preset-size',action='store_true',help='print the selected preset size, if reduced')

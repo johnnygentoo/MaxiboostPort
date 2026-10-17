@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<!-- gvport's built-in patches for GUNDAM VERSUS (CUSA08790) 1.13, in the shadPS4/GoldHEN format.
+     Addresses are PS4 virtual addresses (eboot base 0x400000). -->
+<Patch>
+    <TitleID>
+        <ID>CUSA08790</ID>
+    </TitleID>
+</Patch>

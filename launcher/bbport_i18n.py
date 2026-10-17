@@ -307,7 +307,7 @@ EN = {
     "Новая: видеокарта работает с памятью игры напрямую, как в игре для ПК, а команды графики переводятся, а не эмулируются. Старая — модель памяти 0.3 со всеми исправлениями. Если драйвер не проходит проверку при запуске — старая":
         "The new one: the GPU works with the game's memory directly, as in a PC game, and graphics commands are translated rather than emulated. The old one: the memory model of 0.3 with all the fixes. If the driver fails the startup check, the old one",
     "Модель памяти и трансляции": "Memory and translation model",
-    "Авто: новая на AMD, старая на других": "Auto: new on AMD, old on others",
+    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Auto: old (GUNDAM VERSUS runs faster with it)",
     "Новая": "New",
     "Старая (как в 0.3)": "Old (as in 0.3)",
     "Синхронизация как в 0.3": "Synchronisation as in 0.3",
@@ -950,7 +950,7 @@ PT_BR = {
     "Новая: видеокарта работает с памятью игры напрямую, как в игре для ПК, а команды графики переводятся, а не эмулируются. Старая — модель памяти 0.3 со всеми исправлениями. Если драйвер не проходит проверку при запуске — старая":
         "O novo: a GPU usa a memória do jogo diretamente, como em um jogo de PC, e os comandos gráficos são traduzidos em vez de emulados. O antigo: o modelo de memória da 0.3 com todas as correções. Se o driver falhar na verificação inicial, o antigo",
     "Модель памяти и трансляции": "Modelo de memória e tradução",
-    "Авто: новая на AMD, старая на других": "Automático: novo na AMD, antigo nas outras",
+    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Automático: antigo (GUNDAM VERSUS roda mais rápido com ele)",
     "Новая": "Novo",
     "Старая (как в 0.3)": "Antigo (como na 0.3)",
     "Синхронизация как в 0.3": "Sincronização como na 0.3",
@@ -1877,8 +1877,7 @@ ES = {
         "El nuevo: la tarjeta gráfica trabaja directamente con la memoria del juego, como en un juego de PC, y los comandos gráficos se traducen en vez de emularse. El antiguo: el modelo de memoria de la 0.3 con todas las correcciones. Si el controlador no pasa la comprobación al arrancar, el antiguo",
     "Модель памяти и трансляции":
         "Modelo de memoria y traducción",
-    "Авто: новая на AMD, старая на других":
-        "Automático: nuevo en AMD, antiguo en las demás",
+    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Automático: antiguo (GUNDAM VERSUS va más rápido con él)",
     "Новая":
         "Nuevo",
     "Старая (как в 0.3)":
@@ -2585,8 +2584,7 @@ IT = {
         "Il nuovo: la scheda video lavora direttamente con la memoria del gioco, come in un gioco per PC, e i comandi grafici vengono tradotti invece che emulati. Il vecchio: il modello di memoria della 0.3 con tutte le correzioni. Se il driver non supera il controllo all'avvio, il vecchio",
     "Модель памяти и трансляции":
         "Modello di memoria e traduzione",
-    "Авто: новая на AMD, старая на других":
-        "Automatico: nuovo su AMD, vecchio sulle altre",
+    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Automatico: vecchio (GUNDAM VERSUS è più veloce così)",
     "Новая":
         "Nuovo",
     "Старая (как в 0.3)":
@@ -3293,8 +3291,7 @@ FR = {
         "Le nouveau : la carte graphique travaille directement avec la mémoire du jeu, comme dans un jeu PC, et les commandes graphiques sont traduites au lieu d'être émulées. L'ancien : le modèle mémoire de la 0.3 avec toutes les corrections. Si le pilote échoue à la vérification au démarrage, l'ancien",
     "Модель памяти и трансляции":
         "Modèle de mémoire et de traduction",
-    "Авто: новая на AMD, старая на других":
-        "Auto : nouveau sur AMD, ancien sur les autres",
+    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Auto : ancien (GUNDAM VERSUS est plus rapide ainsi)",
     "Новая":
         "Nouveau",
     "Старая (как в 0.3)":
@@ -4001,8 +3998,7 @@ DE = {
         "Das neue: Die Grafikkarte arbeitet direkt mit dem Speicher des Spiels, wie bei einem PC-Spiel, und Grafikbefehle werden übersetzt statt emuliert. Das alte: das Speichermodell von 0.3 mit allen Korrekturen. Besteht der Treiber die Prüfung beim Start nicht, das alte",
     "Модель памяти и трансляции":
         "Speicher- und Übersetzungsmodell",
-    "Авто: новая на AMD, старая на других":
-        "Automatisch: neu auf AMD, alt auf anderen",
+    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Auto: alt (GUNDAM VERSUS läuft damit schneller)",
     "Новая":
         "Neu",
     "Старая (как в 0.3)":
@@ -4634,7 +4630,7 @@ ZH_CN = {
     "Новая: видеокарта работает с памятью игры напрямую, как в игре для ПК, а команды графики переводятся, а не эмулируются. Старая — модель памяти 0.3 со всеми исправлениями. Если драйвер не проходит проверку при запуске — старая":
         "新模型：显卡像 PC 游戏那样直接读写游戏内存，图形指令被转译而非模拟。旧模型：0.3 版的内存模型，包含所有修复。如果驱动未通过启动检查，则使用旧模型",
     "Модель памяти и трансляции": "内存与指令转译模型",
-    "Авто: новая на AMD, старая на других": "自动：AMD 用新模型，其他显卡用旧模型",
+    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "自动：旧模型（GUNDAM VERSUS 用它更快）",
     "Новая": "新模型",
     "Старая (как в 0.3)": "旧模型（与 0.3 版相同）",
     "Синхронизация как в 0.3": "与 0.3 版相同的同步方式",

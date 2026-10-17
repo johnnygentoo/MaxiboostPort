@@ -42,17 +42,29 @@ static int new_id(void) { pthread_mutex_lock(&lock); int id=next_id++; pthread_m
 static void note(const char *what) { printf("Runtime: %s\n",what); }
 
 /* ---- UserService ---- */
+/* User 1 is logged in from the start; users 2..4 log in as further gamepads connect (couch co-op,
+ * runtime_pad.c), each with a login event. Names: BB_USER_NAME for user 1 (default "Pilot"),
+ * BB_USER2_NAME.. for the others (default "Pilot 2".."Pilot 4"). */
 static int login_event_pending=1;
 static ABI int32_t user_initialize(const void *params) { (void)params; note("UserService initialized (user 1 logged in)"); return 0; }
 static ABI int32_t user_terminate(void) { return 0; }
 static ABI int32_t user_initial(int32_t *id) { if (!id) return USER_INVALID_ARGUMENT; *id=USER_ID; return 0; }
+static int logged_in(int32_t id) {
+    int32_t ids[4];
+    runtime_users_logged_in(ids);
+    for (int i=0;i<4;++i) if (ids[i]==id) return 1;
+    return 0;
+}
 static ABI int32_t user_list(int32_t *ids) {
     if (!ids) return USER_INVALID_ARGUMENT;
-    ids[0]=USER_ID; ids[1]=ids[2]=ids[3]=-1; return 0;
+    runtime_users_logged_in(ids); return 0;
 }
 static ABI int32_t user_name(int32_t id,char *name,uint64_t size) {
-    if (id!=USER_ID || !name) return USER_INVALID_ARGUMENT;
-    const char *value=getenv("BB_USER_NAME") ? getenv("BB_USER_NAME") : "Hunter";
+    if (!name || id<1 || id>4 || !logged_in(id)) return USER_INVALID_ARGUMENT;
+    char key[16], fallback[16];
+    if (id==1) snprintf(key,sizeof(key),"BB_USER_NAME"); else snprintf(key,sizeof(key),"BB_USER%d_NAME",id);
+    if (id==1) snprintf(fallback,sizeof(fallback),"Pilot"); else snprintf(fallback,sizeof(fallback),"Pilot %d",id);
+    const char *value=getenv(key) && *getenv(key) ? getenv(key) : fallback;
     if (strlen(value)+1>size) return (int32_t)0x8096000a; /* BUFFER_TOO_SHORT */
     strcpy(name,value); return 0;
 }
@@ -61,8 +73,10 @@ static ABI int32_t user_event(int32_t *event) {
     pthread_mutex_lock(&lock);
     int pending=login_event_pending; login_event_pending=0;
     pthread_mutex_unlock(&lock);
-    if (!pending) return USER_NO_EVENT;
-    event[0]=0; event[1]=USER_ID; /* LOGIN */
+    const int user=pending ? USER_ID : runtime_users_next_login();
+    if (!user) return USER_NO_EVENT;
+    if (user!=USER_ID) printf("Runtime: UserService: user %d logged in\n",user);
+    event[0]=0; event[1]=user; /* LOGIN */
     return 0;
 }
 
@@ -569,8 +583,8 @@ static ABI int32_t rudp_unreachable(void) { return RUDP_NOT_ACCEPTABLE; }
 static ABI int32_t rudp_nothing(void) { return 0; }
 static ABI int32_t netctl_result(int32_t event,int32_t *error) { (void)event; if (error) *error=NET_CTL_NOT_CONNECTED; return 0; }
 static ABI int32_t user_color(int32_t user,int32_t *color) {
-    if (user!=USER_ID || !color) return USER_INVALID_ARGUMENT;
-    *color=0; /* blue, the first user's colour */
+    if (!color || user<1 || user>4 || !logged_in(user)) return USER_INVALID_ARGUMENT;
+    *color=user-1; /* blue, red, green, pink: the users' colours in login order */
     return 0;
 }
 

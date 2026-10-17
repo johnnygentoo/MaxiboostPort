@@ -23,6 +23,7 @@ uint64_t runtime_process_time_counter() { return runtime_process_time_us() * 100
 int32_t* runtime_errno() { std::abort(); }
 int runtime_memory_write_backing(uintptr_t, const void*, uint64_t) { std::abort(); }
 void runtime_memory_read_backing(uintptr_t, void*, uint64_t) { std::abort(); }
+int runtime_neo_mode() { return 0; }
 const uint64_t* runtime_memory_generation() { static const uint64_t generation = 0; return &generation; }
 void runtime_memory_note_write(uintptr_t, uint64_t) { std::abort(); }
 void runtime_memory_set_note_write_hook(void (*)(uintptr_t, uint64_t)) {}

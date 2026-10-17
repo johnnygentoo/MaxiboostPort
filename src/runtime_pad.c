@@ -691,20 +691,24 @@ static void sample_host(PadData *d) {
  * options touchpad touchpad_left touchpad_right up down left right) are held while listed;
  * touchpad defaults to a left-side click; lx= ly= rx= ry= (0..255) override
  * the sticks. An empty file releases everything. */
-static struct { uint32_t buttons; int stick[4]; int touch_side; } injected={0,{-1,-1,-1,-1},-1};
+typedef struct {
+    uint32_t buttons; int stick[4]; int touch_side;
+    uint64_t last_check; struct timespec mtime;
+} Inject;
+static Inject injected={0,{-1,-1,-1,-1},-1,0,{0,0}};
 static int replay_armed;      /* 1 while a BB_PAD_REPLAY recording plays, 2 once it ended */
 static uint64_t replay_start; /* 0: (re)start at the next sample */
-static void read_inject(void) {
-    static const char *path; static int checked; static uint64_t last_check; static struct timespec mtime;
-    if (!checked) { path=getenv("BB_PAD_FILE"); checked=1; }
+/* Reads a pad file into *in when it changed (BB_PAD_FILE for player 1, BB_PAD2_FILE for player
+ * 2); `who` names it in the log. */
+static void read_inject_file(const char *path, Inject *in, const char *who) {
     if (!path || !*path) return;
     uint64_t now=now_us();
-    if (now-last_check<20000) return;
-    last_check=now;
+    if (now-in->last_check<20000) return;
+    in->last_check=now;
     struct stat st;
     if (stat(path,&st)!=0) return;
-    if (st.st_mtim.tv_sec==mtime.tv_sec && st.st_mtim.tv_nsec==mtime.tv_nsec) return;
-    mtime=st.st_mtim;
+    if (st.st_mtim.tv_sec==in->mtime.tv_sec && st.st_mtim.tv_nsec==in->mtime.tv_nsec) return;
+    in->mtime=st.st_mtim;
     FILE *f=fopen(path,"r");
     if (!f) return;
     static const struct { const char *name; uint32_t ps; } names[]={
@@ -714,22 +718,27 @@ static void read_inject(void) {
         {"up",BTN_UP}, {"down",BTN_DOWN}, {"left",BTN_LEFT}, {"right",BTN_RIGHT},
     };
     static const char *sticks[]={"lx=","ly=","rx=","ry="};
-    injected.buttons=0;
-    injected.touch_side=-1;
-    for (int i=0;i<4;++i) injected.stick[i]=-1;
+    in->buttons=0;
+    in->touch_side=-1;
+    for (int i=0;i<4;++i) in->stick[i]=-1;
     char token[64];
     while (fscanf(f,"%63s",token)==1) {
-        if (!strcmp(token,"replay") && replay_armed!=1) { replay_armed=1; replay_start=0; } /* BB_PAD_REPLAY */
+        if (in==&injected && !strcmp(token,"replay") && replay_armed!=1) { replay_armed=1; replay_start=0; } /* BB_PAD_REPLAY */
         if (!strcmp(token,"touchpad_left") || !strcmp(token,"touchpad_right")) {
-            injected.buttons|=BTN_TOUCHPAD;
-            injected.touch_side=!strcmp(token,"touchpad_right");
+            in->buttons|=BTN_TOUCHPAD;
+            in->touch_side=!strcmp(token,"touchpad_right");
         }
-        for (size_t i=0;i<sizeof(names)/sizeof(*names);++i) if (!strcmp(token,names[i].name)) injected.buttons|=names[i].ps;
-        for (int i=0;i<4;++i) if (!strncmp(token,sticks[i],3)) { int v=atoi(token+3); injected.stick[i]=v<0 ? 0 : v>255 ? 255 : v; }
+        for (size_t i=0;i<sizeof(names)/sizeof(*names);++i) if (!strcmp(token,names[i].name)) in->buttons|=names[i].ps;
+        for (int i=0;i<4;++i) if (!strncmp(token,sticks[i],3)) { int v=atoi(token+3); in->stick[i]=v<0 ? 0 : v>255 ? 255 : v; }
     }
     fclose(f);
-    printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d\n",injected.buttons,
-           injected.stick[0],injected.stick[1],injected.stick[2],injected.stick[3]);
+    printf("Runtime: %s: buttons 0x%x sticks %d %d %d %d\n",who,in->buttons,
+           in->stick[0],in->stick[1],in->stick[2],in->stick[3]);
+}
+static void read_inject(void) {
+    static const char *path; static int checked;
+    if (!checked) { path=getenv("BB_PAD_FILE"); checked=1; }
+    read_inject_file(path,&injected,"pad file");
 }
 /* BB_PAD_RECORD=<file>: F9 starts and stops recording the pad state (gamepad or keyboard) with
  * the time since F9; BB_PAD_REPLAY=<file> plays such a recording back, started by the token
@@ -840,13 +849,177 @@ static void sample(PadData *d) {
     touch_ids(d);
 }
 
+/* ---- Players 2-4: couch co-op. Each further SDL gamepad (in connection order, after player 1's)
+ * is another PS4 user, logged in when it connects: users 2..4, pad handles 2..4. Player 1 keeps
+ * everything above (the keyboard and mouse, calibration, the scripted file, the overlay); the
+ * others read their gamepad with the same button bindings and a plain stick dead zone. A gamepad
+ * stays with its player while connected; a player stays logged in when it disconnects (as on a
+ * PS4) and gets the next free gamepad. BB_PLAYERS=1..4 limits them (default 4). BB_PAD2_FILE=
+ * <file>: a virtual gamepad for player 2 driven by a pad file as BB_PAD_FILE's (tests without a
+ * second controller). The light bar shows the player's colour (blue, red, green, pink). */
+#define MAX_PLAYERS 4
+typedef struct { SDL_Gamepad *g; int logged_in, opened, virtual_pad; Inject inject; } Player;
+static Player players[MAX_PLAYERS]; /* [0]: player 1 is the path above */
+static int login_queue[8], login_count;
+static const uint8_t player_colors[MAX_PLAYERS][3]={{0,0,64},{64,0,0},{0,64,0},{64,0,32}};
+static int max_players(void) {
+    static int n;
+    if (!n) { const char *v=getenv("BB_PLAYERS"); n=v ? atoi(v) : MAX_PLAYERS; if (n<1) n=1; if (n>MAX_PLAYERS) n=MAX_PLAYERS; }
+    return n;
+}
+static const char *pad2_file(void) {
+    static const char *path; static int read;
+    if (!read) { path=getenv("BB_PAD2_FILE"); if (path && !*path) path=NULL; read=1; }
+    return path;
+}
+static void player_login(int k) {
+    if (players[k].logged_in) return;
+    players[k].logged_in=1;
+    if (login_count<(int)(sizeof(login_queue)/sizeof(*login_queue))) login_queue[login_count++]=k+1;
+}
+/* Gives free gamepads to players 2..4 (twice a second; under lock). */
+static void scan_players(void) {
+    static uint64_t last;
+    const uint64_t now=now_us();
+    if (last && now-last<500000) return;
+    last=now;
+    SDL_Gamepad *first=current_gamepad();
+    if (sdl_ready<0) return;
+    const SDL_JoystickID first_id=first ? SDL_GetGamepadID(first) : 0;
+    for (int k=1;k<max_players();++k) {
+        Player *pl=&players[k];
+        if (pl->g && (!SDL_GamepadConnected(pl->g) || SDL_GetGamepadID(pl->g)==first_id)) {
+            printf("Runtime: player %d's gamepad is gone\n",k+1);
+            SDL_CloseGamepad(pl->g); pl->g=NULL;
+        }
+    }
+    if (pad2_file() && max_players()>1 && !players[1].virtual_pad) {
+        players[1].virtual_pad=1; player_login(1);
+        printf("Runtime: player 2 logged in: a virtual gamepad (BB_PAD2_FILE)\n");
+    }
+    int count=0;
+    SDL_JoystickID *ids=SDL_GetGamepads(&count);
+    for (int i=0;ids && i<count;++i) {
+        if (ids[i]==first_id) continue;
+        int taken=0, free_slot=-1;
+        for (int k=1;k<max_players();++k) {
+            if (players[k].g && SDL_GetGamepadID(players[k].g)==ids[i]) taken=1;
+            else if (!players[k].g && !players[k].virtual_pad && free_slot<0) free_slot=k;
+        }
+        if (taken || free_slot<0) continue;
+        Player *pl=&players[free_slot];
+        pl->g=SDL_OpenGamepad(ids[i]);
+        if (!pl->g) continue;
+        const uint8_t *c=player_colors[free_slot];
+        SDL_SetGamepadLED(pl->g,c[0],c[1],c[2]);
+        printf("Runtime: player %d logged in: %s\n",free_slot+1,SDL_GetGamepadName(pl->g));
+        player_login(free_slot);
+    }
+    SDL_free(ids);
+}
+/* The users logged in (1 always, then players 2..4 as their gamepads came): fills ids (4 entries,
+ * -1 after the last), returns how many. For sceUserServiceGetLoginUserIdList. */
+int runtime_users_logged_in(int32_t ids[4]) {
+    pthread_mutex_lock(&lock);
+    scan_players();
+    int n=0;
+    ids[n++]=1;
+    for (int k=1;k<MAX_PLAYERS;++k) if (players[k].logged_in) ids[n++]=k+1;
+    for (int i=n;i<4;++i) ids[i]=-1;
+    pthread_mutex_unlock(&lock);
+    return n;
+}
+/* The next user who logged in since the last call (sceUserServiceGetEvent), or 0. */
+int runtime_users_next_login(void) {
+    pthread_mutex_lock(&lock);
+    scan_players();
+    int user=0;
+    if (login_count) { user=login_queue[0]; memmove(login_queue,login_queue+1,sizeof(*login_queue)*(size_t)--login_count); }
+    pthread_mutex_unlock(&lock);
+    return user;
+}
+static int players_connected(void) {
+    int n=gamepad ? 1 : 0;
+    for (int k=1;k<MAX_PLAYERS;++k) n+=players[k].g || players[k].virtual_pad;
+    return n ? n : 1;
+}
+/* Player k+1's state (under lock): the gamepad through the bindings, the sticks with a dead zone,
+ * the touchpad (Back is a left-side click), then its pad file. */
+static void sample_player(int k, PadData *d) {
+    Player *pl=&players[k];
+    memset(d,0,sizeof(*d));
+    d->left_x=d->left_y=d->right_x=d->right_y=128;
+    d->orientation[3]=1.0f;
+    d->timestamp=now_us();
+    d->connected=pl->g || pl->virtual_pad;
+    d->connected_count=(uint8_t)players_connected();
+    if (bbgpu_overlay_captures_input()) return; /* the menu is open: neutral input */
+    if (!bindings_ready) { load_bindings(); bindings_ready=1; }
+    SDL_Gamepad *g=pl->g;
+    if (g) {
+        for (int i=IN_CROSS;i<=IN_RIGHT;++i) {
+            int v=0;
+            for (int j=0;j<bindings[i].pad_count;++j) {
+                const int b=bindings[i].pad[j];
+                const int x=b==PAD_LEFT_TRIGGER ? trigger(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_LEFT_TRIGGER))
+                          : b==PAD_RIGHT_TRIGGER ? trigger(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_RIGHT_TRIGGER))
+                          : SDL_GetGamepadButton(g,(SDL_GamepadButton)b) ? 255 : 0;
+                if (x>v) v=x;
+            }
+            if (i==IN_L2) d->l2=(uint8_t)v;
+            if (i==IN_R2) d->r2=(uint8_t)v;
+            if (i==IN_TOUCHPAD_RIGHT) { if (v>30) { d->buttons|=BTN_TOUCHPAD; pl->inject.touch_side=1; } }
+            else if (v>30) d->buttons|=input_buttons[i];
+        }
+        static const SDL_GamepadAxis axes[4]={SDL_GAMEPAD_AXIS_LEFTX,SDL_GAMEPAD_AXIS_LEFTY,
+                                              SDL_GAMEPAD_AXIS_RIGHTX,SDL_GAMEPAD_AXIS_RIGHTY};
+        uint8_t *out[4]={&d->left_x,&d->left_y,&d->right_x,&d->right_y};
+        for (int i=0;i<4;++i) {
+            const int v=SDL_GetGamepadAxis(g,axes[i])/256;               /* -128..127 */
+            *out[i]=(uint8_t)(v>-6 && v<6 ? 128 : v+128);                 /* dead zone 5, as player 1's */
+        }
+        if (SDL_GetNumGamepadTouchpads(g)>0) {
+            const int fingers=SDL_GetNumGamepadTouchpadFingers(g,0);
+            for (int finger=0;finger<fingers && d->touch_count<2;++finger) {
+                bool down=false; float x=0, y=0;
+                if (SDL_GetGamepadTouchpadFinger(g,0,finger,&down,&x,&y,NULL) && down)
+                    d->touches[d->touch_count++]=(PadTouch){.x=touch_axis(x,1919),.y=touch_axis(y,942),.id=(uint8_t)(finger+1)};
+            }
+        }
+    }
+    if (k==1) read_inject_file(pad2_file(),&pl->inject,"player 2 pad file");
+    d->buttons|=pl->inject.buttons;
+    if (pl->inject.buttons & BTN_L2) d->l2=255;
+    if (pl->inject.buttons & BTN_R2) d->r2=255;
+    uint8_t *axes[4]={&d->left_x,&d->left_y,&d->right_x,&d->right_y};
+    for (int i=0;i<4;++i) if (pl->inject.stick[i]>=0) *axes[i]=(uint8_t)pl->inject.stick[i];
+    if ((d->buttons & BTN_TOUCHPAD) && !d->touch_count) {
+        d->touches[d->touch_count++]=(PadTouch){.x=pl->inject.touch_side==1 ? 1500 : 400,.y=470,.id=1};
+    }
+    if (d->touch_count) d->touch_held_time=1;
+}
+/* The player index (1..3) of an opened handle of players 2..4, else 0. */
+static int player_of(int32_t handle) {
+    return handle>=2 && handle<=MAX_PLAYERS && players[handle-1].opened ? handle-1 : 0;
+}
+
 static ABI int32_t pad_init(void) { pthread_mutex_lock(&lock); initialized=1; pthread_mutex_unlock(&lock); return 0; }
 static ABI int32_t pad_open(int32_t user, int32_t type, int32_t index, const void *param) {
     (void)param;
     if (!initialized) return ERR_NOT_INITIALIZED;
-    if (user!=1) return ERR_INVALID_ARG;
     if (type!=0 && type!=2) return ERR_INVALID_ARG; /* standard / special port */
     if (index) return ERR_INVALID_ARG;
+    if (user>=2 && user<=max_players()) { /* players 2..4, once logged in */
+        pthread_mutex_lock(&lock);
+        scan_players();
+        Player *pl=&players[user-1];
+        const int32_t r=!pl->logged_in ? ERR_INVALID_ARG : pl->opened ? ERR_ALREADY_OPENED : user;
+        if (r==user) pl->opened=1;
+        pthread_mutex_unlock(&lock);
+        if (r==user) printf("Runtime: pad opened for user %d\n",user);
+        return r;
+    }
+    if (user!=1) return ERR_INVALID_ARG;
     pthread_mutex_lock(&lock);
     int already=opened; opened=1;
     pthread_mutex_unlock(&lock);
@@ -856,67 +1029,83 @@ static ABI int32_t pad_open(int32_t user, int32_t type, int32_t index, const voi
 }
 /* The handle scePadOpen gave for this user and port. */
 static ABI int32_t pad_get_handle(int32_t user, int32_t type, int32_t index) {
-    (void)user; (void)index;
-    if (type!=0 || !opened) return ERR_INVALID_HANDLE;
-    return PAD_HANDLE;
+    (void)index;
+    if (type!=0) return ERR_INVALID_HANDLE;
+    if (user==1) return opened ? PAD_HANDLE : ERR_INVALID_HANDLE;
+    return player_of(user) ? user : ERR_INVALID_HANDLE;
 }
 static ABI int32_t pad_close(int32_t handle) {
-    if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
-    opened=0; return 0;
+    pthread_mutex_lock(&lock);
+    int32_t r=0;
+    if (player_of(handle)) players[handle-1].opened=0;
+    else if (handle==PAD_HANDLE && opened) opened=0;
+    else r=ERR_INVALID_HANDLE;
+    pthread_mutex_unlock(&lock);
+    return r;
 }
 static ABI int32_t pad_read_state(int32_t handle, PadData *data) {
-    if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
+    const int k=player_of(handle);
+    if (!k && (handle!=PAD_HANDLE || !opened)) return ERR_INVALID_HANDLE;
     if (!data) return ERR_INVALID_ARG;
     pthread_mutex_lock(&lock);
-    sample(data); ++reads;
+    if (k) { scan_players(); sample_player(k,data); }
+    else { sample(data); data->connected_count=(uint8_t)players_connected(); ++reads; }
     pthread_mutex_unlock(&lock);
     return 0;
 }
 /* Buffered read: the port samples once per call, so one entry is returned. */
 static ABI int32_t pad_read(int32_t handle, PadData *data, int32_t count) {
-    if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
+    if (!player_of(handle) && (handle!=PAD_HANDLE || !opened)) return ERR_INVALID_HANDLE;
     if (!data || count<1 || count>64) return ERR_INVALID_ARG;
     pad_read_state(handle,data);
     return 1;
 }
 static ABI int32_t pad_info(int32_t handle, ControllerInfo *info) {
-    if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
+    const int k=player_of(handle);
+    if (!k && (handle!=PAD_HANDLE || !opened)) return ERR_INVALID_HANDLE;
     if (!info) return ERR_INVALID_ARG;
     memset(info,0,sizeof(*info));
     info->pixel_density=44.86f; info->resolution_x=1920; info->resolution_y=943;
     info->dead_zone_left=info->dead_zone_right=2;
-    info->connection_type=0; info->connected=1; info->device_class=0;
+    info->connection_type=0; info->device_class=0;
     pthread_mutex_lock(&lock);
     current_gamepad();
-    info->connected_count=connected_count ? connected_count : 1;
+    scan_players();
+    info->connected=k ? (players[k].g || players[k].virtual_pad) : 1;
+    info->connected_count=(uint8_t)players_connected();
     pthread_mutex_unlock(&lock);
     return 0;
 }
+/* The gamepad behind a handle (under lock): player 1's or a further player's. */
+static SDL_Gamepad *handle_gamepad(int32_t handle) {
+    const int k=player_of(handle);
+    return k ? players[k].g : current_gamepad();
+}
 static ABI int32_t pad_vibration(int32_t handle, const uint8_t *param) {
-    if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
+    if (!player_of(handle) && (handle!=PAD_HANDLE || !opened)) return ERR_INVALID_HANDLE;
     if (!param) return ERR_INVALID_ARG;
     pthread_mutex_lock(&lock);
-    SDL_Gamepad *g=current_gamepad();
+    SDL_Gamepad *g=handle_gamepad(handle);
     if (g) SDL_RumbleGamepad(g,(uint16_t)(param[0]*257),(uint16_t)(param[1]*257),1000);
     pthread_mutex_unlock(&lock);
     return 0;
 }
 /* The light bar (OrbisPadLightBarParam: r, g, b) on controllers that have one (DualShock 4,
- * DualSense); others ignore it. Reset gives back the system's colour for user 1 (blue). */
+ * DualSense); others ignore it. Reset gives back the system's colour for the user. */
 static ABI int32_t pad_light_bar(int32_t handle, const uint8_t *rgb) {
-    if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
+    if (!player_of(handle) && (handle!=PAD_HANDLE || !opened)) return ERR_INVALID_HANDLE;
     if (!rgb) return ERR_INVALID_ARG;
     pthread_mutex_lock(&lock);
-    SDL_Gamepad *g=current_gamepad();
+    SDL_Gamepad *g=handle_gamepad(handle);
     if (g) SDL_SetGamepadLED(g,rgb[0],rgb[1],rgb[2]);
     pthread_mutex_unlock(&lock);
     return 0;
 }
 static ABI int32_t pad_reset_light_bar(int32_t handle) {
-    static const uint8_t blue[3]={0,0,64};
-    return pad_light_bar(handle,blue);
+    const int k=player_of(handle);
+    return pad_light_bar(handle,player_colors[k]);
 }
-static ABI int32_t pad_ok_handle(int32_t handle) { return handle==PAD_HANDLE && opened ? 0 : ERR_INVALID_HANDLE; }
+static ABI int32_t pad_ok_handle(int32_t handle) { return player_of(handle) || (handle==PAD_HANDLE && opened) ? 0 : ERR_INVALID_HANDLE; }
 static ABI int32_t pad_ok_handle_flag(int32_t handle, uint8_t flag) { (void)flag; return pad_ok_handle(handle); }
 
 static const RuntimeExport exports[]={
@@ -930,4 +1119,9 @@ static const RuntimeExport exports[]={
     {"scePadSetLightBar",pad_light_bar}, {"scePadResetLightBar",pad_reset_light_bar},
 };
 uintptr_t runtime_pad_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
-void runtime_pad_report(void) { printf("Runtime: pad reads=%zu, gamepad=%s\n",reads,gamepad ? SDL_GetGamepadName(gamepad) : "none"); }
+void runtime_pad_report(void) {
+    printf("Runtime: pad reads=%zu, gamepad=%s",reads,gamepad ? SDL_GetGamepadName(gamepad) : "none");
+    for (int k=1;k<MAX_PLAYERS;++k)
+        if (players[k].logged_in) printf("; player %d %s%s",k+1,players[k].g ? SDL_GetGamepadName(players[k].g) : players[k].virtual_pad ? "virtual" : "none",players[k].opened ? " (opened)" : "");
+    printf("\n");
+}

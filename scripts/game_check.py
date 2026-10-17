@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The game files gzport runs: GODZILLA (PS4, 2015) with the 1.01 update merged in.
+"""The game files gvport runs: GUNDAM VERSUS (PS4, 2017) with the 1.13 update merged in.
 
 Hooks and patches use the addresses of one executable, so the loaded image decides: its hash is
 the same whatever tool dumped it (the SELF headers around it differ). The base game 1.00 is
@@ -13,14 +13,15 @@ import os
 import sys
 from pathlib import Path
 
-# The retail releases: the North American one (CUSA02046) is the one checked; the executable
-# decides in the end (SUPPORTED_IMAGE), so another region with the same 1.01 eboot runs too.
-SUPPORTED_TITLES = ('CUSA02046',)
-SUPPORTED_VERSION = '01.01'
-SUPPORTED_IMAGE = 'aa191628d842649f553ffffcff88bd5c7d977d12a45aed7b2b9743cd2f81f77c'
-BASE_IMAGE = '1284618c6d4d14ddbe31800573a2daf6cbe2e5a4519c11b15f063350127e87b7'  # 1.00
-# The game opens these first; a folder without them is not a whole extraction.
-REQUIRED_FILES = ('system.pac', 'game_en.pac', 'sound')
+# The retail releases: the North American one (CUSA08790) is the one checked; the executable
+# decides in the end (SUPPORTED_IMAGE), so another region with the same 1.13 eboot runs too.
+SUPPORTED_TITLES = ('CUSA08790',)
+SUPPORTED_VERSION = '01.13'
+SUPPORTED_IMAGE = 'c7ce4c6f176ea1986888d3474ac80a284d072fce9ba08c5e97bddda13cf3c1ff'
+BASE_IMAGE = '8812ceca102398cb786aef4e8d4dab84e6f4240e778324be3d7ca2343ade4541'  # 1.00
+# The game opens these first; a folder without them is not a whole extraction (the archives, the
+# disc map, the image folder; sounds and movies are hash-named files at the root).
+REQUIRED_FILES = ('archives', 'sce_discmap.plt', 'img')
 
 
 def image_sha256(game):
@@ -41,7 +42,7 @@ def missing_files(game):
 
 def problem(game, image_hash=None):
     """None for the supported game, else (kind, title, version): kind is 'missing_update' (the
-    base game), 'wrong_eboot' (param.sfo says 1.01, eboot.bin is another version), 'other_title',
+    base game), 'wrong_eboot' (param.sfo says 1.13, eboot.bin is another version), 'other_title',
     'unreadable' or 'damaged_files' (the right executable, game files missing)."""
     if os.environ.get('BB_SKIP_GAME_CHECK') == '1':
         return None
@@ -70,15 +71,15 @@ def explain(kind, title, version):
     """What is wrong and what to do, for the log (English)."""
     found = f'Found {title} version {version} (sce_sys/param.sfo).'
     return {
-        'missing_update': f'{found} gzport needs the 1.01 update merged into the game folder: copy '
-                          'everything from the dumped update (e.g. CUSA02046-patch) into the game '
+        'missing_update': f'{found} gvport needs the 1.13 update merged into the game folder: copy '
+                          'everything from the dumped update (e.g. CUSA08790-patch) into the game '
                           'folder, replacing files (eboot.bin and sce_sys too).',
-        'wrong_eboot': f'{found} param.sfo is from 1.01 but eboot.bin is not: copy eboot.bin from '
-                       'the dumped 1.01 update into the game folder, replacing the old one.',
-        'other_title': f'{found} This is not a retail release of GODZILLA that gzport knows: it '
-                       'runs GODZILLA (CUSA02046) with update 1.01.',
+        'wrong_eboot': f'{found} param.sfo is from 1.13 but eboot.bin is not: copy eboot.bin from '
+                       'the dumped 1.13 update into the game folder, replacing the old one.',
+        'other_title': f'{found} This is not a retail release of GUNDAM VERSUS that gvport knows: it '
+                       'runs GUNDAM VERSUS (CUSA08790) with update 1.13.',
         'unreadable': f'{found} eboot.bin could not be read as a decrypted PS4 executable: dump '
-                      'the game and the 1.01 update again.',
+                      'the game and the 1.13 update again.',
         'damaged_files': f'{found} The game folder is incomplete: one of '
                          f'{", ".join(REQUIRED_FILES)} is not there. Extract the game again.',
     }[kind]
@@ -90,7 +91,7 @@ def main(argv):
         print('Usage: game_check.py GAME_DIR', file=sys.stderr)
         return 2
     found = problem(argv[1])
-    print(explain(*found) if found else 'GODZILLA 1.01: supported')
+    print(explain(*found) if found else 'GUNDAM VERSUS 1.13: supported')
     return 1 if found else 0
 
 

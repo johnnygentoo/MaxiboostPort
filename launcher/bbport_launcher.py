@@ -61,13 +61,13 @@ CONFIG_FILE = CONFIG_DIR / "settings.json"
 # The player's own defaults (bbport_defaults): "Restore my defaults" on the Settings page.
 DEFAULTS_FILE = CONFIG_DIR / "defaults.json"
 MAX_LOG_LINES = 5000
-# The memory model (run.sh: BB_PC_MODEL): "auto" leaves it to the GPU (the new one on AMD, the
-# 0.3 one elsewhere), or either by hand. The new one goes through the layer's memory module on
+# The memory model (run.sh: BB_PC_MODEL): "auto" is the 0.3 one for GUNDAM VERSUS on every GPU (with
+# the new one its compute queues wait for GPU round trips: ~30 instead of 60 FPS), or either by hand. The new one goes through the layer's memory module on
 # every GPU (no sparse binding of the game's memory; BB_LAYER_MEMORY=0: AMD's sparse arena).
 PC_MODEL_SUBTITLE = ("Новая: видеокарта работает с памятью игры напрямую, как в игре для ПК, а команды "
                      "графики переводятся, а не эмулируются. Старая — модель памяти 0.3 со всеми "
                      "исправлениями. Если драйвер не проходит проверку при запуске — старая")
-MEMORY_MODELS = [("Авто: новая на AMD, старая на других", "auto"), ("Новая", "new"),
+MEMORY_MODELS = [("Авто: старая (GUNDAM VERSUS с ней быстрее)", "auto"), ("Новая", "new"),
                  ("Старая (как в 0.3)", "old")]
 # FSR 4.1.1 assets built from the user's AMD DLL (tools/fsr4cap, also in the package).
 FSR4CAP_DIR = PORT_DIR / "tools" / "fsr4cap"
@@ -402,8 +402,8 @@ def game_environment(s):
         env["BB_FRAME_STATS"] = "1"
     if s.get("save_log"):
         env["BB_SAVE_LOG"] = "1"
-    # The memory model: "auto" is run.sh's choice by GPU (the new one on AMD, the 0.3 one
-    # elsewhere). "pc_model", "pc_memory", "old_memory_model", "new_memory_model" and
+    # The memory model: "auto" is run.sh's choice (the 0.3 one for GUNDAM VERSUS on every GPU).
+    # "pc_model", "pc_memory", "old_memory_model", "new_memory_model" and
     # "legacy_memory_model" of older settings are ignored (0.5: auto for everyone).
     # BB_PC_MODEL from the shell (or the extra variables) still wins over "auto".
     model = s.get("memory_model", "auto")
@@ -771,7 +771,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         game.add(steam)
         page.add(game)
 
-        # Auto: the new memory model on AMD, the 0.3 one elsewhere; or either by hand.
+        # Auto: the 0.3 memory model (faster for GUNDAM VERSUS); or either by hand.
         mode = Adw.PreferencesGroup(title=tr("Режим работы"))
         self.memory_model_row = combo_row(tr("Модель памяти и трансляции"), tr(PC_MODEL_SUBTITLE),
                                           MEMORY_MODELS, self.settings.get("memory_model", "auto"))
