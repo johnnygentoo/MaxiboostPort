@@ -154,6 +154,10 @@ private:
     void PrepareUiDepth(VideoCore::ImageId depth);
     /// Render size below the scaled-preset output size (the resolution patch is on).
     [[nodiscard]] bool Scaled() const;
+    /// gzport: whether the HUD is composed at the output size: a scaled session with an upscaler
+    /// on or a scene below the output size. A game drawing at the output size without one shows
+    /// its own frame (redirecting it lost the HUD from frames).
+    [[nodiscard]] bool Composing() const;
     /// A target of the patched render size: the game allocates it with aligned dimensions
     /// (a 1916x1078 scene in 1916x1080 targets).
     [[nodiscard]] bool RenderTarget(u32 w, u32 h) const {

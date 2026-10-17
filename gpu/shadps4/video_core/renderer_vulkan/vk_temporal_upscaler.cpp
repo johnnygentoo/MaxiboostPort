@@ -401,7 +401,7 @@ bool TemporalUpscaler::OnFrameStart() {
     // (their display buffer is shown as the game drew it, at its own size), and of one that had it.
     if (ui_trace_on) {
         static int bad = 0, good = 0;
-        if ((!ui_phase && Scaled() && good > 0 && bad < 64) || (ui_phase && good < 1)) {
+        if ((!ui_phase && Composing() && good > 0 && bad < 64) || (ui_phase && good < 1)) {
             ++(ui_phase ? good : bad);
             std::printf("UI trace: frame %llu %s:%s\n",
                         (unsigned long long)BbStats::frame_number.load(std::memory_order_relaxed),
@@ -413,7 +413,7 @@ bool TemporalUpscaler::OnFrameStart() {
     // that drew nothing but its display pass (the game showing its last frame again, in
     // transitions) keeps the last composition: shown at the render size it was a HUD flicker.
     const bool repeat = frame_draws == 0 && last_redirect;
-    if (ui_trace_on && Scaled() && !ui_phase && !repeat) {
+    if (ui_trace_on && Composing() && !ui_phase && !repeat) {
         std::printf("UI trace: frame %llu not composed: %u draws before, last composed %d, relay %d\n",
                     (unsigned long long)BbStats::frame_number.load(std::memory_order_relaxed),
                     frame_draws, int(last_redirect), int(relay.valid));
@@ -425,7 +425,7 @@ bool TemporalUpscaler::OnFrameStart() {
     // gzport: how many frames of a scaled session were composed (the HUD at the output size over
     // the upscaled or scaled scene); one shown without composition between composed ones is a
     // flicker of the HUD. Every 600 frames, when any was not.
-    if (Scaled()) {
+    if (Composing()) {
         static u32 frames = 0, composed = 0;
         ++frames;
         composed += display_redirect ? 1 : 0;
@@ -1474,6 +1474,10 @@ bool TemporalUpscaler::Scaled() const {
     return scaled_session || target_width != 1920 || target_height != 1080;
 }
 
+bool TemporalUpscaler::Composing() const {
+    return Scaled() && (Active() || render_width < target_width || render_height < target_height);
+}
+
 void TemporalUpscaler::OnColorTarget(VideoCore::ImageId color) {
     if (ui_phase || !camera_motion.Depth()) {
         return;
@@ -1525,7 +1529,7 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
         }
         return;
     }
-    if (!Scaled() || !color) {
+    if (!Composing() || !color) {
         return;
     }
     if (scene_done_vs && vs_hash == scene_done_vs) {
