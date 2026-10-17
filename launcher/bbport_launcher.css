@@ -1,0 +1,90 @@
+/* Launcher style, on top of libadwaita's stylesheet (application priority: ~/.config/gtk-4.0/gtk.css
+ * still wins where it sets something).
+ *
+ * Colours come from the desktop theme's legacy names (theme_bg_color, theme_fg_color), which
+ * libadwaita defines itself and a custom theme's gtk.css redefines: a themed desktop gets cards,
+ * switches and buttons in its own palette instead of libadwaita's greys and blue. */
+:root {
+    --window-bg-color: @theme_bg_color;
+    --window-fg-color: @theme_fg_color;
+    --view-bg-color: @theme_bg_color;
+    --view-fg-color: @theme_fg_color;
+    --headerbar-bg-color: shade(@theme_bg_color, 0.55);
+    --headerbar-fg-color: @theme_fg_color;
+    --headerbar-backdrop-color: shade(@theme_bg_color, 0.55);
+    --card-bg-color: alpha(@theme_fg_color, 0.07);
+    --card-fg-color: @theme_fg_color;
+    --popover-bg-color: shade(@theme_bg_color, 1.2);
+    --popover-fg-color: @theme_fg_color;
+    --dialog-bg-color: shade(@theme_bg_color, 1.2);
+    --dialog-fg-color: @theme_fg_color;
+    --accent-color: @theme_fg_color;
+    --accent-bg-color: @theme_fg_color;
+    --accent-fg-color: @theme_bg_color;
+}
+
+/* Room for titles with subtitles, whatever the font: pixel and other wide fonts wrap early. */
+preferencesgroup > box > box.header { margin-bottom: 10px; }
+preferencesgroup > box > box.header label.heading { font-weight: bold; }
+preferencesgroup > box > box.header label.body { line-height: 1.6; margin-top: 6px; }
+row > box.header { min-height: 52px; }
+row > box.header > box.title { margin-top: 9px; margin-bottom: 9px; margin-right: 12px; }
+row > box.header label.title { line-height: 1.4; }
+row > box.header label.subtitle { line-height: 1.6; margin-top: 4px; opacity: 0.7; }
+list.boxed-list { border: 1px solid alpha(@theme_fg_color, 0.22); }
+list.boxed-list > row:not(:last-child) { border-bottom: 1px solid alpha(@theme_fg_color, 0.12); }
+
+/* Switches: the off state is an outlined track, the on state is filled; both read at a glance. */
+switch {
+    min-width: 46px;
+    min-height: 24px;
+    background-color: alpha(@theme_fg_color, 0.10);
+    border: 1px solid alpha(@theme_fg_color, 0.55);
+}
+switch > slider {
+    min-width: 18px;
+    min-height: 18px;
+    margin: 2px;
+    background-color: alpha(@theme_fg_color, 0.65);
+    box-shadow: none;
+}
+switch:checked { background-color: @theme_fg_color; border-color: @theme_fg_color; }
+switch:checked > slider { background-color: @theme_bg_color; }
+switch:disabled { opacity: 0.4; }
+
+/* Number rows: the value next to outlined -/+ buttons. */
+spinbutton { background: none; border: none; box-shadow: none; }
+spinbutton > text { padding: 0 10px; }
+spinbutton > button {
+    min-width: 28px;
+    min-height: 28px;
+    margin: 3px 2px;
+    border: 1px solid alpha(@theme_fg_color, 0.45);
+    border-radius: 6px;
+}
+spinbutton > button:hover { background-color: alpha(@theme_fg_color, 0.2); }
+
+/* Drop-downs: the chosen value keeps room next to a long subtitle instead of shrinking to "3...";
+ * the list marks the chosen entry by inverting it. */
+row.combo listview.inline label { min-width: 13em; }
+row.combo image.dropdown-arrow { margin-left: 6px; opacity: 0.8; }
+row.combo popover listview > row { min-height: 30px; padding: 2px 8px; border-radius: 6px; }
+row.combo popover listview > row label { min-width: 24em; }
+row.combo popover listview > row:hover { background-color: alpha(@theme_fg_color, 0.18); }
+row.combo popover listview > row:selected {
+    background-color: @theme_fg_color;
+    color: @theme_bg_color;
+    outline: none;
+    box-shadow: none;
+}
+
+/* Folder and reset buttons in rows. */
+row button.flat { min-width: 34px; min-height: 34px; border-radius: 8px; }
+row button.flat:hover { background-color: alpha(@theme_fg_color, 0.18); }
+
+headerbar button.suggested-action,
+headerbar button.destructive-action { padding: 6px 18px; font-weight: bold; }
+headerbar button.destructive-action { background-color: #d8334a; color: #ffffff; }
+
+textview.log { padding: 4px; }
+textview.log > text { line-height: 1.5; }
