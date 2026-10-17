@@ -3,8 +3,13 @@
  *
  * Colours come from the desktop theme's legacy names (theme_bg_color, theme_fg_color), which
  * libadwaita defines itself and a custom theme's gtk.css redefines: a themed desktop gets cards,
- * switches and buttons in its own palette instead of libadwaita's greys and blue. */
+ * switches and buttons in its own palette instead of libadwaita's greys and blue.
+ *
+ * GODZILLA's accent on top: atomic-breath blue for what is switched on or chosen, the title's
+ * orange for the Play button. */
 :root {
+    --gz-atomic: #4fb3ff;
+    --gz-orange: #ff6a1a;
     --window-bg-color: @theme_bg_color;
     --window-fg-color: @theme_fg_color;
     --view-bg-color: @theme_bg_color;
@@ -18,9 +23,9 @@
     --popover-fg-color: @theme_fg_color;
     --dialog-bg-color: shade(@theme_bg_color, 1.2);
     --dialog-fg-color: @theme_fg_color;
-    --accent-color: @theme_fg_color;
-    --accent-bg-color: @theme_fg_color;
-    --accent-fg-color: @theme_bg_color;
+    --accent-color: var(--gz-atomic);
+    --accent-bg-color: var(--gz-atomic);
+    --accent-fg-color: #08121c;
 }
 
 /* Room for titles with subtitles, whatever the font: pixel and other wide fonts wrap early. */
@@ -48,8 +53,8 @@ switch > slider {
     background-color: alpha(@theme_fg_color, 0.65);
     box-shadow: none;
 }
-switch:checked { background-color: @theme_fg_color; border-color: @theme_fg_color; }
-switch:checked > slider { background-color: @theme_bg_color; }
+switch:checked { background-color: var(--gz-atomic); border-color: var(--gz-atomic); }
+switch:checked > slider { background-color: #08121c; }
 switch:disabled { opacity: 0.4; }
 
 /* Number rows: the value next to outlined -/+ buttons. */
@@ -72,8 +77,8 @@ row.combo popover listview > row { min-height: 30px; padding: 2px 8px; border-ra
 row.combo popover listview > row label { min-width: 24em; }
 row.combo popover listview > row:hover { background-color: alpha(@theme_fg_color, 0.18); }
 row.combo popover listview > row:selected {
-    background-color: @theme_fg_color;
-    color: @theme_bg_color;
+    background-color: var(--gz-atomic);
+    color: #08121c;
     outline: none;
     box-shadow: none;
 }
@@ -84,7 +89,16 @@ row button.flat:hover { background-color: alpha(@theme_fg_color, 0.18); }
 
 headerbar button.suggested-action,
 headerbar button.destructive-action { padding: 6px 18px; font-weight: bold; }
+headerbar button.suggested-action { background-color: var(--gz-orange); color: #160800; }
+headerbar button.suggested-action:hover { background-color: shade(#ff6a1a, 1.1); }
 headerbar button.destructive-action { background-color: #d8334a; color: #ffffff; }
+
+/* The brand at the start of the header bar: the game's icon (or the launcher's) and its name. */
+headerbar .gz-brand { margin: 0 6px; }
+headerbar .gz-brand image { border-radius: 6px; }
+headerbar .gz-brand label.gz-title { font-weight: 800; letter-spacing: 2px; color: var(--gz-orange); }
+headerbar .gz-brand label.gz-subtitle { font-size: 0.8em; opacity: 0.65; }
+viewswitcher button:checked { color: var(--gz-atomic); }
 
 textview.log { padding: 4px; }
 textview.log > text { line-height: 1.5; }
