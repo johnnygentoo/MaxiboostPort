@@ -25,12 +25,18 @@ import bbport_cache
 import bbport_steam
 import bbport_update
 
-import gi
+# GTK_THEME makes libadwaita drop its own stylesheet for the named theme's. A theme written for
+# plain GTK has no rules for libadwaita's rows, switches and spin buttons: the window came up as
+# unpadded text with invisible switches. The user's ~/.config/gtk-4.0/gtk.css still applies.
+os.environ.pop("GTK_THEME", None)
+
+import gi  # noqa: E402
 
 # GTK's GPU renderers cut the top row of pixels off text at fractional display scales (115 %:
 # the "I" of "Idioma" lost its serif); cairo draws it whole, and a settings window needs no GPU.
 # The game draws with its own Vulkan. GSK_RENDERER set by the user still wins.
 os.environ.setdefault("GSK_RENDERER", "cairo")
+gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
@@ -2875,6 +2881,15 @@ class LauncherApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id="io.github.bbport.Launcher",
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+
+    def do_startup(self):
+        Adw.Application.do_startup(self)
+        # Dark unless the desktop asks for light (without a settings portal libadwaita is light).
+        Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.PREFER_DARK)
+        provider = Gtk.CssProvider()
+        provider.load_from_path(str(Path(__file__).resolve().parent / "bbport_launcher.css"))
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def do_activate(self):
         # The launcher's own icons (launcher/icons: GitHub's mark), symbolic like the theme's.

@@ -39,3 +39,10 @@ param.sfo
 *.dcx
 *.7z
 /CUSA*/
+/fsr4_411
+/fsr4_shaders
+
+# Godzilla dumps (never committed)
+/CUSA*/
+/fsr4_411
+/fsr4_shaders
