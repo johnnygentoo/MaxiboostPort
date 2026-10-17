@@ -620,7 +620,12 @@ static ABI int32_t voice_state(uintptr_t handle,unsigned char *state,uint64_t si
     memset(state,0,size);
     uint32_t flags=state_flags(v);
     if (size>=4) memcpy(state,&flags,4);
-    if (is_sampler(v->rack) && size>=56) {
+    /* OrbisNgs2SamplerVoiceState (48 bytes on the PS4, 56 on the PS5): flags, envelope height,
+       peak, then decoded samples and bytes (how a streaming game knows what it may refill),
+       the block's user data and the waveform. */
+    static int size_noted;
+    if (!size_noted && is_sampler(v->rack)) { size_noted=1; TRACE("VoiceGetState: sampler state of %llu bytes\n",(unsigned long long)size); }
+    if (is_sampler(v->rack) && size>=48) {
         float envelope=1.0f; uintptr_t user=v->nblocks ? v->blocks[0].b.user : 0; const void *data=v->data;
         memcpy(state+4,&envelope,4);
         memcpy(state+16,&v->decoded_samples,8); memcpy(state+24,&v->decoded_bytes,8);
