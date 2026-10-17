@@ -100,6 +100,11 @@ struct Voice {
     void *at9;
     Atrac9CodecInfo at9_info;
     uint32_t at9_frame_in_superframe;
+    /* ATRAC9 decodes whole superframes, gathered across blocks: a streamed waveform's data
+       blocks (voice lines) are cut anywhere. The segment (the samples a block with a sample
+       count starts, continued by data-only blocks) counts down in at9_remaining. */
+    unsigned char superframe[1024];
+    uint32_t superframe_fill, at9_remaining;
     float frame[MAX_CH*256*4];
     uint32_t frame_count, frame_pos;
     float current[MAX_CH], next[MAX_CH];
@@ -447,8 +452,17 @@ static void voice_fail(Voice *v,const char *why) {
     v->state=STATE_EMPTY; v->nblocks=0;
 }
 static void block_restart(Voice *v) {
-    v->played=0; v->read_bytes=0; v->frame_count=v->frame_pos=0; v->at9_frame_in_superframe=0;
-    v->skip_left=v->nblocks ? v->blocks[0].b.skip : 0;
+    v->read_bytes=0;
+    /* No block yet: a stream waiting for its next data keeps what it gathered. */
+    if (!v->nblocks && v->type==WAVE_ATRAC9 && v->at9_remaining) return;
+    /* A block with samples starts a segment; a data-only one (no samples) continues it. */
+    const int continues=v->type==WAVE_ATRAC9 && v->nblocks && !v->blocks[0].b.samples;
+    if (!continues) {
+        v->played=0; v->frame_count=v->frame_pos=0; v->at9_frame_in_superframe=0;
+        v->skip_left=v->nblocks ? v->blocks[0].b.skip : 0;
+        v->superframe_fill=0;
+        v->at9_remaining=v->nblocks ? v->blocks[0].b.samples : 0;
+    }
     /* One decoder per waveform (setup): LibAtrac9 builds its tables in InitDecoder, too slow for
        every block and repeat. A block starts a frame early (at9_range), which settles the
        overlap. */
@@ -502,11 +516,13 @@ static int32_t sampler_blocks(Voice *v,const unsigned char *p,uint32_t size) {
     } else if (data!=v->data) {
         /* Appended blocks of another buffer: offsets are rebased onto the first buffer. */
         const intptr_t delta=(const unsigned char *)data-v->data;
+        const uint32_t before=v->nblocks;
         for (uint32_t i=0;i<count && v->nblocks<MAX_BLOCKS;++i) {
             Block *b=&v->blocks[v->nblocks++];
             b->b=blocks[i]; b->b.offset=(uint32_t)((intptr_t)b->b.offset+delta); b->repeated=0;
         }
         v->accepts=(flags&BLOCKS_CONTINUE)!=0;
+        if (!before && v->nblocks) block_restart(v); /* the voice waited for this data */
         return 0;
     }
     for (uint32_t i=0;i<count && v->nblocks<MAX_BLOCKS;++i) {
@@ -515,8 +531,10 @@ static int32_t sampler_blocks(Voice *v,const unsigned char *p,uint32_t size) {
     }
     v->accepts=(flags&BLOCKS_CONTINUE)!=0;
     if (!append) {
-        /* A new waveform after one stopped inside a superframe: a fresh decoder (rare). */
-        if (v->at9 && v->at9_frame_in_superframe) voice_release_decoder(v);
+        /* A new waveform: a fresh decoder. ATRAC9 frames reuse the band parameters of the frame
+           before; the last waveform's would make its first frame fail (voice lines played one
+           after another on one voice without a new setup). */
+        if (v->at9 && count && blocks[0].samples) voice_release_decoder(v);
         block_restart(v);
     }
     return 0;
@@ -669,42 +687,42 @@ static int decode_more(Voice *v) {
     v->frame_count=v->frame_pos=0;
     const uint32_t channels=v->channels;
     while (!v->frame_count) {
-        if (v->played>=b->b.samples) {
-            /* The block ends inside a superframe: its other frames are decoded and dropped, so
-               the decoder starts the next block at a superframe (LibAtrac9 counts them). */
-            int16_t drop[256*MAX_CH];
-            while (v->type==WAVE_ATRAC9 && v->at9 && v->at9_frame_in_superframe && v->read_bytes<b->b.size) {
-                int used=0;
-                if (Atrac9Decode(v->at9,src+v->read_bytes,drop,&used)) break;
-                v->read_bytes+=(uint32_t)used;
-                if (++v->at9_frame_in_superframe==(uint32_t)v->at9_info.framesInSuperframe) v->at9_frame_in_superframe=0;
-            }
-            return 0;
-        }
+        if (v->type!=WAVE_ATRAC9 && v->played>=b->b.samples) return 0;
         uint32_t produced=0;
         if (v->type==WAVE_ATRAC9) {
-            if (!v->at9 || v->read_bytes>=b->b.size) return 0;
+            if (!v->at9 || !v->at9_remaining) return 0;
             const uint32_t frame=(uint32_t)v->at9_info.frameSamples, ch=(uint32_t)v->at9_info.channels;
-            if (ch!=channels || frame*ch>256*MAX_CH) { voice_fail(v,"ATRAC9 channel count differs from the setup"); return 0; }
+            const uint32_t frames=(uint32_t)v->at9_info.framesInSuperframe, size=(uint32_t)v->at9_info.superframeSize;
+            if (ch!=channels || frame*frames*ch>sizeof(v->frame)/sizeof(*v->frame) || size>sizeof(v->superframe)) {
+                voice_fail(v,"ATRAC9 layout this sampler cannot hold"); return 0;
+            }
+            /* Gather one superframe from this block (and the next ones, for a stream). */
+            const uint32_t take=size-v->superframe_fill<b->b.size-v->read_bytes ? size-v->superframe_fill
+                                                                                : b->b.size-v->read_bytes;
+            memcpy(v->superframe+v->superframe_fill,src+v->read_bytes,take);
+            v->superframe_fill+=take; v->read_bytes+=take; v->decoded_bytes+=take;
+            if (v->superframe_fill<size) return 0; /* this block's data ends: the next one goes on */
+            v->superframe_fill=0;
             int16_t pcm[256*MAX_CH];
-            int used=0;
-            const int e=Atrac9Decode(v->at9,src+v->read_bytes,pcm,&used);
-            if (e) {
-                char why[96]; snprintf(why,sizeof(why),"ATRAC9 frame at block byte %u does not decode (%d)",v->read_bytes,e);
-                voice_fail(v,why); return 0;
+            uint32_t used_total=0;
+            for (uint32_t f=0;f<frames;++f) {
+                int used=0;
+                const int e=Atrac9Decode(v->at9,v->superframe+used_total,pcm,&used);
+                if (e) {
+                    char why[96]; snprintf(why,sizeof(why),"ATRAC9 superframe before block byte %u does not decode (%d)",v->read_bytes,e);
+                    voice_fail(v,why); return 0;
+                }
+                used_total+=(uint32_t)used;
+                const uint32_t start=v->skip_left<frame ? v->skip_left : frame;
+                v->skip_left-=start;
+                for (uint32_t smp=start;smp<frame;++smp) for (uint32_t c=0;c<ch;++c)
+                    v->frame[(produced+smp-start)*ch+c]=pcm[smp*ch+c]/32768.0f;
+                produced+=frame-start;
             }
-            v->read_bytes+=(uint32_t)used; v->decoded_bytes+=(uint32_t)used;
-            if (++v->at9_frame_in_superframe==(uint32_t)v->at9_info.framesInSuperframe) {
-                /* Superframes are padded to their size. */
-                const uint32_t superframe=(uint32_t)v->at9_info.superframeSize;
-                v->read_bytes=(v->read_bytes+superframe-1)/superframe*superframe;
-                v->at9_frame_in_superframe=0;
-            }
-            uint32_t start=v->skip_left<frame ? v->skip_left : frame;
-            v->skip_left-=start;
-            for (uint32_t s=start;s<frame;++s) for (uint32_t c=0;c<ch;++c)
-                v->frame[(s-start)*ch+c]=pcm[s*ch+c]/32768.0f;
-            produced=frame-start;
+            if (produced>v->at9_remaining) produced=v->at9_remaining;
+            v->at9_remaining-=produced;
+            v->frame_count=produced;
+            continue;
         } else {
             const uint32_t bytes=v->type==WAVE_PCM_I16L ? 2 : 4, stride=bytes*channels;
             /* PCM blocks: the skipped samples come first, then up to 1024 samples at a time. */

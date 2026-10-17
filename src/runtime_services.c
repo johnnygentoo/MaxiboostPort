@@ -170,35 +170,95 @@ static ABI int32_t voice_info(uint32_t port,uint32_t *info) {
 }
 
 /* ---- Common dialogs: nothing is displayed; an opened dialog finishes. ---- */
-typedef struct { const char *name; int initialized, status; } Dialog;
-static Dialog dialogs[]={{"CommonDialog",0,0},{"MsgDialog",0,0},{"SaveDataDialog",0,0},
-                         {"NpProfileDialog",0,0},{"NpCommerceDialog",0,0},{"ImeDialog",0,0},
-                         {"ErrorDialog",0,0},{"NpFriendListDialog",0,0}};
+/* Status: 0 none, 1 initialized, 2 running, 3 finished. An opened dialog runs until the game's
+ * next status poll and finishes as if its first button (OK / Yes) was pressed; a progress bar
+ * (persistent) runs until the game closes it, as the game writes meanwhile. */
+typedef struct { const char *name; int initialized, status, persistent; uint32_t mode; } Dialog;
+static Dialog dialogs[]={{"CommonDialog",0,0,0,0},{"MsgDialog",0,0,0,0},{"SaveDataDialog",0,0,0,0},
+                         {"NpProfileDialog",0,0,0,0},{"NpCommerceDialog",0,0,0,0},{"ImeDialog",0,0,0,0},
+                         {"ErrorDialog",0,0,0,0},{"NpFriendListDialog",0,0,0,0}};
 static int common_initialized;
 static ABI int32_t common_init(void) { common_initialized=1; return 0; }
+/* BB_DIALOG_TRACE=1: every dialog call and its result (a status poll only when it changes). */
+static int dialog_tracing(void) {
+    static int trace=-1;
+    if (trace<0) { const char *v=getenv("BB_DIALOG_TRACE"); trace=v && v[0]=='1'; }
+    return trace;
+}
+#define DTRACE(...) do { if (dialog_tracing()) { printf("Dialog: " __VA_ARGS__); fflush(stdout); } } while (0)
 static int32_t dialog_init(int i) {
-    if (dialogs[i].initialized) return (int32_t)0x80B80004;
-    dialogs[i].initialized=1; dialogs[i].status=1; return 0;
+    int32_t r=dialogs[i].initialized ? (int32_t)0x80B80004 : 0;
+    if (!r) { dialogs[i].initialized=1; dialogs[i].status=1; }
+    DTRACE("%s Initialize -> %#x\n",dialogs[i].name,(uint32_t)r);
+    return r;
 }
-static int32_t dialog_open(int i) {
-    if (!dialogs[i].initialized) return DIALOG_NOT_INITIALIZED;
-    printf("Runtime: %s opened; completed immediately (no dialog UI yet)\n",dialogs[i].name);
-    dialogs[i].status=3; return 0;
+static int32_t dialog_open_mode(int i,uint32_t mode,int persistent) {
+    if (!dialogs[i].initialized) { DTRACE("%s Open: not initialized\n",dialogs[i].name); return DIALOG_NOT_INITIALIZED; }
+    DTRACE("%s Open mode %u%s\n",dialogs[i].name,mode,persistent ? " (progress bar: runs until closed)" : "");
+    dialogs[i].status=2; dialogs[i].mode=mode; dialogs[i].persistent=persistent;
+    return 0;
 }
-static int32_t dialog_status(int i) { return dialogs[i].status; }
+static int32_t dialog_open(int i) { return dialog_open_mode(i,0,0); }
+static int32_t dialog_status(int i) {
+    static int last[8]={-1,-1,-1,-1,-1,-1,-1,-1};
+    if (dialogs[i].status==2 && !dialogs[i].persistent) dialogs[i].status=3; /* answered: OK / Yes */
+    if (last[i]!=dialogs[i].status) { last[i]=dialogs[i].status; DTRACE("%s status %d\n",dialogs[i].name,dialogs[i].status); }
+    return dialogs[i].status;
+}
 static int32_t dialog_term(int i) {
+    DTRACE("%s Terminate (initialized %d)\n",dialogs[i].name,dialogs[i].initialized);
     if (!dialogs[i].initialized) return DIALOG_NOT_INITIALIZED;
     dialogs[i].initialized=0; dialogs[i].status=0; return 0;
 }
 #define DIALOG(tag,i) \
     static ABI int32_t tag##_init(void) { return dialog_init(i); } \
-    static ABI int32_t tag##_open(const void *p) { (void)p; return dialog_open(i); } \
+    static ABI int32_t tag##_open(const void *p) { \
+        if (p && dialog_tracing()) { \
+            const unsigned char *b=p; printf("Dialog: %s Open param:",dialogs[i].name); \
+            for (int k=0;k<96;++k) { printf("%s%02x",k%16 ? " " : "\n    ",b[k]); } \
+            printf("\n"); \
+        } \
+        return dialog_open(i); } \
     static ABI int32_t tag##_status(void) { return dialog_status(i); } \
     static ABI int32_t tag##_term(void) { return dialog_term(i); }
-DIALOG(msg,1) DIALOG(save,2) DIALOG(profile,3) DIALOG(commerce,4) DIALOG(friends,7)
+DIALOG(profile,3) DIALOG(commerce,4) DIALOG(friends,7)
+static ABI int32_t msg_init(void) { return dialog_init(1); }
+static ABI int32_t msg_status(void) { return dialog_status(1); }
+static ABI int32_t msg_term(void) { return dialog_term(1); }
+/* OrbisMsgDialogParam: base (0x30), size (8), mode (1 user message, 2 progress bar, 3 system). */
+static ABI int32_t msg_open(const unsigned char *param) {
+    uint32_t mode=0;
+    if (param) memcpy(&mode,param+0x38,4);
+    return dialog_open_mode(1,mode,mode==2);
+}
+static ABI int32_t save_init(void) { return dialog_init(2); }
+static ABI int32_t save_status(void) { return dialog_status(2); }
+static ABI int32_t save_term(void) { return dialog_term(2); }
+/* OrbisSaveDataDialogParam: base (0x30), size, mode (1 list, 2 user message, 3 system message,
+ * 4 error code, 5 progress bar), type (save, load, delete), animation, items (0x48), ...,
+ * user data (0x70). Items: user, title id, dir names (0x10) and their count (0x18), new item,
+ * focus, focus dir name (0x30). A list answers with the first listed save (the one in focus). */
+static struct { char dir_name[32]; uintptr_t user_data; } save_dialog;
+static ABI int32_t save_open(const unsigned char *param) {
+    uint32_t mode=0;
+    memset(&save_dialog,0,sizeof(save_dialog));
+    if (param) {
+        const unsigned char *items;
+        memcpy(&mode,param+0x34,4); memcpy(&items,param+0x48,8); memcpy(&save_dialog.user_data,param+0x70,8);
+        if (mode==1 && items) {
+            const char *focus, *dirs; uint32_t count;
+            memcpy(&dirs,items+0x10,8); memcpy(&count,items+0x18,4); memcpy(&focus,items+0x30,8);
+            const char *chosen=focus && focus[0] ? focus : dirs && count ? dirs : NULL;
+            if (chosen) snprintf(save_dialog.dir_name,sizeof(save_dialog.dir_name),"%.31s",chosen);
+            DTRACE("SaveDataDialog list of %u saves: answers '%s'\n",count,save_dialog.dir_name);
+        }
+    }
+    return dialog_open_mode(2,mode,mode==5);
+}
 /* Closing a dialog finishes it; its result is the first button (OK / Yes), a list dialog's is
  * "cancelled" (nothing chosen). OrbisCommonDialog results: 0 OK, 1 user cancelled. */
 static int32_t dialog_close(int i) {
+    DTRACE("%s Close\n",dialogs[i].name);
     if (!dialogs[i].initialized) return DIALOG_NOT_INITIALIZED;
     dialogs[i].status=3; return 0;
 }
@@ -208,17 +268,24 @@ static ABI int32_t commerce_close(void) { return dialog_close(4); }
 static ABI int32_t friends_close(void) { return dialog_close(7); }
 /* OrbisMsgDialogResult / OrbisSaveDataDialogResult: mode, result, button id, ... */
 static ABI int32_t msg_result(int32_t *result) {
+    DTRACE("MsgDialog GetResult\n");
     if (!result) return (int32_t)0x80B80006; /* ARG_NULL */
-    result[1]=0; result[2]=1; /* OK, the first button (Yes) */
+    result[0]=(int32_t)dialogs[1].mode; result[1]=0; result[2]=1; /* OK, the first button (Yes) */
     return 0;
 }
-static ABI int32_t save_result(int32_t *result) {
+/* OrbisSaveDataDialogResult: mode, result, button, dir name* (0x10), param* (0x18), user data (0x20). */
+static ABI int32_t save_result(unsigned char *result) {
+    DTRACE("SaveDataDialog GetResult: mode %u, '%s'\n",dialogs[2].mode,save_dialog.dir_name);
     if (!result) return (int32_t)0x80B80006;
-    result[1]=0; result[2]=1;
+    const int32_t values[3]={(int32_t)dialogs[2].mode,0,1};
+    memcpy(result,values,sizeof(values));
+    char *dir; memcpy(&dir,result+0x10,8);
+    if (dir && save_dialog.dir_name[0]) memcpy(dir,save_dialog.dir_name,strlen(save_dialog.dir_name)+1);
+    memcpy(result+0x20,&save_dialog.user_data,8);
     return 0;
 }
-static ABI int32_t save_ready(void) { return 1; }
-static ABI int32_t save_progress(int32_t target,uint32_t rate) { (void)target; (void)rate; return 0; }
+static ABI int32_t save_ready(void) { DTRACE("SaveDataDialog IsReadyToDisplay\n"); return 1; }
+static ABI int32_t save_progress(int32_t target,uint32_t rate) { DTRACE("SaveDataDialog progress %d: %u\n",target,rate); return 0; }
 static ABI int32_t cancelled_result(int32_t *result) { if (result) result[0]=1; return 0; }
 /* ErrorDialog: the system's error message for a code; the code is logged, the dialog finishes. */
 typedef struct { int32_t size, error_code, user, reserved; } ErrorDialogParam;

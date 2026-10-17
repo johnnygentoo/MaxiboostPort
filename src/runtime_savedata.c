@@ -148,6 +148,12 @@ static int remove_entry(const char *path, const struct stat *st, int flag, struc
     (void)st; (void)flag; (void)ftw; return remove(path);
 }
 
+/* BB_DIALOG_TRACE=1 also traces the save calls (scripts of save and load flows). */
+static void save_trace(const char *what, const char *detail) {
+    static int trace=-1;
+    if (trace<0) { const char *v=getenv("BB_DIALOG_TRACE"); trace=v && v[0]=='1'; }
+    if (trace) { printf("Save: %s %s\n",what,detail ? detail : ""); fflush(stdout); }
+}
 static ABI int32_t save_initialize(const void *param) { (void)param; initialized=1; return 0; }
 static ABI int32_t save_terminate(void) {
     if (!initialized) return ERR_NOT_INITIALIZED;
@@ -203,6 +209,7 @@ static int slot_of(const MountPoint *point) {
     return slot>=0 && slot<SLOTS && slots[slot].used ? slot : -1;
 }
 static ABI int32_t save_umount(const MountPoint *point) {
+    save_trace("Umount",point ? point->data : NULL);
     if (!initialized) return ERR_NOT_INITIALIZED;
     pthread_mutex_lock(&lock);
     int slot=slot_of(point);
@@ -211,6 +218,7 @@ static ABI int32_t save_umount(const MountPoint *point) {
     return slot>=0 ? 0 : ERR_NOT_FOUND;
 }
 static ABI int32_t save_set_param(const MountPoint *point, uint32_t type, const void *buffer, uint64_t size) {
+    save_trace("SetParam",point ? point->data : NULL);
     if (!initialized) return ERR_NOT_INITIALIZED;
     if (!buffer) return ERR_PARAMETER;
     pthread_mutex_lock(&lock);
@@ -233,6 +241,7 @@ bad:
     return ERR_PARAMETER;
 }
 static ABI int32_t save_icon(const MountPoint *point, const Icon *icon) {
+    save_trace("SaveIcon",point ? point->data : NULL);
     if (!initialized) return ERR_NOT_INITIALIZED;
     if (!icon || !icon->buffer) return ERR_PARAMETER;
     pthread_mutex_lock(&lock);
@@ -246,6 +255,7 @@ static ABI int32_t save_icon(const MountPoint *point, const Icon *icon) {
     return r;
 }
 static ABI int32_t save_delete(const Delete *d) {
+    save_trace("Delete",NULL);
     if (!initialized) return ERR_NOT_INITIALIZED;
     if (!d || !d->dir || !valid_name(d->dir->data,sizeof(d->dir->data))) return ERR_PARAMETER;
     char base[600], host[640], meta[680];
@@ -275,6 +285,7 @@ static int compare(const void *a, const void *b) {
     return sort_order ? -c : c;
 }
 static ABI int32_t save_search(const SearchCond *cond, SearchResult *result) {
+    save_trace("DirNameSearch",NULL);
     if (!initialized) return ERR_NOT_INITIALIZED;
     if (!cond || !result) return ERR_PARAMETER;
     char base[600];
@@ -353,8 +364,8 @@ static ABI int32_t memory_get(int32_t user, void *buffer, uint64_t size, int64_t
 static ABI int32_t memory_set(int32_t user, void *buffer, uint64_t size, int64_t offset) { (void)user; return memory_io(buffer,size,offset,1); }
 /* Backups: the PS4 keeps a copy of a save made at unmount, to restore a damaged one. The port's
  * saves are plain files the user can copy; there is no backup to check or restore. */
-static ABI int32_t backup_none(const void *param) { (void)param; return ERR_NOT_FOUND; }
-static ABI int32_t save_umount_backup(const MountPoint *point) { return save_umount(point); }
+static ABI int32_t backup_none(const void *param) { (void)param; save_trace("CheckBackupData/RestoreBackupData","(no backup)"); return ERR_NOT_FOUND; }
+static ABI int32_t save_umount_backup(const MountPoint *point) { save_trace("UmountWithBackup",point ? point->data : NULL); return save_umount(point); }
 
 static const RuntimeExport exports[]={
     {"sceSaveDataCheckBackupData",backup_none}, {"sceSaveDataRestoreBackupData",backup_none},
