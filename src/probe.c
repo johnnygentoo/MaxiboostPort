@@ -236,6 +236,13 @@ static void dump_frames(ucontext_t *uc) {
     char arg[]="  tid=0000000000000000 rdi=0000000000000000\n";
     write_hex(arg+6,tid); write_hex(arg+27,(uint64_t)uc->uc_mcontext.gregs[REG_RDI]);
     { ssize_t written_=write(2,arg,sizeof(arg)-1); (void)written_; }
+    /* The thread's name (/proc/self/task/<tid>/comm; open and read are async-signal-safe). */
+    { char path[]="/proc/self/task/0000000000/comm", name[40]="  name=";
+      uint64_t v=tid; for (int i=25;i>=16;--i) { path[i]=(char)('0'+v%10); v/=10; }
+      int start=16; while (path[start]=='0' && start<25) ++start;
+      memmove(path+16,path+start,sizeof(path)-start);
+      int fd=open(path,O_RDONLY);
+      if (fd>=0) { ssize_t n=read(fd,name+7,sizeof(name)-8); close(fd); if (n>0) { ssize_t w=write(2,name,(size_t)(7+n)); (void)w; } } }
     for (int depth=0; depth<24; ++depth) {
         write_hex(line+6,tid); write_hex(line+27,rip); write_hex(line+59,rip-(uintptr_t)image); write_hex(line+90,rip-exe_base);
         { ssize_t written_=write(2,line,sizeof(line)-1); (void)written_; }
@@ -244,6 +251,20 @@ static void dump_frames(ucontext_t *uc) {
         if (!rbp || process_vm_readv(getpid(),&local,1,&remote,1,0)!=(ssize_t)sizeof(frame)) break;
         if (frame[0]<=rbp) break;
         rbp=frame[0]; rip=frame[1];
+    }
+    /* The host side of the thread (the runtime function a guest thread waits in): unwound
+     * through the signal frame by the host's unwind tables, up to the first guest frame. */
+    void *frames[16];
+    int depth=backtrace(frames,16);
+    for (int i=2;i<depth;++i) {
+        Dl_info where;
+        char text[256];
+        if (dladdr(frames[i],&where) && where.dli_fname)
+            snprintf(text,sizeof(text),"  host #%d %s+0x%lx (%s)\n",i,strrchr(where.dli_fname,'/') ? strrchr(where.dli_fname,'/')+1 : where.dli_fname,
+                     (unsigned long)((uintptr_t)frames[i]-(uintptr_t)where.dli_fbase),where.dli_sname ? where.dli_sname : "?");
+        else
+            snprintf(text,sizeof(text),"  host #%d guest+0x%lx\n",i,(unsigned long)((uintptr_t)frames[i]-(uintptr_t)image));
+        ssize_t w=write(2,text,strlen(text)); (void)w;
     }
 }
 static void thread_dump(int sig, siginfo_t *info, void *context) { (void)sig; (void)info; dump_frames(context); }

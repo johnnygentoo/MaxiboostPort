@@ -111,6 +111,7 @@ struct Voice {
     float matrix[MAX_MATRICES][MAX_CH*MAX_CH];
     uint32_t matrix_levels[MAX_MATRICES];
     uint32_t output_id;
+    int failed;
     CallbackHandler callback;
     uintptr_t callback_data;
     uint32_t callback_flags;
@@ -436,13 +437,25 @@ static ABI int32_t parse_file(const char *path,uint64_t offset,WaveformInfo *inf
 }
 
 /* ---- Voices ---- */
+/* A voice that cannot play its waveform stops, with the reason logged once per voice. */
+static void voice_fail(Voice *v,const char *why) {
+    if (!v->failed) {
+        v->failed=1;
+        printf("Ngs2: voice %u of rack %#x stopped: %s (type %#x, %u ch, %u Hz, %u blocks)\n",v->index,v->rack->id,why,
+               v->type,v->channels,v->rate,v->nblocks);
+    }
+    v->state=STATE_EMPTY; v->nblocks=0;
+}
 static void block_restart(Voice *v) {
     v->played=0; v->read_bytes=0; v->frame_count=v->frame_pos=0; v->at9_frame_in_superframe=0;
     v->skip_left=v->nblocks ? v->blocks[0].b.skip : 0;
-    if (v->type==WAVE_ATRAC9) {
-        if (!v->at9) v->at9=Atrac9GetHandle();
+    /* One decoder per waveform (setup): LibAtrac9 builds its tables in InitDecoder, too slow for
+       every block and repeat. A block starts a frame early (at9_range), which settles the
+       overlap. */
+    if (v->type==WAVE_ATRAC9 && !v->at9) {
+        v->at9=Atrac9GetHandle();
         if (v->at9 && !Atrac9InitDecoder(v->at9,v->config)) Atrac9GetCodecInfo(v->at9,&v->at9_info);
-        else voice_release_decoder(v);
+        else { voice_release_decoder(v); voice_fail(v,"ATRAC9 configuration not accepted"); }
     }
 }
 static void set_event(Voice *v,uint32_t event) {
@@ -465,7 +478,7 @@ static int32_t sampler_setup(Voice *v,const unsigned char *p,uint32_t size) {
     const int was_playing=v->state!=STATE_EMPTY;
     voice_release_decoder(v);
     v->state=STATE_EMPTY; v->nblocks=0; v->accepts=1; v->data=NULL; v->frame_count=v->frame_pos=0;
-    v->decoded_samples=v->decoded_bytes=0; v->pitch=1.0f; v->primed=0; v->phase=0;
+    v->decoded_samples=v->decoded_bytes=0; v->pitch=1.0f; v->primed=0; v->phase=0; v->failed=0;
     (void)was_playing;
     if (!f.channels || f.channels>MAX_CH) return ERR_INVALID_WAVEFORM_FORMAT;
     v->type=f.type; v->channels=f.channels; v->rate=f.sample_rate ? f.sample_rate : 48000;
@@ -652,10 +665,14 @@ static int decode_more(Voice *v) {
         if (v->type==WAVE_ATRAC9) {
             if (!v->at9 || v->read_bytes>=b->b.size) return 0;
             const uint32_t frame=(uint32_t)v->at9_info.frameSamples, ch=(uint32_t)v->at9_info.channels;
-            if (ch!=channels || frame*ch>256*MAX_CH) return 0;
+            if (ch!=channels || frame*ch>256*MAX_CH) { voice_fail(v,"ATRAC9 channel count differs from the setup"); return 0; }
             int16_t pcm[256*MAX_CH];
             int used=0;
-            if (Atrac9Decode(v->at9,src+v->read_bytes,pcm,&used)) return 0;
+            const int e=Atrac9Decode(v->at9,src+v->read_bytes,pcm,&used);
+            if (e) {
+                char why[96]; snprintf(why,sizeof(why),"ATRAC9 frame at block byte %u does not decode (%d)",v->read_bytes,e);
+                voice_fail(v,why); return 0;
+            }
             v->read_bytes+=(uint32_t)used; v->decoded_bytes+=(uint32_t)used;
             if (++v->at9_frame_in_superframe==(uint32_t)v->at9_info.framesInSuperframe) {
                 /* Superframes are padded to their size. */
@@ -691,6 +708,8 @@ static int decode_more(Voice *v) {
 }
 /* The next source sample frame of the voice (all channels); false when it ran out. */
 static int next_source(Voice *v,float *out) {
+    /* Blocks that end without a sample (empty, or a repeat of one) would loop for ever. */
+    unsigned empty_blocks=0;
     for (;;) {
         if (v->frame_pos<v->frame_count) {
             memcpy(out,&v->frame[v->frame_pos*v->channels],v->channels*sizeof(float));
@@ -698,7 +717,8 @@ static int next_source(Voice *v,float *out) {
             return 1;
         }
         if (decode_more(v)) continue;
-        if (!v->nblocks) return 0;
+        if (!v->nblocks || v->state!=STATE_PLAYING) return 0;
+        if (!v->played && ++empty_blocks>v->nblocks+1) { voice_fail(v,"its blocks hold no samples"); return 0; }
         if (!block_finished(v)) return 0;
     }
 }

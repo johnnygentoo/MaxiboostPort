@@ -2202,6 +2202,8 @@ bool TemporalUpscaler::PresentDumpDue() {
         const char* env = std::getenv("BB_PRESENT_DUMP_COUNT");
         return env ? std::max(1, std::atoi(env)) : 1;
     }();
+    static bool noted = false;
+    if (!noted) { noted = true; std::printf("Present dump: trigger %s\n", dump ? dump : "(none)"); }
     if (dump && present_dump_remaining == 0 && std::remove(dump) == 0) {
         present_dump_remaining = dump_count;
     }
