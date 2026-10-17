@@ -248,8 +248,8 @@ void Menu() {
                                  200.0f * base_scale)));
     bool keep_open = true;
     if (!ImGui::Begin(
-            BbSettings::MenuText("GODZILLA - Graphics  (Insert / L3+R3)###bbport_settings",
-                                 "GODZILLA — настройки  (Insert / L3+R3)###bbport_settings"),
+            BbSettings::MenuText("GUNDAM VERSUS - Graphics  (Insert / L3+R3)###bbport_settings",
+                                 "GUNDAM VERSUS — настройки  (Insert / L3+R3)###bbport_settings"),
             &keep_open, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
