@@ -88,10 +88,10 @@ headerbar button.destructive-action { padding: 6px 18px; font-weight: bold; }
 headerbar button.destructive-action { background-color: #d8334a; color: #ffffff; }
 
 /* The brand at the start of the header bar: the game's icon (or the launcher's) and its name. */
-headerbar .gz-brand { margin: 0 6px; }
-headerbar .gz-brand image { border-radius: 6px; }
-headerbar .gz-brand label.gz-title { font-weight: 800; letter-spacing: 2px; color: @theme_fg_color; }
-headerbar .gz-brand label.gz-subtitle { font-size: 0.8em; opacity: 0.65; }
+headerbar .gv-brand { margin: 0 6px; }
+headerbar .gv-brand image { border-radius: 6px; }
+headerbar .gv-brand label.gv-title { font-weight: 800; letter-spacing: 2px; color: @theme_fg_color; }
+headerbar .gv-brand label.gv-subtitle { font-size: 0.8em; opacity: 0.65; }
 viewswitcher button:checked { color: @theme_fg_color; }
 
 textview.log { padding: 4px; }

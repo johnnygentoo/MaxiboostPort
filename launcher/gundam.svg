@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- gvport launcher icon: a mecha head seen from the front, its V-fin crest swept up, eyes lit,
+     in the JohnnyCyan palette (navy #1E2E3E / #091018, cyan #15F4EE). Original artwork for this
+     project: no game artwork, logo or trademark is used. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1E2E3E"/>
+      <stop offset="1" stop-color="#091018"/>
+    </linearGradient>
+    <radialGradient id="haze" cx="0.5" cy="0.46" r="0.55">
+      <stop offset="0" stop-color="#15F4EE" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#15F4EE" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fin" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#0c8f8b"/>
+      <stop offset="0.55" stop-color="#15F4EE"/>
+      <stop offset="1" stop-color="#e8fffe"/>
+    </linearGradient>
+    <linearGradient id="armor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1E2E3E"/>
+      <stop offset="1" stop-color="#050b12"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <clipPath id="tile"><rect x="8" y="8" width="240" height="240" rx="44"/></clipPath>
+  </defs>
+
+  <rect x="8" y="8" width="240" height="240" rx="44" fill="url(#sky)"/>
+  <g clip-path="url(#tile)">
+    <rect x="8" y="8" width="240" height="240" fill="url(#haze)"/>
+    <!-- scan lines of a cockpit display behind the head -->
+    <g stroke="#15F4EE" stroke-width="1" opacity="0.12">
+      <path d="M8 60 H248 M8 84 H248 M8 196 H248 M8 220 H248"/>
+    </g>
+
+    <!-- V-fin: two swept blades from the crest -->
+    <g fill="url(#fin)" stroke="#15F4EE" stroke-width="1.5" stroke-linejoin="round" filter="url(#glow)">
+      <path d="M114 106 L36 30 L50 32 L138 90 Z"/>
+      <path d="M142 106 L220 30 L206 32 L118 90 Z"/>
+    </g>
+
+    <g transform="translate(128 150) scale(1.12) translate(-128 -150)">
+    <!-- helmet -->
+    <path fill="url(#armor)" stroke="#15F4EE" stroke-width="2.5" stroke-linejoin="round"
+          d="M80 112 C82 96 100 88 128 88 C156 88 174 96 176 112
+             L184 150 L172 158 L172 176 L150 200 L106 200 L84 176 L84 158 L72 150 Z"/>
+    <!-- side vents -->
+    <g fill="none" stroke="#15F4EE" stroke-width="2" opacity="0.7">
+      <path d="M80 126 L90 128 M78 136 L88 138"/>
+      <path d="M176 126 L166 128 M178 136 L168 138"/>
+    </g>
+    <!-- visor band and eyes -->
+    <path d="M94 126 L162 126 L156 146 L100 146 Z" fill="#050b12" stroke="#15F4EE" stroke-width="1.5"/>
+    <g fill="#15F4EE" filter="url(#glow)">
+      <path d="M100 132 L124 134 L122 142 L104 140 Z"/>
+      <path d="M156 132 L132 134 L134 142 L152 140 Z"/>
+    </g>
+    <path d="M100 132 L124 134 L122 142 L104 140 Z M156 132 L132 134 L134 142 L152 140 Z"
+          fill="#15F4EE" opacity="0.6" filter="url(#soft)"/>
+    <!-- faceplate and chin -->
+    <path d="M128 148 L144 156 L140 178 L128 188 L116 178 L112 156 Z" fill="#0d1a26"
+          stroke="#15F4EE" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M118 162 L138 162 M120 170 L136 170" stroke="#15F4EE" stroke-width="2" opacity="0.8"/>
+    <path d="M118 182 L128 192 L138 182" fill="none" stroke="#15F4EE" stroke-width="2"/>
+    </g>
+    <!-- crest jewel on the forehead, between the blades -->
+    <path d="M128 78 L139 92 L128 106 L117 92 Z" fill="#15F4EE" stroke="#e8fffe" stroke-width="1" filter="url(#glow)"/>
+  </g>
+  <rect x="9.5" y="9.5" width="237" height="237" rx="43" fill="none" stroke="#15F4EE" stroke-width="3" opacity="0.85"/>
+</svg>
