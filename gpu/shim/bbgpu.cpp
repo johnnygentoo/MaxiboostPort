@@ -275,7 +275,7 @@ extern "C" int bbgpu_init(const BbGpuConfig* config) {
     g_sdk_version = config->sdk_version;
     if (config->user_dir) setenv("BB_GPU_USER_DIR", config->user_dir, 0);
     Core::Emulator::FillElfInfo(*config);
-    const std::string title = config->title ? config->title : "Bloodborne";
+    const std::string title = config->title ? config->title : "GODZILLA";
     const s32 width = config->width, height = config->height;
     g_window_thread = std::thread([title, width, height] {
         Common::SetCurrentThreadName("bb:window");

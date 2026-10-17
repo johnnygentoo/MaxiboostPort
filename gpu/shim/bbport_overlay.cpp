@@ -19,6 +19,7 @@
 
 #include <SDL3/SDL.h>
 #include "bbport_settings.h"
+#include "game_profile.h"
 #include "bbport_shader_activity.h"
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -247,8 +248,8 @@ void Menu() {
                                  200.0f * base_scale)));
     bool keep_open = true;
     if (!ImGui::Begin(
-            BbSettings::MenuText("Bloodborne - Graphics  (Insert / L3+R3)###bbport_settings",
-                                 "Bloodborne — настройки  (Insert / L3+R3)###bbport_settings"),
+            BbSettings::MenuText("GODZILLA - Graphics  (Insert / L3+R3)###bbport_settings",
+                                 "GODZILLA — настройки  (Insert / L3+R3)###bbport_settings"),
             &keep_open, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
@@ -564,45 +565,51 @@ void Menu() {
         "остаётся в 1080p — на Steam Deck и старых видеокартах это заметно медленнее. "
         "Выключена: всё рисуется в разрешении пресета, смена — через перезапуск. Авто включает "
         "её на мощных дискретных видеокартах. Применяется после перезапуска игры."));
-    ImGui::SeparatorText(BbSettings::MenuText("Game effects (restart required)",
-                                              "Эффекты игры (после перезапуска)"));
-    const char* lods[] = {BbSettings::MenuText("Highest (-2)", "Максимальная (-2)"),
-                          BbSettings::MenuText("Game default", "Как в игре"),
-                          BbSettings::MenuText("Lower (1)", "Ниже (1)"),
-                          BbSettings::MenuText("Lowest (2)", "Минимальная (2)")};
-    static constexpr int lod_values[] = {-2, 0, 1, 2};
-    int lod_index = 1;
-    for (int i = 0; i < 4; ++i) {
-        if (lod_values[i] == s.model_lod) lod_index = i;
-    }
-    if (ImGui::BeginCombo(BbSettings::MenuText("Model detail", "Детализация моделей"),
-                          lods[lod_index])) {
+    // The effect switches and model detail are Bloodborne's community patches: other games get
+    // the section once their patches exist.
+    const Game::Profile* profile = Game::Active();
+    const bool game_effects = profile && std::string_view(profile->name) == "Bloodborne";
+    if (game_effects) {
+        ImGui::SeparatorText(BbSettings::MenuText("Game effects (restart required)",
+                                                  "Эффекты игры (после перезапуска)"));
+        const char* lods[] = {BbSettings::MenuText("Highest (-2)", "Максимальная (-2)"),
+                              BbSettings::MenuText("Game default", "Как в игре"),
+                              BbSettings::MenuText("Lower (1)", "Ниже (1)"),
+                              BbSettings::MenuText("Lowest (2)", "Минимальная (2)")};
+        static constexpr int lod_values[] = {-2, 0, 1, 2};
+        int lod_index = 1;
         for (int i = 0; i < 4; ++i) {
-            if (ImGui::Selectable(lods[i], i == lod_index)) {
-                Store(s.model_lod, lod_values[i], true);
+            if (lod_values[i] == s.model_lod) lod_index = i;
+        }
+        if (ImGui::BeginCombo(BbSettings::MenuText("Model detail", "Детализация моделей"),
+                              lods[lod_index])) {
+            for (int i = 0; i < 4; ++i) {
+                if (ImGui::Selectable(lods[i], i == lod_index)) {
+                    Store(s.model_lod, lod_values[i], true);
+                }
+            }
+            ImGui::EndCombo();
+        }
+        for (int e = 0; e < BbSettings::EffectCount; ++e) {
+            const auto& effect = BbSettings::Effects[e];
+            Checkbox(BbSettings::MenuText(effect.label, effect.label_ru), s.effects[e]);
+            if (std::string_view(effect.key) == "debug_camera") {
+                Hint(BbSettings::MenuText("Hold Cross and press L3 (keyboard: Space + Z).",
+                                          "Удерживайте Cross и нажмите L3 (клавиатура: Space + Z)."));
+            } else if (std::string_view(effect.key) == "debug_menu") {
+                Hint(BbSettings::MenuText(
+                    "Left side of the touchpad (Tab); right side: Backspace. Needs the adhoc folder "
+                    "from Nexus mod #253 (the fonts in adhoc/font).",
+                    "Левая сторона тачпада (Tab), правая — Backspace. Нужна папка adhoc из мода "
+                    "Nexus #253 (шрифты в adhoc/font)."));
             }
         }
-        ImGui::EndCombo();
+        Hint(BbSettings::MenuText(
+            "Effects are enabled and disabled by game patches at startup (patches/Godzilla.xml). "
+            "Motion blur and shadows from dynamic lights place a significant load on the GPU.",
+            "Эффекты включаются и выключаются патчами игры при запуске (patches/Godzilla.xml). "
+            "Размытие в движении и тени от динамических источников заметно нагружают GPU."));
     }
-    for (int e = 0; e < BbSettings::EffectCount; ++e) {
-        const auto& effect = BbSettings::Effects[e];
-        Checkbox(BbSettings::MenuText(effect.label, effect.label_ru), s.effects[e]);
-        if (std::string_view(effect.key) == "debug_camera") {
-            Hint(BbSettings::MenuText("Hold Cross and press L3 (keyboard: Space + Z).",
-                                      "Удерживайте Cross и нажмите L3 (клавиатура: Space + Z)."));
-        } else if (std::string_view(effect.key) == "debug_menu") {
-            Hint(BbSettings::MenuText(
-                "Left side of the touchpad (Tab); right side: Backspace. Needs the adhoc folder "
-                "from Nexus mod #253 (the fonts in adhoc/font).",
-                "Левая сторона тачпада (Tab), правая — Backspace. Нужна папка adhoc из мода "
-                "Nexus #253 (шрифты в adhoc/font)."));
-        }
-    }
-    Hint(BbSettings::MenuText(
-        "Effects are enabled and disabled by game patches at startup (patches/Bloodborne.xml). "
-        "Motion blur and shadows from dynamic lights place a significant load on the GPU.",
-        "Эффекты включаются и выключаются патчами игры при запуске (patches/Bloodborne.xml). "
-        "Размытие в движении и тени от динамических источников заметно нагружают GPU."));
 
     bool restart =
         s.object_motion != s.startup_object_motion || s.model_lod != s.startup_model_lod ||
