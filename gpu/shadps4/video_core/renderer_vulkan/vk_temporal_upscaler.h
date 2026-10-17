@@ -223,6 +223,20 @@ private:
     bool context_hdr = true;
     u32 target_width = 1920, target_height = 1080; ///< output size of scaled presets
     u64 ui_trigger_vs = 0x34e8a281;
+    /// gzport: the game profile's end of the scene (every later draw into it is the HUD) and its
+    /// copy of the finished frame, kept at the output size in `relay` for the display pass.
+    u64 scene_done_vs = 0, frame_copy_vs = 0;
+    std::array<u64, 4> hud_vs{};
+    bool scene_done = false;
+    /// The target the scene was finished in (the HUD's), and the last render-size RGBA8 target
+    /// drawn (a frame without a scene: menus, loading).
+    VideoCore::ImageId scene_done_target{}, last_target{};
+    VideoCore::ImageId relay_guest{};
+    bool relay_active = false;
+    /// Draws of the frame other than the display pass: a frame without any shows the game's last
+    /// frame again, composed as it was.
+    u32 frame_draws = 0;
+    bool last_redirect = false;
     VideoCore::ImageId ldr_target{};
     VideoCore::ImageId ui_color{}, ui_depth{};
     bool ui_phase = false;         ///< from the upscale to the next display pass
@@ -256,6 +270,7 @@ private:
         u32 width = 0, height = 0;
         bool valid = false;
     };
+    DisplayImage relay;
     std::mutex display_mutex;
     int present_dump_remaining = 0, present_dump_index = 0;
     std::unordered_map<VAddr, DisplayImage> displays;

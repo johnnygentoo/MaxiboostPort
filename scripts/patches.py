@@ -65,11 +65,26 @@ def resolution_writes(size,image):
     return writes
 
 
+# Upscaler presets (bbport.ini "preset": Native AA, Quality, Balanced, Performance, Ultra
+# Performance): output / render size ratio. The temporal upscalers take the scene at the reduced
+# size, the HUD is drawn at the output size (the GPU library's UI composition).
+PRESET_SCALES=[1.0,1.5,1.7,2.0,3.0]
+TEMPORAL_UPSCALERS={'fsr3','fsr4','fsr411','dlss'}
+
+
 def scaled_sizes(settings):
-    """(render, output) when bbport.ini selects an output other than 1080p: the game renders at
-    the output size. None at 1080p."""
+    """(render, output): the size the game renders at (the output, divided by the upscaler
+    preset's scale with a temporal upscaler) and the output. None when both are 1920x1080 (the
+    game's own size, no patch)."""
     out=output_size(settings)
-    return None if out==OUTPUT_SIZE else (out,out)
+    scale=1.0
+    if settings.get('upscaler','off') in TEMPORAL_UPSCALERS:
+        preset=int(settings.get('preset','0') or 0)
+        scale=PRESET_SCALES[max(0,min(preset,len(PRESET_SCALES)-1))]
+    render=tuple(max(2,round(v/scale/2)*2) for v in out)
+    if render==out==OUTPUT_SIZE:
+        return None
+    return render,out
 
 
 # Effect switches (bbport.ini, in-game menu, launcher): key -> (patch when the key is 0, patch

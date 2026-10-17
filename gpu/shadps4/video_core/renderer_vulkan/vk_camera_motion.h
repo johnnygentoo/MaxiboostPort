@@ -12,6 +12,7 @@
 #include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/buffer_cache/buffer.h"
 #include "video_core/texture_cache/image.h"
+#include "game_profile.h"
 
 namespace VideoCore {
 class TextureCache;
@@ -61,6 +62,9 @@ public:
     /// Vertical field of view and near/far planes of the current camera.
     [[nodiscard]] float VerticalFov() const noexcept;
     [[nodiscard]] float Near() const noexcept;
+    [[nodiscard]] float Far() const noexcept {
+        return far_plane;
+    }
     // Current projection, previous projection, and row Z of previous-view * inverse-view.
     [[nodiscard]] std::array<std::array<float, 4>, 3> TaaDepthParameters() const noexcept;
     /// bbport: the matrices and jitter of the motion of this frame, printed with an upscaler dump
@@ -71,14 +75,36 @@ public:
     /// layout) into `motion_view` (RG16F storage, General), pixels, previous minus current.
     void RecordMotion(vk::ImageView depth_view, vk::ImageView motion_view, u32 width, u32 height);
 
+    /// A bound constant buffer of a scene pass draw: the scene camera when it is one (the game
+    /// profile's layout, or Bloodborne's 864-byte scene constants).
+    void OnConstantBuffer(const float* data, u64 size) {
+        const Game::UpscalerHooks* hooks = Game::Upscaler();
+        if (hooks && hooks->camera) {
+            Game::SceneCamera camera;
+            if (size == hooks->camera_constants_size && hooks->camera(data, camera)) {
+                OnSceneCamera(camera);
+            }
+        } else if (size == 864) {
+            OnConstants(data);
+        }
+    }
+    /// The color targets a pass needs for its depth to be the scene depth.
+    [[nodiscard]] static u32 ScenePassTargets() noexcept {
+        const Game::UpscalerHooks* hooks = Game::Upscaler();
+        return hooks ? hooks->scene_pass_targets : 5;
+    }
     /// A bound constant buffer of 864 bytes: checks the scene constant signature.
     void OnConstants(const float* data);
+    /// The scene camera a game profile found in its constants.
+    void OnSceneCamera(const Game::SceneCamera& camera);
 
     /// The G-buffer pass (5+ color targets): its depth is the scene depth.
     /// `x_sign`/`y_sign`: signs of the G-buffer pass's viewport x/y scale (window = ndc * scale +
     /// offset). The motion shaders take ndc as +y down the screen, so the projection's scales are
     /// multiplied by them: the game's viewport decides which way view +y goes, per frame.
-    void OnGBufferPass(VideoCore::ImageId depth, float x_sign = 1.0f, float y_sign = 1.0f);
+    /// `z_scale`/`z_offset`: the viewport's depth from ndc z (depth = ndc z * scale + offset).
+    void OnGBufferPass(VideoCore::ImageId depth, float x_sign = 1.0f, float y_sign = 1.0f,
+                       float z_scale = 1.0f, float z_offset = 0.0f);
 
     /// The pass copying the finished frame (`frame`, the last target drawn) to the display: the
     /// frame's depth and camera are complete. Records the debug overlay, starts a new frame.
@@ -120,6 +146,8 @@ private:
     VideoCore::ImageId depth_id{};
     float gbuffer_x_sign = 1.0f; ///< bbport: signs of the G-buffer viewport scales (OnGBufferPass)
     float gbuffer_y_sign = 1.0f;
+    float gbuffer_z_scale = 1.0f, gbuffer_z_offset = 0.0f;
+    float far_plane = 3000.0f; ///< Bloodborne's; a profile's camera names its own
 
     vk::UniqueDescriptorSetLayout desc_layout;
     vk::UniquePipelineLayout pipeline_layout;

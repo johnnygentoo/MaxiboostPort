@@ -351,7 +351,45 @@ void CameraMotion::OnConstants(const float* data) {
     }
 }
 
-void CameraMotion::OnGBufferPass(VideoCore::ImageId depth, float x_sign, float y_sign) {
+void CameraMotion::OnSceneCamera(const Game::SceneCamera& c) {
+    if (pass_has_camera) {
+        return; // the first camera of the pass is its own (as OnConstants)
+    }
+    pass_camera.view = c.view;
+    pass_camera.inv_view = InverseAffine(c.view);
+    // The motion shaders take depth = proj.z + proj.w / z and ndc +y down the screen: the scene
+    // pass's viewport maps ndc z to depth and decides which way +y goes.
+    const float y_sign = gbuffer_y_sign * (BbToggle::Disabled(BbToggle::CameraYFlip) ? -1.0f : 1.0f);
+    pass_camera.proj = {c.proj_x * gbuffer_x_sign, c.proj_y * y_sign,
+                        gbuffer_z_scale * c.ndc_z + gbuffer_z_offset,
+                        gbuffer_z_scale * c.ndc_z_over_z};
+    pass_camera.valid = c.proj_x != 0.0f && c.proj_y != 0.0f;
+    far_plane = c.far_plane;
+    static bool noted = false;
+    if (!noted) {
+        noted = true;
+        std::printf("Camera motion: scene camera of the game profile: projection x %.4f y %.4f, "
+                    "depth %.6f %+.6f / z, near %g far %g\n",
+                    pass_camera.proj[0], pass_camera.proj[1], pass_camera.proj[2],
+                    pass_camera.proj[3], c.near_plane, c.far_plane);
+    }
+    const std::array<u32, 2> size{c.width, c.height};
+    if (size != render_size) {
+        std::printf("Camera motion: scene render size %ux%u\n", size[0], size[1]);
+        render_size = size;
+    }
+    pass_has_camera = true;
+    frame_has_camera = true;
+    if (frame_gbuffer_passes <= pass_positions.size() && frame_gbuffer_passes > 0) {
+        const auto& v = pass_camera.inv_view; // world position of this pass's camera
+        pass_positions[frame_gbuffer_passes - 1] = {v[3], v[7], v[11]};
+    }
+}
+
+void CameraMotion::OnGBufferPass(VideoCore::ImageId depth, float x_sign, float y_sign,
+                                 float z_scale, float z_offset) {
+    gbuffer_z_scale = z_scale;
+    gbuffer_z_offset = z_offset;
     if (depth != depth_id) {
         // Another depth target: another G-buffer pass, with its own camera.
         depth_id = depth;

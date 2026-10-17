@@ -691,11 +691,15 @@ void Rasterizer::PrepareRenderState(const GraphicsPipeline* pipeline) {
     }
     // bbport: the G-buffer pass (5+ color targets) holds the scene depth, and its constants the
     // main camera (shadow passes bind the same layout with the light's camera).
-    gbuffer_draw = camera_motion->Enabled() && std::popcount(key.mrt_mask) >= 5 && db_desc.first;
+    // gzport: a forward renderer (GODZILLA) draws its scene into one color target: the game
+    // profile names how many targets its scene pass has.
+    gbuffer_draw = camera_motion->Enabled() &&
+                   u32(std::popcount(key.mrt_mask)) >= CameraMotion::ScenePassTargets() &&
+                   db_desc.first;
     if (gbuffer_draw) {
         const auto& vp = regs.viewports[0];
         camera_motion->OnGBufferPass(db_desc.first, vp.xscale < 0.0f ? -1.0f : 1.0f,
-                                     vp.yscale < 0.0f ? -1.0f : 1.0f);
+                                     vp.yscale < 0.0f ? -1.0f : 1.0f, vp.zscale, vp.zoffset);
     }
     if (upscaler->Enabled() && cb_descs[0].first) {
         upscaler->OnColorTarget(cb_descs[0].first);
@@ -3015,9 +3019,14 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         if (ring) {
             // Copied by the GPU command thread into the constant ring (read-only).
             if (!desc.IsSpecial()) {
-                if (ring->size == 864 && gbuffer_draw &&
-                    memory->IsValidGpuMapping(ring->address, 0)) {
-                    camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address));
+                if (gbuffer_draw && memory->IsValidGpuMapping(ring->address, 0)) {
+                    camera_motion->OnConstantBuffer(reinterpret_cast<const float*>(ring->address),
+                                                    ring->size);
+                }
+                if (FrameCapture::Active() && memory->IsValidGpuMapping(ring->address, 0)) {
+                    FrameCapture::Buffer(stage.pgm_hash, binding.buffer, ring->address,
+                                         reinterpret_cast<const void*>(ring->address),
+                                         memory->ClampRangeSize(ring->address, ring->size));
                 }
                 push_data.AddOffset(binding.buffer, 0);
             }
@@ -3076,9 +3085,9 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         } else {
             const auto vsharp =
                 prepared ? prepared->buffer_sharps[buffer_index] : desc.GetSharp(stage);
-            if (vsharp.GetSize() == 864 && gbuffer_draw &&
-                memory->IsValidGpuMapping(vsharp.base_address, 0)) {
-                camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address));
+            if (gbuffer_draw && memory->IsValidGpuMapping(vsharp.base_address, 0)) {
+                camera_motion->OnConstantBuffer(
+                    reinterpret_cast<const float*>(vsharp.base_address), vsharp.GetSize());
             }
             // Object motion research: the vertex shader buffers of G-buffer draws.
             if (FrameCapture::Active() && gbuffer_draw && stage.sw_stage == Shader::SwStage::Vertex &&
@@ -4020,6 +4029,22 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
             target_scale = UiComposition::Scale(guest_extent.first, guest_extent.second,
                                                 redirect.width, redirect.height,
                                                 native_coordinates);
+            // BB_UI_TRACE=1: each redirected draw kind once (its shader, viewport and clip).
+            static const bool ui_trace = std::getenv("BB_UI_TRACE") != nullptr;
+            if (ui_trace) {
+                static std::vector<u64> seen;
+                const u64 vs = pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash;
+                if (std::find(seen.begin(), seen.end(), vs) == seen.end() && seen.size() < 64) {
+                    seen.push_back(vs);
+                    std::printf("UI redirect: vs %llx clip %s viewport %.1f x %.1f (scale %d) guest "
+                                "%ux%u -> %ux%u, target scale %.3f\n",
+                                (unsigned long long)vs, regs.IsClipDisabled() ? "off" : "on",
+                                viewport.xscale * 2, viewport.yscale * 2,
+                                int(regs.viewport_control.xscale_enable), guest_extent.first,
+                                guest_extent.second, redirect.width, redirect.height,
+                                target_scale[0]);
+                }
+            }
         }
     }
 

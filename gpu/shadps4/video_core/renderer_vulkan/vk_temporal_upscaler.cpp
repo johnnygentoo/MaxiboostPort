@@ -193,6 +193,13 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
     if (const char* hash = std::getenv("BB_UPSCALE_BEFORE_CS")) {
         trigger_hash = std::strtoull(hash, nullptr, 16);
     }
+    // gzport: the game profile names the draw that starts its HUD.
+    if (const Game::UpscalerHooks* hooks = Game::Upscaler(); hooks && hooks->hud_vertex_shader) {
+        ui_trigger_vs = hooks->hud_vertex_shader;
+        scene_done_vs = hooks->scene_done_vertex_shader;
+        frame_copy_vs = hooks->frame_copy_vertex_shader;
+        hud_vs = hooks->hud_vertex_shaders;
+    }
     if (const char* hash = std::getenv("BB_UI_TRIGGER_VS")) {
         ui_trigger_vs = std::strtoull(hash, nullptr, 16);
     }
@@ -394,7 +401,7 @@ bool TemporalUpscaler::OnFrameStart() {
     // (their display buffer is shown as the game drew it, at its own size), and of one that had it.
     if (ui_trace_on) {
         static int bad = 0, good = 0;
-        if ((!ui_phase && Scaled() && good > 0 && bad < 12) || (ui_phase && good < 1)) {
+        if ((!ui_phase && Scaled() && good > 0 && bad < 64) || (ui_phase && good < 1)) {
             ++(ui_phase ? good : bad);
             std::printf("UI trace: frame %llu %s:%s\n",
                         (unsigned long long)BbStats::frame_number.load(std::memory_order_relaxed),
@@ -402,9 +409,36 @@ bool TemporalUpscaler::OnFrameStart() {
         }
         ui_trace.clear();
     }
-    // The display pass of an upscaled frame reads the upscaled UI image.
-    display_redirect = ui_phase;
+    // The display pass of an upscaled frame reads the upscaled UI image (or its relay). A frame
+    // that drew nothing but its display pass (the game showing its last frame again, in
+    // transitions) keeps the last composition: shown at the render size it was a HUD flicker.
+    const bool repeat = frame_draws == 0 && last_redirect;
+    if (ui_trace_on && Scaled() && !ui_phase && !repeat) {
+        std::printf("UI trace: frame %llu not composed: %u draws before, last composed %d, relay %d\n",
+                    (unsigned long long)BbStats::frame_number.load(std::memory_order_relaxed),
+                    frame_draws, int(last_redirect), int(relay.valid));
+    }
+    display_redirect = ui_phase || repeat;
+    relay_active = relay_guest && relay.valid && (ui_phase || (repeat && relay_active));
+    last_redirect = display_redirect;
+    frame_draws = 0;
+    // gzport: how many frames of a scaled session were composed (the HUD at the output size over
+    // the upscaled or scaled scene); one shown without composition between composed ones is a
+    // flicker of the HUD. Every 600 frames, when any was not.
+    if (Scaled()) {
+        static u32 frames = 0, composed = 0;
+        ++frames;
+        composed += display_redirect ? 1 : 0;
+        if (frames == 600) {
+            if (composed != frames) {
+                std::printf("UI composition: %u of %u frames composed\n", composed, frames);
+            }
+            frames = composed = 0;
+        }
+    }
     ui_phase = false;
+    scene_done = false;
+    scene_done_target = last_target = {};
     ui_read_barrier = false;
     done_this_frame = false;
     ldr_target = {};
@@ -1263,7 +1297,7 @@ void TemporalUpscaler::Run() {
         info.frameTimeMilliseconds = frame_ms;
         info.preExposure = 1.0f;
         info.cameraNear = camera_motion.Near();
-        info.cameraFar = 3000.0f;
+        info.cameraFar = camera_motion.Far();
         info.cameraVerticalFovRadians = camera_motion.VerticalFov();
         info.viewSpaceToMeters = 1.0f;
         // RCAS strength 0..1 (menu, BB_FSR_SHARPNESS); jitter at 1:1 softens the image slightly.
@@ -1454,6 +1488,9 @@ void TemporalUpscaler::OnColorTarget(VideoCore::ImageId color) {
 
 void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
                               VideoCore::ImageId depth, bool native_viewport) {
+    if (color && !FrameCapture::IsDisplayBuffer(texture_cache.GetImage(color).info.guest_address)) {
+        ++frame_draws;
+    }
     if (!Scaled() && vs_hash == ui_trigger_vs) done_this_frame = true;
     // bbport (issue #67, patch by bmy): a UI draw without a color target (a Scaleform mask, color
     // writes off) writes the stencil the UI's next draws test, so it must go into the UI's
@@ -1474,6 +1511,28 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
     if (!Scaled() || !color) {
         return;
     }
+    if (scene_done_vs && vs_hash == scene_done_vs) {
+        scene_done = true;
+        scene_done_target = last_target = color;
+        return;
+    }
+    if (frame_copy_vs && vs_hash == frame_copy_vs) {
+        // The copy of the finished frame: every frame is composed by then, whether its HUD
+        // started with a known shader or not (a frame shown without composition between composed
+        // ones flickered: the HUD at the render size, then at the output size). The background is
+        // the upscaled scene when the scene is ready, else the target scaled.
+        const VideoCore::ImageId source = scene_done ? scene_done_target : last_target;
+        if (!ui_phase && source) {
+            if (source == ldr_target && camera_motion.Ready() && Active() && !failed) RunScaled();
+            if (!ui_phase) RunUiOnly(source, {});
+        } else if (!ui_phase && last_redirect && ui_color) {
+            // Nothing drawn since the last frame: the game copies it again, and the composed
+            // image of that frame (ui_color's output-size copy) still holds it.
+            ui_phase = done_this_frame = true;
+        }
+        if (ui_phase) relay_guest = color;
+        return;
+    }
     if (ui_phase) {
         // A UI movie can start without stencil and enable it for later text/masks.
         if (color == ui_color && depth && depth != ui_depth) {
@@ -1485,8 +1544,17 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
         return;
     }
     const auto& image = texture_cache.GetImage(color);
+    const bool frame_target =
+        (image.info.pixel_format == vk::Format::eR8G8B8A8Unorm ||
+         image.info.pixel_format == vk::Format::eR8G8B8A8Srgb) &&
+        RenderTarget(image.info.size.width, image.info.size.height) &&
+        !FrameCapture::IsDisplayBuffer(image.info.guest_address);
+    if (frame_target) last_target = color;
+    const bool hud_shader =
+        std::find(hud_vs.begin(), hud_vs.end(), vs_hash) != hud_vs.end() && vs_hash;
     const bool movie = vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
-                       (scaled_session && native_viewport);
+                       (scaled_session && native_viewport && !scene_done_vs) || hud_shader ||
+                       (scene_done && color == scene_done_target);
     if (ui_trace_on && ui_trace.size() < 1500) {
         ui_trace += fmt::format(" [vs {:x} {}x{} fmt {} movie {} display {}]", vs_hash,
                                 image.info.size.width, image.info.size.height,
@@ -2011,7 +2079,7 @@ void TemporalUpscaler::RunScaled() {
     info.frameTimeMilliseconds = frame_ms;
     info.preExposure = 1.0f;
     info.cameraNear = camera_motion.Near();
-    info.cameraFar = 3000.0f;
+    info.cameraFar = camera_motion.Far();
     info.cameraVerticalFovRadians = camera_motion.VerticalFov();
     info.viewSpaceToMeters = 1.0f;
     info.sharpness = std::min(settings.sharpness.load(), 1.0f);
@@ -2088,6 +2156,52 @@ bool TemporalUpscaler::RedirectColor(VideoCore::ImageId color,
                   vk::ImageLayout::eGeneral, ui_width, ui_height, true};
         return true;
     }
+    if (ui_phase && relay_guest && color == relay_guest) {
+        // gzport: the copy of the finished frame, at the output size for the display pass.
+        const auto& image = texture_cache.GetImage(color);
+        if (!relay.image || relay.format != image.info.pixel_format || relay.width != ui_width ||
+            relay.height != ui_height) {
+            scheduler.Finish();
+            relay.views.clear();
+            relay.format = image.info.pixel_format;
+            relay.width = ui_width;
+            relay.height = ui_height;
+            relay.image = VideoCore::UniqueImage(instance.GetDevice(), instance.GetAllocator());
+            relay.image.Create(vk::ImageCreateInfo{
+                .flags = vk::ImageCreateFlagBits::eMutableFormat,
+                .imageType = vk::ImageType::e2D,
+                .format = relay.format,
+                .extent = {ui_width, ui_height, 1},
+                .mipLevels = 1,
+                .arrayLayers = 1,
+                .samples = vk::SampleCountFlagBits::e1,
+                .tiling = vk::ImageTiling::eOptimal,
+                .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
+                         vk::ImageUsageFlagBits::eTransferSrc,
+                .initialLayout = vk::ImageLayout::eUndefined,
+            });
+            std::printf("Display: relay %ux%u for the game's copy of the frame\n", ui_width,
+                        ui_height);
+        }
+        scheduler.EndRendering();
+        const vk::ImageMemoryBarrier2 b{
+            .srcStageMask = vk::PipelineStageFlagBits2::eAllCommands,
+            .srcAccessMask = vk::AccessFlagBits2::eNone,
+            .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+            .oldLayout = vk::ImageLayout::eUndefined,
+            .newLayout = vk::ImageLayout::eGeneral,
+            .image = vk::Image(relay.image),
+            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        };
+        scheduler.Record([b](vk::CommandBuffer cmd) {
+            cmd.pipelineBarrier2({.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &b});
+        });
+        relay.valid = true;
+        target = {Mirror(vk::Image(relay.image), relay.views, view_info.format, {}),
+                  vk::ImageLayout::eGeneral, ui_width, ui_height};
+        return true;
+    }
     const auto& image = texture_cache.GetImage(color);
     const VAddr address = image.info.guest_address;
     if (!FrameCapture::IsDisplayBuffer(address)) {
@@ -2156,7 +2270,32 @@ bool TemporalUpscaler::RedirectDepth(VideoCore::ImageId depth, Target& target) {
 bool TemporalUpscaler::RedirectSampled(VideoCore::ImageId image,
                                        const VideoCore::ImageViewInfo& info, vk::ImageView& view,
                                        vk::ImageLayout& layout) {
-    if (!display_redirect || image != ui_color) {
+    if (relay_active && image == relay_guest && relay.valid) {
+        // gzport: the display pass reads the game's copy of the frame: its output-size relay.
+        if (!ui_read_barrier) {
+            ui_read_barrier = true;
+            scheduler.EndRendering();
+            const vk::ImageMemoryBarrier2 b{
+                .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+                .dstStageMask = vk::PipelineStageFlagBits2::eAllCommands,
+                .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+                .oldLayout = vk::ImageLayout::eGeneral,
+                .newLayout = vk::ImageLayout::eGeneral,
+                .image = vk::Image(relay.image),
+                .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+            };
+            scheduler.Record([b](vk::CommandBuffer cmd) {
+                cmd.pipelineBarrier2({.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &b});
+            });
+        }
+        view = Mirror(vk::Image(relay.image), relay.views, info.format, info.mapping);
+        layout = vk::ImageLayout::eGeneral;
+        return true;
+    }
+    // The upscaled image is read by the display pass, or (gzport) by the game's copy of the
+    // frame while the HUD is drawn.
+    if (!(display_redirect || (ui_phase && relay_guest)) || image != ui_color) {
         return false;
     }
     if (!ui_read_barrier) {
@@ -2252,7 +2391,7 @@ bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image 
         .jitter = {sign * jitter[0], sign * jitter[1]},
         .frame_ms = frame_ms,
         .near_plane = camera_motion.Near(),
-        .far_plane = 3000.0f,
+        .far_plane = camera_motion.Far(),
         .vertical_fov = camera_motion.VerticalFov(),
         .sharpness = std::min(settings.sharpness.load(), 1.0f),
         .sharpen = settings.sharpen,
