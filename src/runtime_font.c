@@ -247,6 +247,8 @@ static ABI int32_t horizontal_layout(uintptr_t handle,HorizontalLayout *layout) 
     layout->line_advance=face->size->metrics.height/64.0f;
     layout->decoration_extent=FT_IS_SCALABLE(face) ? -FT_MulFix(face->underline_position,face->size->metrics.y_scale)/64.0f : 0.0f;
     pthread_mutex_unlock(&lock);
+    TRACE("horizontal layout at %.1fx%.1f: baseline %.2f, line %.2f, decoration %.2f\n",f->scale_w,f->scale_h,
+          layout->baseline_offset,layout->line_advance,layout->decoration_extent);
     return 0;
 }
 
@@ -279,10 +281,11 @@ static ABI int32_t render_glyph(uintptr_t handle,uint32_t code,RenderSurface *su
     int32_t r=0;
     if (FT_Load_Glyph(face,index,FT_LOAD_DEFAULT|FT_LOAD_NO_BITMAP)) { pthread_mutex_unlock(&lock); return ERR_NO_SUPPORT_CODE; }
     FT_GlyphSlot g=face->glyph;
-    if ((f->weight_x>0 || f->weight_y>0) && g->format==FT_GLYPH_FORMAT_OUTLINE) {
-        /* Weight: the outline grows by the given fraction of the size, in each direction. */
-        FT_Outline_EmboldenXY(&g->outline,(FT_Pos)lrintf(f->weight_x*f->scale_w*64.0f),(FT_Pos)lrintf(f->weight_y*f->scale_h*64.0f));
-    }
+    /* Weight: scales where 1 is the font's own (GODZILLA draws its subtitles at 1.04); the
+       outline grows by the excess, as a fraction of the size. */
+    const float grow_x=f->weight_x>1.0f ? f->weight_x-1.0f : 0.0f, grow_y=f->weight_y>1.0f ? f->weight_y-1.0f : 0.0f;
+    if ((grow_x>0 || grow_y>0) && g->format==FT_GLYPH_FORMAT_OUTLINE)
+        FT_Outline_EmboldenXY(&g->outline,(FT_Pos)lrintf(grow_x*f->scale_w*64.0f),(FT_Pos)lrintf(grow_y*f->scale_h*64.0f));
     FT_Render_Glyph(g,FT_RENDER_MODE_NORMAL);
     const FT_Bitmap *b=&g->bitmap;
     const float advance=g->advance.x/64.0f;
@@ -293,7 +296,10 @@ static ABI int32_t render_glyph(uintptr_t handle,uint32_t code,RenderSurface *su
         metrics->v_bearing_x=g->metrics.vertBearingX/64.0f; metrics->v_bearing_y=g->metrics.vertBearingY/64.0f;
         metrics->v_advance=g->metrics.vertAdvance/64.0f;
     }
-    int32_t left=(int32_t)lrintf(x)+g->bitmap_left, top=(int32_t)lrintf(y)-g->bitmap_top;
+    /* (x, y) is the top left of the line: the baseline is the ascender below it. GODZILLA draws
+       every glyph at (0, 0) of a scratch surface and copies the rectangle reported back. */
+    const int32_t ascender=(int32_t)((face->size->metrics.ascender+63)/64);
+    int32_t left=(int32_t)lrintf(x)+g->bitmap_left, top=(int32_t)lrintf(y)+ascender-g->bitmap_top;
     uint32_t ux=0, uy=0, uw=0, uh=0;
     if (surf && surf->buffer && b->buffer && b->width && b->rows) {
         const int32_t px=surf->pixel_size_byte>0 ? surf->pixel_size_byte : 1;
@@ -307,10 +313,8 @@ static ABI int32_t render_glyph(uintptr_t handle,uint32_t code,RenderSurface *su
             const unsigned char *src=b->buffer+(size_t)(py-top)*(size_t)b->pitch;
             for (int32_t pxl=x0;pxl<x1;++pxl) {
                 const unsigned char a=src[pxl-left];
-                if (!a) continue;
                 unsigned char *dst=row+(size_t)pxl*(size_t)px;
-                if (px==1) { if (a>dst[0]) dst[0]=a; }
-                else { for (int32_t k=0;k<px;++k) if (a>dst[k]) dst[k]=a; } /* white with coverage */
+                for (int32_t k=0;k<px;++k) dst[k]=a; /* coverage; 32-bit: white with coverage */
             }
         }
         if (x1>x0 && y1>y0) { ux=(uint32_t)x0; uy=(uint32_t)y0; uw=(uint32_t)(x1-x0); uh=(uint32_t)(y1-y0); }
@@ -318,7 +322,10 @@ static ABI int32_t render_glyph(uintptr_t handle,uint32_t code,RenderSurface *su
     if (result) {
         memset(result,0,sizeof(*result));
         if (surf) {
-            result->image.address=surf->buffer; result->image.width_byte=(uint32_t)surf->width_byte;
+            /* The image starts at the update rectangle. */
+            const uint32_t px=surf->pixel_size_byte>0 ? (uint32_t)surf->pixel_size_byte : 1;
+            result->image.address=(uint8_t *)surf->buffer+(size_t)uy*(size_t)surf->width_byte+(size_t)ux*px;
+            result->image.width_byte=(uint32_t)surf->width_byte;
             result->image.pixel_size_byte=(uint8_t)surf->pixel_size_byte;
         }
         result->update.x=ux; result->update.y=uy; result->update.w=uw; result->update.h=uh;
@@ -328,7 +335,10 @@ static ABI int32_t render_glyph(uintptr_t handle,uint32_t code,RenderSurface *su
     }
     ++glyphs;
     pthread_mutex_unlock(&lock);
-    TRACE("glyph U+%04X at (%.1f, %.1f) size %.1fx%.1f -> %ux%u, advance %.1f\n",code,x,y,f->scale_w,f->scale_h,b->width,b->rows,advance);
+    TRACE("glyph U+%04X buffer %p weight %.3f,%.3f at (%.1f, %.1f) size %.1fx%.1f -> %ux%u left %d top %d, advance %.1f; surface %dx%d stride %d px %d scissor %u,%u-%u,%u\n",
+          code,surf ? surf->buffer : NULL,f->weight_x,f->weight_y,x,y,f->scale_w,f->scale_h,b->width,b->rows,g->bitmap_left,g->bitmap_top,advance,
+          surf ? surf->width : 0,surf ? surf->height : 0,surf ? surf->width_byte : 0,surf ? surf->pixel_size_byte : 0,
+          surf ? surf->sc_x0 : 0,surf ? surf->sc_y0 : 0,surf ? surf->sc_x1 : 0,surf ? surf->sc_y1 : 0);
     return r;
 }
 
