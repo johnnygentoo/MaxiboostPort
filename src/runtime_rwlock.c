@@ -54,7 +54,8 @@ static int create_locked(Rwlock **out) {
 static ABI int32_t rw_init(Rwlock **out, void *const *attr, const char *name) {
     (void)name;
     if (!out || (attr && !*attr)) return error(EINVAL);
-    if (attr) { fputs("STOP: non-default PS4 rwlock attributes are not implemented\n",stderr); exit(21); }
+    /* An attribute object (rw_attr_init) only names reader or writer preference: Linux's default
+     * order serves both. */
     pthread_mutex_lock(&registry_lock);
     /* POSIX allows uninitialized storage, so never read *out during init. */
     int e=create_locked(out);
@@ -143,7 +144,31 @@ static ABI int32_t rw_destroy(Rwlock **handle) {
     }
     pthread_mutex_unlock(&registry_lock); return error(e);
 }
+/* Attribute objects: a handle to the type (PS4: 1 prefer readers, 2 prefer writers). */
+static ABI int32_t rw_attr_init(int32_t **attr) {
+    if (!attr) return error(EINVAL);
+    if (!(*attr=calloc(1,sizeof(**attr)))) return error(ENOMEM);
+    **attr=1; return 0;
+}
+static ABI int32_t rw_attr_destroy(int32_t **attr) {
+    if (!attr || !*attr) return error(EINVAL);
+    free(*attr); *attr=NULL; return 0;
+}
+static ABI int32_t rw_attr_settype(int32_t **attr, int32_t type) {
+    if (!attr || !*attr || type<1 || type>2) return error(EINVAL);
+    **attr=type; return 0;
+}
+static ABI int32_t rw_attr_gettype(int32_t *const *attr, int32_t *type) {
+    if (!attr || !*attr || !type) return error(EINVAL);
+    *type=**attr; return 0;
+}
+static const RuntimeExport attr_exports[]={
+    {"scePthreadRwlockattrInit",rw_attr_init}, {"scePthreadRwlockattrDestroy",rw_attr_destroy},
+    {"scePthreadRwlockattrSettype",rw_attr_settype}, {"scePthreadRwlockattrGettype",rw_attr_gettype},
+};
 uintptr_t runtime_rwlock_resolve(const char *name) {
+    const uintptr_t attr=RUNTIME_LOOKUP(attr_exports,name);
+    if (attr) return attr;
     if (runtime_nid_is(name,"6ULAa0fq4jA#p#J")) return (uintptr_t)rw_init;
     if (runtime_nid_is(name,"BB+kb08Tl9A#p#J")) return (uintptr_t)rw_destroy;
     if (runtime_nid_is(name,"Ox9i0c7L5w0#p#J")) return (uintptr_t)rw_read;

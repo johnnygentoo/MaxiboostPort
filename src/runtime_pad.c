@@ -281,9 +281,10 @@ static SDL_Gamepad *current_gamepad(void) {
     return gamepad;
 }
 /* bbport (frame stats): the game's libc heap, read every 5 s from a game thread (it reads the pad)
- * with libc.prx's malloc_stats (export stub at libc.prx+0x1f8c0; malloc_stats_fast returns 1 in this libc;
- * gzport: the module is where the linker put it, image +0x56e0000 in Bloodborne, +0xb40000 in GODZILLA):
- * in use now and at most, and what it took from the system. A heap that keeps growing is a leak. */
+ * with libc.prx's malloc_stats (malloc_stats_fast returns 1 in Bloodborne's libc). Its export is
+ * found by NID when the modules are linked (link_modules.py RUNTIME_EXPORTS): each libc.prx build
+ * has it elsewhere (+0x1f8c0 in Bloodborne's and GODZILLA's, +0x55c50 in GUNDAM VERSUS').
+ * In use now and at most, and what it took from the system. A heap that keeps growing is a leak. */
 typedef struct { uint16_t size, version; uint32_t reserved; uint64_t max_system, system, max_in_use, in_use; } MallocManagedSize;
 static void report_guest_heap(void) {
     static int enabled=-1; static uint64_t last;
@@ -291,10 +292,8 @@ static void report_guest_heap(void) {
     const uint64_t now=now_us();
     if (!enabled || now-last<5000000) return;
     last=now;
-    if (!runtime_libc_module || runtime_libc_module_size<0x1f8c0+6) { enabled=0; return; }
-    const uint8_t *stub=runtime_libc_module+0x1f8c0;
-    if (stub[0]!=0xff || stub[1]!=0x25) return; /* another libc */
-    ABI int (*stats)(MallocManagedSize *)=(ABI int (*)(MallocManagedSize *))(uintptr_t)stub;
+    if (!runtime_libc_malloc_stats) { enabled=0; return; } /* no linked libc.prx */
+    ABI int (*stats)(MallocManagedSize *)=(ABI int (*)(MallocManagedSize *))(uintptr_t)runtime_libc_malloc_stats;
     MallocManagedSize m={.size=sizeof(m),.version=1};
     const int result=stats(&m);
     if (result!=0) { static int told; if (!told++) printf("Guest heap: malloc_stats returned %#x\n",(unsigned)result); return; }
@@ -855,6 +854,12 @@ static ABI int32_t pad_open(int32_t user, int32_t type, int32_t index, const voi
     puts("Runtime: pad opened for user 1 (SDL gamepad or keyboard)");
     return PAD_HANDLE;
 }
+/* The handle scePadOpen gave for this user and port. */
+static ABI int32_t pad_get_handle(int32_t user, int32_t type, int32_t index) {
+    (void)user; (void)index;
+    if (type!=0 || !opened) return ERR_INVALID_HANDLE;
+    return PAD_HANDLE;
+}
 static ABI int32_t pad_close(int32_t handle) {
     if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
     opened=0; return 0;
@@ -915,6 +920,7 @@ static ABI int32_t pad_ok_handle(int32_t handle) { return handle==PAD_HANDLE && 
 static ABI int32_t pad_ok_handle_flag(int32_t handle, uint8_t flag) { (void)flag; return pad_ok_handle(handle); }
 
 static const RuntimeExport exports[]={
+    {"scePadGetHandle",pad_get_handle},
     {"scePadInit",pad_init}, {"scePadOpen",pad_open}, {"scePadClose",pad_close},
     {"scePadReadState",pad_read_state}, {"scePadRead",pad_read},
     {"scePadGetControllerInformation",pad_info}, {"scePadSetVibration",pad_vibration},

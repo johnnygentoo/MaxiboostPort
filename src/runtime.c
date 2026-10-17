@@ -30,6 +30,10 @@ uint64_t runtime_libc_module_size;
 void runtime_set_libc_module(const unsigned char *base, uint64_t size) {
     runtime_libc_module=base; runtime_libc_module_size=size;
 }
+const unsigned char *runtime_libc_malloc_stats;
+void runtime_set_libc_malloc_stats(const unsigned char *function) {
+    runtime_libc_malloc_stats=function;
+}
 void runtime_set_procparam(void *param) {
     process_param=param;
     /* bbport: the game's libc heap settings (SceProcParam +0x30: SceLibcParam; its +0x10.. pointers to
@@ -97,6 +101,7 @@ void runtime_report(void) {
     runtime_rwlock_report();
     runtime_sema_report();
     runtime_eventflag_report();
+    runtime_fiber_report();
     runtime_ngs2_report();
     runtime_font_report();
     runtime_content_report();
@@ -215,7 +220,7 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
         static int32_t need_libc_internal = 1; /* SDK marker variable referenced by Fios2 */
         if (runtime_nid_is(name,"f7uOxY9mM1U#p#J")) return (uintptr_t)&stack_canary;
         if (runtime_nid_is(name,"ZT4ODD2Ts9o#libSceLibcInternal")) return (uintptr_t)&need_libc_internal;
-        return 0;
+        return runtime_process_resolve_data(name);
     }
     /* Exact scoped imports for CUSA03173; the suffix identifies library/module. */
     if (runtime_nid_is(name,"bzQExy189ZI#q#q")) return (uintptr_t)init_env;
@@ -246,6 +251,12 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (timer) return timer;
     uintptr_t flag = runtime_eventflag_resolve(name);
     if (flag) return flag;
+    uintptr_t fiber = runtime_fiber_resolve(name);
+    if (fiber) return fiber;
+    uintptr_t process = runtime_process_resolve(name);
+    if (process) return process;
+    uintptr_t usbd = runtime_usbd_resolve(name);
+    if (usbd) return usbd;
     uintptr_t sema = runtime_sema_resolve(name);
     if (sema) return sema;
     uintptr_t rwlock = runtime_rwlock_resolve(name);

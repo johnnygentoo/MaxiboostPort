@@ -362,6 +362,43 @@ static int32_t memory_io(void *buffer, uint64_t size, int64_t offset, int write)
 }
 static ABI int32_t memory_get(int32_t user, void *buffer, uint64_t size, int64_t offset) { (void)user; return memory_io(buffer,size,offset,0); }
 static ABI int32_t memory_set(int32_t user, void *buffer, uint64_t size, int64_t offset) { (void)user; return memory_io(buffer,size,offset,1); }
+/* SaveDataMemory2 (GUNDAM VERSUS): the same blob, the requests in structures (slot 0 only). */
+typedef struct { uint32_t option; int32_t user; uint64_t size, icon_size; const Param *param; const void *icon; uint32_t slot; uint8_t reserved[20]; } MemorySetup2;
+typedef struct { uint64_t existed; uint8_t reserved[16]; } MemorySetupResult;
+typedef struct { void *buffer; uint64_t size; int64_t offset; uint8_t reserved[40]; } MemoryData;
+typedef struct { int32_t user; uint32_t pad; MemoryData *data; Param *param; void *icon; uint32_t slot; uint8_t reserved[28]; } MemoryGet2;
+typedef struct { int32_t user; uint32_t pad; const MemoryData *data; const Param *param; const void *icon; uint32_t count, slot; uint8_t reserved[32]; } MemorySet2;
+static ABI int32_t memory_setup2(const MemorySetup2 *setup, MemorySetupResult *result) {
+    if (!setup) return ERR_PARAMETER;
+    char base[600], path[700];
+    root(setup->user,NULL,base,sizeof(base));
+    snprintf(path,sizeof(path),"%s.memory/memory.dat",base);
+    struct stat st;
+    const uint64_t existed=stat(path,&st) ? 0 : (uint64_t)st.st_size;
+    const int32_t r=memory_setup(setup->user,setup->size,existed ? NULL : setup->param);
+    if (!r && result) result->existed=existed;
+    save_trace("SetupSaveDataMemory2",existed ? "(existing)" : "(new)");
+    return r;
+}
+static ABI int32_t memory_get2(const MemoryGet2 *get) {
+    if (!get) return ERR_PARAMETER;
+    return get->data ? memory_io(get->data->buffer,get->data->size,get->data->offset,0) : 0;
+}
+static ABI int32_t memory_set2(const MemorySet2 *set) {
+    if (!set) return ERR_PARAMETER;
+    for (uint32_t i=0;set->data && i<(set->count ? set->count : 1);++i) {
+        const int32_t r=memory_io(set->data[i].buffer,set->data[i].size,set->data[i].offset,1);
+        if (r) return r;
+    }
+    if (set->param) {
+        char base[600], dir[640];
+        root(set->user,NULL,base,sizeof(base));
+        snprintf(dir,sizeof(dir),"%s.memory",base);
+        pthread_mutex_lock(&lock); write_param(dir,set->param); pthread_mutex_unlock(&lock);
+    }
+    return 0;
+}
+static ABI int32_t memory_sync(const void *sync) { (void)sync; return 0; } /* writes are synchronous */
 /* Backups: the PS4 keeps a copy of a save made at unmount, to restore a damaged one. The port's
  * saves are plain files the user can copy; there is no backup to check or restore. */
 static ABI int32_t backup_none(const void *param) { (void)param; save_trace("CheckBackupData/RestoreBackupData","(no backup)"); return ERR_NOT_FOUND; }
@@ -377,6 +414,8 @@ static const RuntimeExport exports[]={
     {"sceSaveDataDirNameSearch",save_search},
     {"sceSaveDataSetupSaveDataMemory",memory_setup}, {"sceSaveDataGetSaveDataMemory",memory_get},
     {"sceSaveDataSetSaveDataMemory",memory_set},
+    {"sceSaveDataSetupSaveDataMemory2",memory_setup2}, {"sceSaveDataGetSaveDataMemory2",memory_get2},
+    {"sceSaveDataSetSaveDataMemory2",memory_set2}, {"sceSaveDataSyncSaveDataMemory",memory_sync},
 };
 uintptr_t runtime_savedata_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
 void runtime_savedata_report(void) { printf("Runtime: save data mounts=%zu, memory writes=%zu\n",mounts_done,memory_writes); }

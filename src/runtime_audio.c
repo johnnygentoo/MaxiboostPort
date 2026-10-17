@@ -325,11 +325,13 @@ static ABI int32_t audio_last_time(int32_t handle, uint64_t *time) {
     *time=p->last_output_us; return 0;
 }
 
+/* The controller speaker's mix level: the pad's speaker is not played. */
+static ABI int32_t audio_pad_speaker_level(int32_t handle, int32_t level) { (void)handle; (void)level; return 0; }
 static const RuntimeExport exports[]={
     {"sceAudioOutInit",audio_init}, {"sceAudioOutOpen",audio_open}, {"sceAudioOutClose",audio_close},
     {"sceAudioOutOutput",audio_output}, {"sceAudioOutOutputs",audio_outputs},
     {"sceAudioOutSetVolume",audio_volume}, {"sceAudioOutGetPortState",audio_state},
-    {"sceAudioOutGetLastOutputTime",audio_last_time},
+    {"sceAudioOutGetLastOutputTime",audio_last_time}, {"sceAudioOutSetMixLevelPadSpk",audio_pad_speaker_level},
 };
 uintptr_t runtime_audio_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
 void runtime_audio_report(void) { printf("Runtime: audio ports opened=%zu, buffers output=%zu\n",ports_opened,buffers_out); }

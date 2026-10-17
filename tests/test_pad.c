@@ -9,6 +9,7 @@ void bbgpu_mouse_take(double *dx, double *dy, int *up, int *down) { *dx=*dy=0; *
 int bbgpu_mouse_captured(void) { return 0; }
 const unsigned char *runtime_libc_module;
 uint64_t runtime_libc_module_size;
+const unsigned char *runtime_libc_malloc_stats;
 void bbgpu_mouse_look_enable(int enabled) { (void)enabled; }
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *name) {
     (void)table; (void)count; (void)name;

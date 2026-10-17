@@ -324,14 +324,29 @@ static int overlaps(uintptr_t start, uintptr_t end, int ignore_reserved) {
         if (!ignore_reserved || vmas[i].kind!=KIND_RESERVED) return 1;
     return 0;
 }
-/* First-fit search in the PS4 user range, starting from the hint. */
-static uintptr_t find_free(uintptr_t hint, uint64_t size, uint64_t alignment) {
-    uintptr_t at=align_up(hint<USER_MIN ? USER_MIN : hint, alignment);
-    for (size_t i=vma_index(at); at+size<=USER_MAX; ++i) {
+/* First-fit search in [from, limit). */
+static uintptr_t find_free_in(uintptr_t from, uintptr_t limit, uint64_t size, uint64_t alignment) {
+    uintptr_t at=align_up(from,alignment);
+    for (size_t i=vma_index(at); at+size<=limit; ++i) {
         if (i==vma_count || vmas[i].start>=at+size) return at;
         at=align_up(vmas[i].end,alignment);
     }
     return 0;
+}
+/* Where the PS4 puts a mapping the game does not place: below the user range, from SYSTEM_MIN
+ * (shadPS4's DEFAULT_MAPPING_BASE), up to the host-owned memory at LOW_MIN. The user range from
+ * USER_MIN stays the game's: GUNDAM VERSUS places its own blocks there with MAP_FIXED|NO_OVERWRITE
+ * from 0x1000000000 up, and libc's first heap block or a flexible mapping there made them fail.
+ * A hint inside the user range is searched from the hint, as before. */
+#define SYSTEM_MIN UINT64_C(0x0200000000)
+#define LOW_MIN UINT64_C(0x0800000000)
+static uintptr_t find_free(uintptr_t hint, uint64_t size, uint64_t alignment) {
+    if (hint<USER_MIN) {
+        const uintptr_t at=find_free_in(hint<SYSTEM_MIN ? SYSTEM_MIN : hint,LOW_MIN,size,alignment);
+        if (at) return at;
+        hint=USER_MIN;
+    }
+    return find_free_in(hint,USER_MAX,size,alignment);
 }
 static void drop_range(uintptr_t start, uintptr_t end) {
     int error; size_t i=carve(start,end,&error), n=0;
@@ -353,7 +368,12 @@ static int32_t place(void **inout, uint64_t size, int prot, int flags, uint64_t 
     uintptr_t address=(uintptr_t)*inout;
     if (flags & MAP_FIXED_FLAG) {
         if (!address || address%PAGE) return INVALID;
-        if ((flags & MAP_NO_OVERWRITE) && overlaps(address,address+size,1)) return NO_MEMORY;
+        if ((flags & MAP_NO_OVERWRITE) && overlaps(address,address+size,1)) {
+            for (size_t i=vma_index(address); i<vma_count && vmas[i].start<address+size; ++i)
+                printf("Runtime: %#" PRIx64 "..%#" PRIx64 " is taken (kind %d, phys %#" PRIx64 ")\n",
+                       (uint64_t)vmas[i].start,(uint64_t)vmas[i].end,vmas[i].kind,vmas[i].phys);
+            return NO_MEMORY;
+        }
     } else {
         address=find_free(address,size,alignment);
         if (!address) return NO_MEMORY;
@@ -417,6 +437,36 @@ static ABI int32_t direct_allocate(int64_t low, int64_t high, uint64_t size,
     printf("Runtime: direct allocation offset=0x%" PRIx64 ", size=%" PRIu64 " bytes, type=%d\n", start, size, type);
     return 0;
 }
+/* The largest free direct memory in [low, high) at the alignment: where it starts and its size
+ * (GUNDAM VERSUS sizes its pools by it). */
+static ABI int32_t direct_available(int64_t low, int64_t high, uint64_t alignment, int64_t *phys_out, uint64_t *size_out) {
+    if (!alignment) alignment=PAGE;
+    if (!phys_out || !size_out || low<0 || high<=low || !valid_alignment(alignment)) return INVALID;
+    const uint64_t end=(uint64_t)high<POOL_SIZE ? (uint64_t)high : POOL_SIZE;
+    uint64_t best_start=0, best=0;
+    read_lock();
+    for (uint64_t at=(uint64_t)low; at<end;) {
+        uint64_t next_used=end, used_end=end;
+        for (int i=0;i<LIMIT;++i) {
+            const Block b=blocks[i];
+            if (!b.used || b.start+b.size<=at) continue;
+            if (b.start<=at) { next_used=at; used_end=b.start+b.size; break; }
+            if (b.start<next_used) { next_used=b.start; used_end=b.start+b.size; }
+        }
+        const uint64_t start=align_up(at,alignment);
+        if (next_used>start && next_used-start>best) { best=next_used-start; best_start=start; }
+        at=used_end>at ? used_end : end;
+    }
+    read_unlock();
+    if (!best) return NO_SPACE;
+    *phys_out=(int64_t)best_start; *size_out=best;
+    return 0;
+}
+static ABI int32_t flexible_available(uint64_t *size) {
+    if (!size) return INVALID;
+    *size=FLEXIBLE_SIZE-flexible_bytes;
+    return 0;
+}
 static int32_t map_direct_locked(void **out, uint64_t size, int prot, int flags, int64_t physical, uint64_t alignment) {
     if (!alignment) alignment=PAGE;
     if (!out || physical < 0 || (uint64_t)physical % PAGE || !size || size % PAGE || !valid_alignment(alignment) ||
@@ -427,12 +477,14 @@ static int32_t map_direct_locked(void **out, uint64_t size, int prot, int flags,
     return result;
 }
 static ABI int32_t direct_map(void **out, uint64_t size, int prot, int flags, int64_t physical, uint64_t alignment) {
+    void *const asked=out ? *out : NULL;
     write_lock();
     int32_t result=map_direct_locked(out,size,prot,flags,physical,alignment);
     write_unlock();
     flush_hooks();
     if (!result) printf("Runtime: mapped direct memory %p, size=%" PRIu64 ", prot=0x%x\n", *out, size, prot);
-    else printf("Runtime: mapping direct memory %#" PRIx64 ", size=%" PRIu64 " failed (error %#x)\n", (uint64_t)physical, size, (unsigned)result);
+    else printf("Runtime: mapping direct memory %#" PRIx64 ", size=%" PRIu64 " at %p (flags %#x, alignment %#" PRIx64 ") failed (error %#x)\n",
+                (uint64_t)physical, size, asked, (unsigned)flags, alignment, (unsigned)result);
     return result;
 }
 static ABI int32_t direct_map_named(void **out, uint64_t size, int prot, int flags, int64_t physical,
@@ -644,6 +696,8 @@ static ABI int32_t batch_map(BatchEntry *entries, int count, int *processed) {
 static const RuntimeExport exports[]={
     {"sceKernelGetDirectMemorySize",direct_size}, {"sceKernelAllocateDirectMemory",direct_allocate},
     {"sceKernelMapDirectMemory",direct_map}, {"sceKernelMapNamedDirectMemory",direct_map_named},
+    {"sceKernelAvailableDirectMemorySize",direct_available}, {"sceKernelAvailableFlexibleMemorySize",flexible_available},
+    {"sceKernelCheckedReleaseDirectMemory",direct_release},
     {"sceKernelReleaseDirectMemory",direct_release}, {"sceKernelMunmap",direct_unmap}, {"munmap",direct_unmap},
     {"sceKernelMapFlexibleMemory",map_flexible}, {"sceKernelMapNamedFlexibleMemory",map_flexible_named},
     {"sceKernelReleaseFlexibleMemory",release_flexible}, {"sceKernelReserveVirtualRange",reserve_range},
@@ -663,7 +717,6 @@ uintptr_t runtime_memory_resolve(const char *name) {
 }
 /* Host-owned memory the guest can see (image, stacks, trampolines) lives in
  * [LOW_MIN, USER_MIN): PS4 code packs pointers into 40-bit fields. */
-#define LOW_MIN UINT64_C(0x0800000000)
 static uintptr_t low_next=LOW_MIN;
 void *runtime_low_map(size_t size, int prot) {
     size=align_up(size,PAGE);

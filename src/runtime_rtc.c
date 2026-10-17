@@ -157,12 +157,52 @@ static ABI int32_t rtc_tick_add_seconds(uint64_t *out, const uint64_t *in, int64
     *out=(uint64_t)((int64_t)*in+seconds*1000000); return 0;
 }
 
+/* Win32 FILETIME: 100 ns units since 1601-01-01 (tick of 1601-01-01: 50491123200 s). */
+#define FILETIME_EPOCH_TICKS UINT64_C(50491123200000000)
+static ABI int32_t rtc_get_win32_filetime(const uint64_t *tick, uint64_t *filetime) {
+    if (!tick || !filetime) return ERR_INVALID_POINTER;
+    if (*tick<FILETIME_EPOCH_TICKS) return ERR_INVALID_YEAR;
+    *filetime=(*tick-FILETIME_EPOCH_TICKS)*10; return 0;
+}
+static ABI int32_t rtc_set_win32_filetime(uint64_t *tick, uint64_t filetime) {
+    if (!tick) return ERR_INVALID_POINTER;
+    *tick=filetime/10+FILETIME_EPOCH_TICKS; return 0;
+}
+/* RFC 3339 / ISO 8601 dates ("2017-07-04T12:00:00.5Z", "...+09:00"; a date alone is midnight),
+ * the form servers and save metadata use; the tick is UTC. */
+static ABI int32_t rtc_parse_date_time(uint64_t *tick, const char *text) {
+    if (!tick || !text) return ERR_INVALID_POINTER;
+    unsigned y=0,mo=0,d=0,h=0,mi=0,sec=0; int used=0;
+    if (sscanf(text,"%4u-%2u-%2u%n",&y,&mo,&d,&used)!=3) return ERR_INVALID_YEAR;
+    const char *at=text+used;
+    uint32_t micro=0; int64_t offset=0;
+    if (*at=='T' || *at=='t' || *at==' ') {
+        if (sscanf(at+1,"%2u:%2u:%2u%n",&h,&mi,&sec,&used)!=3) return ERR_INVALID_HOUR;
+        at+=1+used;
+        if (*at=='.') {
+            uint32_t scale=100000;
+            for (++at; *at>='0' && *at<='9'; ++at) { micro+=(uint32_t)(*at-'0')*scale; scale/=10; }
+        }
+        if (*at=='+' || *at=='-') {
+            unsigned oh=0,om=0;
+            if (sscanf(at+1,"%2u:%2u",&oh,&om)!=2) return ERR_INVALID_MINUTE;
+            offset=(int64_t)(oh*60+om)*60*(*at=='-' ? -1 : 1);
+        }
+    }
+    const DateTime t={(uint16_t)y,(uint16_t)mo,(uint16_t)d,(uint16_t)h,(uint16_t)mi,(uint16_t)sec,micro};
+    const int32_t r=validate(&t);
+    if (r) return r;
+    *tick=to_tick(&t)-(uint64_t)(offset*1000000);
+    return 0;
+}
 static const RuntimeExport exports[]={
     {"sceRtcFormatRFC3339LocalTime",rtc_rfc3339_local}, {"sceRtcTickAddSeconds",rtc_tick_add_seconds},
     {"sceRtcGetCurrentClockLocalTime",rtc_current_local}, {"sceRtcGetCurrentClock",rtc_current_clock},
     {"sceRtcGetCurrentTick",rtc_current_tick}, {"sceRtcGetCurrentNetworkTick",rtc_current_tick},
     {"sceRtcConvertUtcToLocalTime",rtc_utc_to_local}, {"sceRtcConvertLocalTimeToUtc",rtc_local_to_utc},
     {"sceRtcGetDayOfWeek",rtc_day_of_week}, {"sceRtcGetTick",rtc_get_tick}, {"sceRtcSetTick",rtc_set_tick},
+    {"sceRtcGetWin32FileTime",rtc_get_win32_filetime}, {"sceRtcSetWin32FileTime",rtc_set_win32_filetime},
+    {"sceRtcParseDateTime",rtc_parse_date_time},
     {"sceRtcGetTickResolution",rtc_tick_resolution}, {"sceRtcSetTime_t",rtc_set_time_t},
     {"sceRtcGetTime_t",rtc_get_time_t}, {"sceRtcFormatRFC2822LocalTime",rtc_rfc2822_local},
 };

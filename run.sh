@@ -76,7 +76,6 @@ if [[ $game != "$(realpath "$original_game")" ]]; then
     trap '"$PYTHON" -c '\''import shutil,sys; shutil.rmtree(sys.argv[1])'\'' "$mod_game"' EXIT
 fi
 "$PYTHON" scripts/prepare.py "$game" --out "$out"
-"$PYTHON" scripts/link_libc.py "$game" --out "$out"
 "$PYTHON" scripts/link_modules.py "$game" --out "$out"
 # BB_DLC_DIR (the launcher's DLC folder): the dumped add-ons of this title, one folder each (e.g.
 # SPEXPANSIONDLC03). The runtime reports <user>/addcont/<title id>/<label> as installed (shadPS4's

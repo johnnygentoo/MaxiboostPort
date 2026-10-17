@@ -176,7 +176,8 @@ static ABI int32_t voice_info(uint32_t port,uint32_t *info) {
 typedef struct { const char *name; int initialized, status, persistent; uint32_t mode; } Dialog;
 static Dialog dialogs[]={{"CommonDialog",0,0,0,0},{"MsgDialog",0,0,0,0},{"SaveDataDialog",0,0,0,0},
                          {"NpProfileDialog",0,0,0,0},{"NpCommerceDialog",0,0,0,0},{"ImeDialog",0,0,0,0},
-                         {"ErrorDialog",0,0,0,0},{"NpFriendListDialog",0,0,0,0}};
+                         {"ErrorDialog",0,0,0,0},{"NpFriendListDialog",0,0,0,0},{"SigninDialog",0,0,0,0},
+                         {"InvitationDialog",0,0,0,0},{"WebBrowserDialog",0,0,0,0}};
 static int common_initialized;
 static ABI int32_t common_init(void) { common_initialized=1; return 0; }
 /* BB_DIALOG_TRACE=1: every dialog call and its result (a status poll only when it changes). */
@@ -200,7 +201,7 @@ static int32_t dialog_open_mode(int i,uint32_t mode,int persistent) {
 }
 static int32_t dialog_open(int i) { return dialog_open_mode(i,0,0); }
 static int32_t dialog_status(int i) {
-    static int last[8]={-1,-1,-1,-1,-1,-1,-1,-1};
+    static int last[sizeof(dialogs)/sizeof(*dialogs)]={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
     if (dialogs[i].status==2 && !dialogs[i].persistent) dialogs[i].status=3; /* answered: OK / Yes */
     if (last[i]!=dialogs[i].status) { last[i]=dialogs[i].status; DTRACE("%s status %d\n",dialogs[i].name,dialogs[i].status); }
     return dialogs[i].status;
@@ -221,7 +222,7 @@ static int32_t dialog_term(int i) {
         return dialog_open(i); } \
     static ABI int32_t tag##_status(void) { return dialog_status(i); } \
     static ABI int32_t tag##_term(void) { return dialog_term(i); }
-DIALOG(profile,3) DIALOG(commerce,4) DIALOG(friends,7)
+DIALOG(profile,3) DIALOG(commerce,4) DIALOG(friends,7) DIALOG(signin,8) DIALOG(invitation,9) DIALOG(browser,10)
 static ABI int32_t msg_init(void) { return dialog_init(1); }
 static ABI int32_t msg_status(void) { return dialog_status(1); }
 static ABI int32_t msg_term(void) { return dialog_term(1); }
@@ -594,7 +595,238 @@ static ABI int32_t mouse_close(int32_t handle) { (void)handle; return 0; }
 static ABI int32_t audio_in_open(void) { return AUDIO_IN_NOT_OPENED; }
 
 
+/* The "A" (account id) generation of the NP calls GUNDAM VERSUS makes; signed out as above. */
+static ABI int32_t np_user_signed_out(int32_t user,void *out) { (void)user; (void)out; return NP_SIGNED_OUT; }
+static ABI int32_t np_title_ctx(const void *label,int32_t user) { (void)label; (void)user; return new_id(); }
+static ABI int32_t np_ctx_request(int32_t ctx) { (void)ctx; return new_id(); }
+/* Async requests (Score, TUS, TSS, WordFilter): every one ends signed out when polled. */
+static ABI int32_t np_poll_async(int32_t request,int32_t *result) { (void)request; if (result) *result=NP_SIGNED_OUT; return 0; }
+static ABI int32_t np_reachability_register(void *cb,void *arg) { (void)cb; (void)arg; return 0; }
+static ABI int32_t np_reachability_unregister(void) { return 0; }
+
+/* ---- NpToolkit2 (C++ API of the game's own libSceNpToolkit2.prx, served here): the toolkit
+ * starts, every PSN request fails signed out. Constructors and destructors of request and
+ * response objects leave the game's objects as they are; a response's data is empty. ---- */
+static ABI void *tk_this(void *self) { return self; }
+static ABI void tk_destroy(void *self) { (void)self; }
+static ABI int32_t tk_ok(const void *request) { (void)request; return 0; }
+static ABI int32_t tk_request(const void *request,void *response) { (void)request; (void)response; return NP_SIGNED_OUT; }
+static ABI int32_t tk_return_code(const void *response) { (void)response; return NP_SIGNED_OUT; }
+static _Alignas(16) unsigned char tk_empty[65536];
+static ABI void *tk_response_get(const void *response) { (void)response; return tk_empty; }
+static ABI int32_t tk_init(const void *params) {
+    (void)params; note("NpToolkit2 initialized (offline: every PSN request fails signed out)");
+    return 0;
+}
+
+/* ---- libSceJson2: the initializer runs; parsing fails (nothing comes from the network), the
+ * values the game builds stay empty (null, "", []). ---- */
+static _Alignas(16) unsigned char json_null[64];
+static ABI int32_t json_ok(void *self) { (void)self; return 0; }
+static ABI int32_t json_parse(void *value,const char *text,uint64_t size) { (void)value; (void)text; (void)size; return (int32_t)0x80920001; }
+static ABI void *json_value_init(void *self) { memset(self,0,16); return self; }
+static ABI void *json_value_copy(void *self,const void *other) { memmove(self,other,16); return self; }
+static ABI void json_value_clear(void *self) { memset(self,0,16); }
+static ABI int32_t json_value_type(const void *self) { int32_t t; memcpy(&t,self,4); return t; }
+static ABI void *json_static_null(const void *self) { (void)self; return json_null; }
+static ABI uint64_t json_zero(const void *self) { (void)self; return 0; }
+static ABI const char *json_c_str(const void *self) { (void)self; return ""; }
+static ABI void *json_ptr_init(void *self) { memset(self,0,8); return self; }
+static ABI void *json_ptr_copy(void *self,const void *other) { (void)other; memset(self,0,8); return self; }
+static ABI void *json_iterator(void *out,const void *self) { (void)self; memset(out,0,8); return out; }
+static ABI int32_t json_iterator_differ(const void *a,const void *b) { (void)a; (void)b; return 0; }
+static ABI int32_t json_to_string(const void *self,void *string) { (void)self; (void)string; return 0; }
+static ABI void *json_init_rtti(void *self,void *alloc,void *user,uint64_t size) { (void)alloc; (void)user; (void)size; return self; }
+
+/* ---- Other dialogs' results: the user cancelled (did not sign in, invite or browse). ---- */
+static ABI int32_t signin_result(int32_t *result) { if (result) result[0]=1; return 0; }
+static ABI int32_t browser_close(void) { return dialog_close(10); }
+static ABI int32_t profile_close(void) { return dialog_close(3); }
+
+/* ---- Remote Play, crash dumps, the system keyboard: none on this console. ---- */
+static ABI int32_t remoteplay_status(int32_t user,int32_t *status) { (void)user; if (status) *status=0; return 0; } /* disconnected */
+static ABI int32_t ime_keyboard_none(void) { return (int32_t)0x80bc0103; } /* no keyboard connected */
+static ABI int32_t ime_panel_size(const void *param,const void *extended,uint32_t *width,uint32_t *height) {
+    (void)param; (void)extended;
+    if (width) *width=0;
+    if (height) *height=0;
+    return 0;
+}
+static ABI int32_t shareplay_connection(void *info) { if (info) memset(info,0,32); return 0; } /* not connected */
+static ABI int32_t addcont_download(int32_t user,const void *label) { (void)user; (void)label; return (int32_t)0x80d90007; } /* no network */
+/* PlayGo: everything is installed. */
+static ABI int32_t playgo_progress(int32_t handle,const uint16_t *ids,uint32_t count,uint64_t *progress) {
+    (void)ids; (void)count;
+    if (handle!=playgo_handle || !handle) return PLAYGO_BAD_HANDLE;
+    if (!progress) return PLAYGO_BAD_POINTER;
+    progress[0]=progress[1]=1; return 0; /* progress size = total size */
+}
+static ABI int32_t playgo_eta(int32_t handle,const uint16_t *ids,uint32_t count,int64_t *eta) {
+    (void)ids; (void)count;
+    if (handle!=playgo_handle || !handle) return PLAYGO_BAD_HANDLE;
+    if (!eta) return PLAYGO_BAD_POINTER;
+    *eta=0; return 0;
+}
+static ABI int32_t playgo_get_speed(int32_t handle,int32_t *speed) {
+    if (handle!=playgo_handle || !handle) return PLAYGO_BAD_HANDLE;
+    if (!speed) return PLAYGO_BAD_POINTER;
+    *speed=2; return 0; /* trickle..full: full */
+}
+static ABI int32_t playgo_close(int32_t handle) { if (handle!=playgo_handle || !handle) return PLAYGO_BAD_HANDLE; playgo_handle=0; return 0; }
+static ABI int32_t playgo_terminate(void) { return 0; }
+/* libc.prx's heap tracing (libSceLibcInternalExt): where its trace tables are. */
+typedef struct { uint64_t size; uint32_t flag, get_segment_info; uint64_t *atomic_id_mask, *mstate_table; } HeapTraceInfo;
+static ABI void heap_trace_info(HeapTraceInfo *info) {
+    static uint64_t id_mask, mstate_table[64];
+    if (!info) return;
+    info->atomic_id_mask=&id_mask; info->mstate_table=mstate_table; info->get_segment_info=0;
+}
+static ABI int32_t discmap_7c98(const char *path,int64_t offset,int64_t size,int32_t *flags,int32_t *r1,int32_t *r2) {
+    (void)path; (void)offset; (void)size;
+    if (flags) *flags=0;
+    if (r1) *r1=0;
+    if (r2) *r2=0;
+    return 0;
+}
+
 static const RuntimeExport exports[]={
+    {"sceNpCheckNpAvailabilityA",np_user_signed_out}, {"sceNpGetAccountCountryA",np_user_signed_out},
+    {"sceNpGetAccountIdA",np_user_signed_out}, {"sceNpGetParentalControlInfoA",np_signed_out},
+    {"sceNpRegisterNpReachabilityStateCallback",np_reachability_register},
+    {"sceNpUnregisterNpReachabilityStateCallback",np_reachability_unregister},
+    {"sceNpScoreCreateNpTitleCtxA",np_title_ctx}, {"sceNpScorePollAsync",np_poll_async},
+    {"sceNpScoreGetBoardInfoAsync",np_signed_out}, {"sceNpScoreGetFriendsRankingAAsync",np_signed_out},
+    {"sceNpScoreGetGameDataByAccountIdAsync",np_signed_out}, {"sceNpScoreGetRankingByAccountIdPcIdAsync",np_signed_out},
+    {"sceNpScoreGetRankingByRangeAAsync",np_signed_out}, {"sceNpScoreRecordGameDataAsync",np_signed_out},
+    {"sceNpScoreRecordScoreAsync",np_signed_out},
+    {"sceNpTusCreateNpTitleCtxA",np_title_ctx}, {"sceNpTssCreateNpTitleCtxA",np_title_ctx},
+    {"sceNpTusDeleteNpTitleCtx",ok_void}, {"sceNpTusCreateRequest",np_ctx_request}, {"sceNpTusDeleteRequest",ok_void},
+    {"sceNpTusPollAsync",np_poll_async}, {"sceNpTusGetDataAAsync",np_signed_out}, {"sceNpTusSetDataAAsync",np_signed_out},
+    {"sceNpTusGetMultiSlotVariableAAsync",np_signed_out}, {"sceNpTusSetMultiSlotVariableAAsync",np_signed_out},
+    {"sceNpTssGetData",np_signed_out}, {"sceNpTssGetDataAsync",np_signed_out},
+    {"sceNpMatching2CreateContextA",np_signed_out}, {"sceNpMatching2CreateJoinRoomA",np_signed_out},
+    {"sceNpMatching2JoinRoomA",np_signed_out}, {"sceNpMatching2GetRoomDataInternal",np_signed_out},
+    {"sceNpMatching2GetUserInfoListA",np_signed_out}, {"sceNpMatching2SignalingGetConnectionInfoA",np_signed_out},
+    {"sceNpSignalingCreateContextA",np_signed_out}, {"sceNpSignalingGetLocalNetInfo",np_signed_out},
+    {"sceNpWordFilterCreateTitleCtxA",np_title_ctx}, {"sceNpWordFilterDeleteTitleCtx",ok_void},
+    {"sceNpWordFilterCreateAsyncRequest",np_ctx_request}, {"sceNpWordFilterDeleteRequest",ok_void},
+    {"sceNpWordFilterCensorComment",np_signed_out}, {"sceNpWordFilterPollAsync",np_poll_async},
+    {"sceNpProfileDialogOpenA",profile_open}, {"sceNpProfileDialogClose",profile_close},
+    {"sceSigninDialogInitialize",signin_init}, {"sceSigninDialogOpen",signin_open},
+    {"sceSigninDialogUpdateStatus",signin_status}, {"sceSigninDialogGetStatus",signin_status},
+    {"sceSigninDialogGetResult",signin_result}, {"sceSigninDialogTerminate",signin_term},
+    {"sceInvitationDialogInitialize",invitation_init}, {"sceInvitationDialogOpenA",invitation_open},
+    {"sceInvitationDialogUpdateStatus",invitation_status}, {"sceInvitationDialogGetResultA",cancelled_result},
+    {"sceInvitationDialogTerminate",invitation_term},
+    {"sceWebBrowserDialogInitialize",browser_init}, {"sceWebBrowserDialogOpen",browser_open},
+    {"sceWebBrowserDialogUpdateStatus",browser_status}, {"sceWebBrowserDialogClose",browser_close},
+    {"sceWebBrowserDialogTerminate",browser_term},
+    {"sceRemoteplayInitialize",ok_void}, {"sceRemoteplayTerminate",ok_void},
+    {"sceRemoteplayGetConnectionStatus",remoteplay_status}, {"sceRemoteplayProhibitStreaming",ok_void},
+    {"sceCoredumpRegisterCoredumpHandler",ok_void}, {"sceCoredumpAttachUserFile",ok_void},
+    {"sceCoredumpWriteUserData",ok_void}, {"sceCoredumpAttachMemoryRegionAsUserFile",ok_void},
+    {"sceImeKeyboardOpen",ime_keyboard_none}, {"sceImeKeyboardGetInfo",ime_keyboard_none},
+    {"sceImeKeyboardClose",ime_keyboard_none}, {"sceImeDialogGetPanelSizeExtended",ime_panel_size},
+    {"sceSharePlayGetCurrentConnectionInfoA",shareplay_connection},
+    {"sceScreenShotSetOverlayImageWithOrigin",accept_any},
+    {"sceAppContentAddcontEnqueueDownload",addcont_download},
+    {"scePlayGoGetProgress",playgo_progress}, {"scePlayGoGetEta",playgo_eta},
+    {"scePlayGoGetInstallSpeed",playgo_get_speed}, {"scePlayGoClose",playgo_close},
+    {"scePlayGoTerminate",playgo_terminate},
+    {"sceLibcHeapGetTraceInfo",heap_trace_info}, {"sceDiscMap_7C980FFB0AA27E7A",discmap_7c98},
+    {"_ZN3sce4Json5ArrayD1Ev",tk_destroy}, /* sce::Json::Array::~Array() */
+    {"_ZN3sce4Json6StringC1Ev",json_ptr_init}, /* sce::Json::String::String() */
+    {"_ZN3sce4Json5ValueD1Ev",tk_destroy}, /* sce::Json::Value::~Value() */
+    {"_ZN3sce4Json5Value5clearEv",json_value_clear}, /* sce::Json::Value::clear() */
+    {"_ZNK3sce4Json5Array4sizeEv",json_zero}, /* sce::Json::Array::size() const */
+    {"_ZNK3sce4Json6String5c_strEv",json_c_str}, /* sce::Json::String::c_str() const */
+    {"_ZNK3sce4Json5Value9getStringEv",json_static_null}, /* sce::Json::Value::getString() const */
+    {"_ZN3sce4Json5Array8iteratorppEv",tk_this}, /* sce::Json::Array::iterator::operator++() */
+    {"_ZN3sce4Json6StringD1Ev",tk_destroy}, /* sce::Json::String::~String() */
+    {"_ZNK3sce4Json6String6lengthEv",json_zero}, /* sce::Json::String::length() const */
+    {"_ZNK3sce4Json5Value11getUIntegerEv",json_zero}, /* sce::Json::Value::getUInteger() const */
+    {"_ZNK3sce4Json5Array3endEv",json_iterator}, /* sce::Json::Array::end() const */
+    {"_ZN3sce4Json5ArrayC1ERKS1_",json_ptr_copy}, /* sce::Json::Array::Array(sce::Json::Array const&) */
+    {"_ZNK3sce4Json5Value8getArrayEv",json_static_null}, /* sce::Json::Value::getArray() const */
+    {"_ZNK3sce4Json5Array5beginEv",json_iterator}, /* sce::Json::Array::begin() const */
+    {"_ZNK3sce4Json5Array8iteratorneERKS2_",json_iterator_differ}, /* sce::Json::Array::iterator::operator!=(sce::Json::Array::iterator const&) const */
+    {"_ZN3sce4Json5ValueC1Ev",json_value_init}, /* sce::Json::Value::Value() */
+    {"_ZNK3sce4Json5Array8iteratordeEv",json_static_null}, /* sce::Json::Array::iterator::operator*() const */
+    {"_ZN3sce4Json5Array8iteratorD1Ev",tk_destroy}, /* sce::Json::Array::iterator::~iterator() */
+    {"_ZN3sce4Json5ValueC1ERKS1_",json_value_copy}, /* sce::Json::Value::Value(sce::Json::Value const&) */
+    {"_ZN3sce4Json5ValueaSERKS1_",json_value_copy}, /* sce::Json::Value::operator=(sce::Json::Value const&) */
+    {"_ZNK3sce4Json5Value7getTypeEv",json_value_type}, /* sce::Json::Value::getType() const */
+    {"_ZNK3sce4Json5ValueixEPKc",json_static_null}, /* sce::Json::Value::operator[](char const*) const */
+    {"_ZNK3sce4Json5Value8toStringERNS0_6StringE",json_to_string}, /* sce::Json::Value::toString(sce::Json::String&) const */
+    {"_ZN3sce7Toolkit2NP2V24Core10OnlineUserD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::OnlineUser::~OnlineUser() */
+    {"_ZN3sce7Toolkit2NP2V24Core10OnlineUserC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::OnlineUser::OnlineUser() */
+    {"_ZN3sce7Toolkit2NP2V24Core11addCallbackERKNS3_7Request11AddCallbackE",tk_ok}, /* sce::Toolkit::NP::V2::Core::addCallback(sce::Toolkit::NP::V2::Core::Request::AddCallback c */
+    {"_ZN3sce7Toolkit2NP2V24Core12ResponseBase13getReturnCodeEv",tk_return_code}, /* sce::Toolkit::NP::V2::Core::ResponseBase::getReturnCode() */
+    {"_ZN3sce7Toolkit2NP2V24Core14removeCallbackERKNS3_7Request14RemoveCallbackE",tk_ok}, /* sce::Toolkit::NP::V2::Core::removeCallback(sce::Toolkit::NP::V2::Core::Request::RemoveCall */
+    {"_ZN3sce7Toolkit2NP2V24Core4initERKNS3_7Request10InitParamsE",tk_init}, /* sce::Toolkit::NP::V2::Core::init(sce::Toolkit::NP::V2::Core::Request::InitParams const&) */
+    {"_ZN3sce7Toolkit2NP2V24Core7Request10InitParamsC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::Request::InitParams::InitParams() */
+    {"_ZN3sce7Toolkit2NP2V24Core7Request10InitParamsD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::Request::InitParams::~InitParams() */
+    {"_ZN3sce7Toolkit2NP2V24Core7Request11AddCallbackC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::Request::AddCallback::AddCallback() */
+    {"_ZN3sce7Toolkit2NP2V24Core7Request11AddCallbackD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::Request::AddCallback::~AddCallback() */
+    {"_ZN3sce7Toolkit2NP2V24Core7Request14RemoveCallbackC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::Request::RemoveCallback::RemoveCallback() */
+    {"_ZN3sce7Toolkit2NP2V24Core7Request14RemoveCallbackD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::Request::RemoveCallback::~RemoveCallback() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_6Friend7FriendsEE3getEv",tk_response_get}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Friend::Friends>::get() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_6Friend7FriendsEEC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Friend::Friends>::Response() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_6Friend7FriendsEED1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Friend::Friends>::~Response() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session11InvitationsEE3getEv",tk_response_get}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::Invitations>::get() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session11InvitationsEEC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::Invitations>::Response */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session11InvitationsEED1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::Invitations>::~Respons */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session11SessionDataEE3getEv",tk_response_get}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::SessionData>::get() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session11SessionDataEEC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::SessionData>::Response */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session11SessionDataEED1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::SessionData>::~Respons */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session8SessionsEE3getEv",tk_response_get}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::Sessions>::get() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session8SessionsEEC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::Sessions>::Response() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session8SessionsEED1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::Sessions>::~Response() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session9SessionIdEE3getEv",tk_response_get}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::SessionId>::get() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session9SessionIdEEC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::SessionId>::Response() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS2_7Session9SessionIdEED1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Session::SessionId>::~Response( */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS3_5EmptyEEC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Core::Empty>::Response() */
+    {"_ZN3sce7Toolkit2NP2V24Core8ResponseINS3_5EmptyEED1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::Response<sce::Toolkit::NP::V2::Core::Empty>::~Response() */
+    {"_ZN3sce7Toolkit2NP2V26Friend7Request10GetFriendsC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Friend::Request::GetFriends::GetFriends() */
+    {"_ZN3sce7Toolkit2NP2V26Friend7Request10GetFriendsD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Friend::Request::GetFriends::~GetFriends() */
+    {"_ZN3sce7Toolkit2NP2V27Session20LocalizedSessionInfoC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Session::LocalizedSessionInfo::LocalizedSessionInfo() */
+    {"_ZN3sce7Toolkit2NP2V27Session20LocalizedSessionInfoD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Session::LocalizedSessionInfo::~LocalizedSessionInfo() */
+    {"_ZN3sce7Toolkit2NP2V27Session4joinERKNS3_7Request4JoinEPNS2_4Core8ResponseINS8_5EmptyEEE",tk_request}, /* sce::Toolkit::NP::V2::Session::join(sce::Toolkit::NP::V2::Session::Request::Join const&, s */
+    {"_ZN3sce7Toolkit2NP2V27Session5leaveERKNS3_7Request5LeaveEPNS2_4Core8ResponseINS8_5EmptyEEE",tk_request}, /* sce::Toolkit::NP::V2::Session::leave(sce::Toolkit::NP::V2::Session::Request::Leave const&, */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request14SendInvitationC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Session::Request::SendInvitation::SendInvitation() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request14SendInvitationD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Session::Request::SendInvitation::~SendInvitation() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request22GetReceivedInvitationsC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Session::Request::GetReceivedInvitations::GetReceivedInvitations() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request22GetReceivedInvitationsD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Session::Request::GetReceivedInvitations::~GetReceivedInvitations() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request4JoinC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Session::Request::Join::Join() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request4JoinD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Session::Request::Join::~Join() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request5LeaveC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Session::Request::Leave::Leave() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request5LeaveD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Session::Request::Leave::~Leave() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request6CreateC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Session::Request::Create::Create() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request6CreateD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Session::Request::Create::~Create() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request6SearchC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Session::Request::Search::Search() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request6SearchD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Session::Request::Search::~Search() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request7GetDataC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Session::Request::GetData::GetData() */
+    {"_ZN3sce7Toolkit2NP2V27Session7Request7GetDataD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Session::Request::GetData::~GetData() */
+    {"_ZN3sce7Toolkit2NP2V27Session9SessionId5resetEv",tk_destroy}, /* sce::Toolkit::NP::V2::Session::SessionId::reset() */
+    {"_ZN3sce7Toolkit2NP2V27Session9SessionIdC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Session::SessionId::SessionId() */
+    {"_ZN3sce7Toolkit2NP2V27Session9SessionIdD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Session::SessionId::~SessionId() */
+    {"_ZN3sce7Toolkit2NP2V28Presence7Request11SetPresenceC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Presence::Request::SetPresence::SetPresence() */
+    {"_ZN3sce7Toolkit2NP2V28Presence7Request11SetPresenceD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Presence::Request::SetPresence::~SetPresence() */
+    {"_ZN3sce7Toolkit2NP2V28Presence7Request19LocalizedGameStatusC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Presence::Request::LocalizedGameStatus::LocalizedGameStatus() */
+    {"_ZN3sce7Toolkit2NP2V28Presence7Request19LocalizedGameStatusD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Presence::Request::LocalizedGameStatus::~LocalizedGameStatus() */
+    {"_ZN3sce4Json11Initializer10initializeEPKNS0_13InitParameterE",json_ok}, /* sce::Json::Initializer::initialize(sce::Json::InitParameter const*) */
+    {"_ZN3sce4Json11Initializer9terminateEv",json_ok}, /* sce::Json::Initializer::terminate() */
+    {"_ZN3sce4Json11InitializerC1Ev",tk_this}, /* sce::Json::Initializer::Initializer() */
+    {"_ZN3sce4Json11InitializerD1Ev",tk_destroy}, /* sce::Json::Initializer::~Initializer() */
+    {"_ZN3sce4Json17InitParameterRttiC1EPNS0_14AllocParamRttiEPvm",json_init_rtti}, /* sce::Json::InitParameterRtti::InitParameterRtti(sce::Json::AllocParamRtti*, void*, unsigne */
+    {"_ZN3sce4Json6Parser5parseERNS0_5ValueEPKcm",json_parse}, /* sce::Json::Parser::parse(sce::Json::Value&, char const*, unsigned long) */
+    {"sceNpToolkit2_7zsee5IHLis",tk_request},
+    {"sceNpToolkit2_cmvr0mOCX2Q",tk_request},
+    {"sceNpToolkit2_o8e-sH1eU5s",tk_request},
+    {"sceNpToolkit2_SX9IOde7tLo",tk_request},
+    {"sceNpToolkit2_p3j95bppH44",tk_request},
+    {"sceNpToolkit2_X8uNKyVpR1I",tk_request},
+    {"sceNpToolkit2_xCg+igDBo3Q",tk_request},
     {"sceUserServiceInitialize",user_initialize}, {"sceUserServiceTerminate",user_terminate},
     {"sceUserServiceGetInitialUser",user_initial}, {"sceUserServiceGetLoginUserIdList",user_list},
     {"sceUserServiceGetUserName",user_name}, {"sceUserServiceGetEvent",user_event},

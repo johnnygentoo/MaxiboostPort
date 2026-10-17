@@ -621,6 +621,9 @@ int main(int argc, char **argv) {
         runtime_thread_attach_main();
         runtime_set_procparam(image+procparam);
         if (module_count) runtime_set_libc_module(image+modules[0].base,modules[0].size); /* libc links first */
+        for (uint64_t i=0;i<import_count;++i) /* link_modules.py RUNTIME_EXPORTS */
+            if (bindings[i] && binding_kinds[i]==1 && runtime_nid_is(names[i],"CC-BLMBu9-I#libc"))
+                runtime_set_libc_malloc_stats(image+bindings[i]);
         /* Dependencies start in link order (libc first), as the PS4 dynamic linker does. */
         for (uint64_t m=0;m<module_count;++m) {
             printf("Starting linked module %" PRIu64 " at image offset 0x%" PRIx64 "; native bindings=%" PRIu64 "\n",m,modules[m].init,nb);

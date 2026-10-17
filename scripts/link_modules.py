@@ -19,6 +19,10 @@ from prepare import parse_self, span, unpack
 from link_libc import encode_id
 
 DEFAULT_MODULES = ('libc.prx', 'libSceFios2.prx')
+# libc exports the runtime calls itself (frame stats: malloc_stats), by NID: each libc.prx build
+# has them at its own offsets (Bloodborne's and GODZILLA's +0x1f8c0, GUNDAM VERSUS' +0x55c50).
+# One the game does not import gets an import entry of its own, bound to the export.
+RUNTIME_EXPORTS = ('CC-BLMBu9-I',)  # malloc_stats
 FS_LOAD = bytes.fromhex('64488b042500000000')  # mov rax, fs:[0]
 
 
@@ -195,6 +199,12 @@ def link(game, out, module_names=DEFAULT_MODULES):
                           tls_filesz=tls['filesz'] if tls else 0, tls_module=module_id,
                           tls_relocations=tls_relocations, exports=count, sha256=m['sha256']))
         base = (base + modsize + 65535) & ~65535
+
+    for nid in RUNTIME_EXPORTS:
+        candidates = [i for i, e in exports.items() if i[0] == nid and i[1][0] == 'libc']
+        if len(candidates) == 1 and candidates[0] not in identities:
+            identities[candidates[0]] = len(names)
+            names.append(f'{nid}#libc')
 
     bindings, unresolved = [], []
     for identity, index in identities.items():
