@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "game_profile.h"
 #include "gnm_error.h"
 #include "gnmdriver.h"
 
@@ -152,7 +153,7 @@ static u32 SubmitsAhead() {
 // malloc) are watched; the leak added ~1800 a second, so 100000 over the lowest count seen is
 // taken as one (or the heap asking for more memory). Then the frames stop overlapping.
 static void WatchOverlapLeak() {
-    if (SubmitsAhead() == 0) {
+    if (SubmitsAhead() == 0 || !Game::HeapWatch()) {
         return;
     }
     if (!BbHeapSites::Counting()) {

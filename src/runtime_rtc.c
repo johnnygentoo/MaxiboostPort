@@ -139,8 +139,26 @@ static ABI int32_t rtc_rfc2822_local(char *out, const uint64_t *utc_tick) {
     memcpy(out,text,strlen(text)+1); /* 31 characters + NUL, the SDK's buffer size */
     return 0;
 }
+/* "2026-09-25T12:00:00.00+03:00" for the given UTC tick (NULL = now) in local time. */
+static ABI int32_t rtc_rfc3339_local(char *out, const uint64_t *utc_tick) {
+    if (!out) return ERR_INVALID_POINTER;
+    uint64_t utc=utc_tick ? *utc_tick : now_utc();
+    int64_t offset=local_offset(utc);
+    DateTime t; from_tick((uint64_t)((int64_t)utc+offset),&t);
+    int64_t minutes=offset/60000000, magnitude=minutes<0 ? -minutes : minutes;
+    char text[64];
+    snprintf(text,sizeof(text),"%04u-%02u-%02uT%02u:%02u:%02u.%02u%c%02d:%02d",t.year,t.month,t.day,t.hour,
+             t.minute,t.second,t.microsecond/10000,minutes<0 ? '-' : '+',(int)(magnitude/60),(int)(magnitude%60));
+    memcpy(out,text,strlen(text)+1); /* 28 characters + NUL */
+    return 0;
+}
+static ABI int32_t rtc_tick_add_seconds(uint64_t *out, const uint64_t *in, int64_t seconds) {
+    if (!out || !in) return ERR_INVALID_POINTER;
+    *out=(uint64_t)((int64_t)*in+seconds*1000000); return 0;
+}
 
 static const RuntimeExport exports[]={
+    {"sceRtcFormatRFC3339LocalTime",rtc_rfc3339_local}, {"sceRtcTickAddSeconds",rtc_tick_add_seconds},
     {"sceRtcGetCurrentClockLocalTime",rtc_current_local}, {"sceRtcGetCurrentClock",rtc_current_clock},
     {"sceRtcGetCurrentTick",rtc_current_tick}, {"sceRtcGetCurrentNetworkTick",rtc_current_tick},
     {"sceRtcConvertUtcToLocalTime",rtc_utc_to_local}, {"sceRtcConvertLocalTimeToUtc",rtc_local_to_utc},

@@ -3,6 +3,8 @@
 // 1.09 executable (game_check.py makes sure that is the one running); every retail release runs
 // the same one.
 #include "game_profile.h"
+#include "bbport_game_menu.h"
+#include "bbport_gnm_hooks.h"
 #include "bbport_guest_hooks.h"
 
 namespace Game {
@@ -30,6 +32,12 @@ void InstallHooks(const CoreServices& services) {
     // The resource loaders' copies, the GPU memory range allocator and the heap (bbport_guest_hooks).
     BbGuestHooks::Install(services.fresh_range);
 }
+
+void PatchImage(unsigned char* image, std::uint64_t size) {
+    // libGnm's functions in the executable and the System menu's Display/Effects pages.
+    BbGnmHooks::PatchImage(image, size);
+    BbGameMenu::PatchImage(image, size);
+}
 } // namespace
 
 extern const Profile BloodborneProfile = {
@@ -39,6 +47,8 @@ extern const Profile BloodborneProfile = {
     .dynamic_writers = DynamicWriters,
     // The game's buffer-copy compute shader (not the export-stage copy shader).
     .buffer_copy_shader = 0xfefebf9f,
+    .patch_image = PatchImage,
+    .heap_watch = true,
 };
 
 } // namespace Game

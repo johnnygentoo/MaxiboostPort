@@ -562,6 +562,19 @@ int main(int argc, char **argv) {
         }
         memcpy(image + relocs[i].target, &value, 8);
     }
+    /* BB_LIST_UNRESOLVED=1: every import neither the runtime nor a linked module provides, then
+     * exit; the whole list at once instead of the first one the game happens to call. */
+    { const char *list=getenv("BB_LIST_UNRESOLVED");
+      if (list && !strcmp(list,"1")) {
+        unsigned missing=0;
+        for (uint64_t i=0;i<import_count;++i) {
+            if (runtime_resolve(names[i],0) || runtime_resolve(names[i],1) || (native_libc && bindings[i])) continue;
+            printf("UNRESOLVED %s %s\n",names[i],runtime_import_name(names[i]));
+            ++missing;
+        }
+        printf("UNRESOLVED total: %u of %" PRIu64 " imports\n",missing,import_count);
+        exit(0);
+      } }
     if (patch_file) apply_patches(patch_file, segments, ns, relocs, nr);
     if (!cpu_only) bbgpu_patch_image(image, size);
     protect(traps, round_page((import_count + 1) * 32), 5);

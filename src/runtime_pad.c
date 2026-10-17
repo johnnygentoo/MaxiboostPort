@@ -894,6 +894,21 @@ static ABI int32_t pad_vibration(int32_t handle, const uint8_t *param) {
     pthread_mutex_unlock(&lock);
     return 0;
 }
+/* The light bar (OrbisPadLightBarParam: r, g, b) on controllers that have one (DualShock 4,
+ * DualSense); others ignore it. Reset gives back the system's colour for user 1 (blue). */
+static ABI int32_t pad_light_bar(int32_t handle, const uint8_t *rgb) {
+    if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
+    if (!rgb) return ERR_INVALID_ARG;
+    pthread_mutex_lock(&lock);
+    SDL_Gamepad *g=current_gamepad();
+    if (g) SDL_SetGamepadLED(g,rgb[0],rgb[1],rgb[2]);
+    pthread_mutex_unlock(&lock);
+    return 0;
+}
+static ABI int32_t pad_reset_light_bar(int32_t handle) {
+    static const uint8_t blue[3]={0,0,64};
+    return pad_light_bar(handle,blue);
+}
 static ABI int32_t pad_ok_handle(int32_t handle) { return handle==PAD_HANDLE && opened ? 0 : ERR_INVALID_HANDLE; }
 static ABI int32_t pad_ok_handle_flag(int32_t handle, uint8_t flag) { (void)flag; return pad_ok_handle(handle); }
 
@@ -904,6 +919,7 @@ static const RuntimeExport exports[]={
     {"scePadResetOrientation",pad_ok_handle},
     {"scePadSetAngularVelocityDeadbandState",pad_ok_handle_flag}, {"scePadSetTiltCorrectionState",pad_ok_handle_flag},
     {"scePadSetMotionSensorState",pad_ok_handle_flag},
+    {"scePadSetLightBar",pad_light_bar}, {"scePadResetLightBar",pad_reset_light_bar},
 };
 uintptr_t runtime_pad_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
 void runtime_pad_report(void) { printf("Runtime: pad reads=%zu, gamepad=%s\n",reads,gamepad ? SDL_GetGamepadName(gamepad) : "none"); }

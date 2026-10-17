@@ -654,11 +654,11 @@ static const RuntimeExport exports[]={
 };
 uintptr_t runtime_memory_resolve(const char *name) {
     /* Direct-memory NIDs are exercised by test_runtime.c before names are loaded. */
-    if (!strcmp(name, "pO96TwzOm5E#p#J")) return (uintptr_t)direct_size;
-    if (!strcmp(name, "rTXw65xmLIA#p#J")) return (uintptr_t)direct_allocate;
-    if (!strcmp(name, "L-Q3LEjIbgA#p#J")) return (uintptr_t)direct_map;
-    if (!strcmp(name, "MBuItvba6z8#p#J")) return (uintptr_t)direct_release;
-    if (!strcmp(name, "cQke9UuBQOk#p#J")) return (uintptr_t)direct_unmap;
+    if (runtime_nid_is(name,"pO96TwzOm5E#p#J")) return (uintptr_t)direct_size;
+    if (runtime_nid_is(name,"rTXw65xmLIA#p#J")) return (uintptr_t)direct_allocate;
+    if (runtime_nid_is(name,"L-Q3LEjIbgA#p#J")) return (uintptr_t)direct_map;
+    if (runtime_nid_is(name,"MBuItvba6z8#p#J")) return (uintptr_t)direct_release;
+    if (runtime_nid_is(name,"cQke9UuBQOk#p#J")) return (uintptr_t)direct_unmap;
     return RUNTIME_LOOKUP(exports,name);
 }
 /* Host-owned memory the guest can see (image, stacks, trampolines) lives in

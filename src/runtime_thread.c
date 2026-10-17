@@ -357,7 +357,7 @@ uintptr_t runtime_thread_resolve(const char *name) {
         {"FJrT5LuUBAU#I#J",thread_exit},
     };
     for (size_t i=0;i<sizeof(table)/sizeof(*table);++i)
-        if (!strcmp(name,table[i].nid)) return (uintptr_t)table[i].fn;
+        if (runtime_nid_is(name,table[i].nid)) return (uintptr_t)table[i].fn;
     return 0;
 }
 void runtime_thread_report(void) {

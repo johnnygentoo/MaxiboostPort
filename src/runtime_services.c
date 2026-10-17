@@ -172,7 +172,8 @@ static ABI int32_t voice_info(uint32_t port,uint32_t *info) {
 /* ---- Common dialogs: nothing is displayed; an opened dialog finishes. ---- */
 typedef struct { const char *name; int initialized, status; } Dialog;
 static Dialog dialogs[]={{"CommonDialog",0,0},{"MsgDialog",0,0},{"SaveDataDialog",0,0},
-                         {"NpProfileDialog",0,0},{"NpCommerceDialog",0,0},{"ImeDialog",0,0}};
+                         {"NpProfileDialog",0,0},{"NpCommerceDialog",0,0},{"ImeDialog",0,0},
+                         {"ErrorDialog",0,0},{"NpFriendListDialog",0,0}};
 static int common_initialized;
 static ABI int32_t common_init(void) { common_initialized=1; return 0; }
 static int32_t dialog_init(int i) {
@@ -194,7 +195,41 @@ static int32_t dialog_term(int i) {
     static ABI int32_t tag##_open(const void *p) { (void)p; return dialog_open(i); } \
     static ABI int32_t tag##_status(void) { return dialog_status(i); } \
     static ABI int32_t tag##_term(void) { return dialog_term(i); }
-DIALOG(msg,1) DIALOG(save,2) DIALOG(profile,3) DIALOG(commerce,4)
+DIALOG(msg,1) DIALOG(save,2) DIALOG(profile,3) DIALOG(commerce,4) DIALOG(friends,7)
+/* Closing a dialog finishes it; its result is the first button (OK / Yes), a list dialog's is
+ * "cancelled" (nothing chosen). OrbisCommonDialog results: 0 OK, 1 user cancelled. */
+static int32_t dialog_close(int i) {
+    if (!dialogs[i].initialized) return DIALOG_NOT_INITIALIZED;
+    dialogs[i].status=3; return 0;
+}
+static ABI int32_t msg_close(void) { return dialog_close(1); }
+static ABI int32_t save_close(const void *param) { (void)param; return dialog_close(2); }
+static ABI int32_t commerce_close(void) { return dialog_close(4); }
+static ABI int32_t friends_close(void) { return dialog_close(7); }
+/* OrbisMsgDialogResult / OrbisSaveDataDialogResult: mode, result, button id, ... */
+static ABI int32_t msg_result(int32_t *result) {
+    if (!result) return (int32_t)0x80B80006; /* ARG_NULL */
+    result[1]=0; result[2]=1; /* OK, the first button (Yes) */
+    return 0;
+}
+static ABI int32_t save_result(int32_t *result) {
+    if (!result) return (int32_t)0x80B80006;
+    result[1]=0; result[2]=1;
+    return 0;
+}
+static ABI int32_t save_ready(void) { return 1; }
+static ABI int32_t save_progress(int32_t target,uint32_t rate) { (void)target; (void)rate; return 0; }
+static ABI int32_t cancelled_result(int32_t *result) { if (result) result[0]=1; return 0; }
+/* ErrorDialog: the system's error message for a code; the code is logged, the dialog finishes. */
+typedef struct { int32_t size, error_code, user, reserved; } ErrorDialogParam;
+static ABI int32_t error_dialog_init(void) { return dialog_init(6); }
+static ABI int32_t error_dialog_open(const ErrorDialogParam *param) {
+    if (param) printf("Runtime: ErrorDialog for error 0x%08x\n",(uint32_t)param->error_code);
+    return dialog_open(6);
+}
+static ABI int32_t error_dialog_status(void) { return dialog_status(6); }
+static ABI int32_t error_dialog_close(void) { return dialog_close(6); }
+static ABI int32_t error_dialog_term(void) { return dialog_term(6); }
 static ABI int32_t profile_result(void *result) { if (result) memset(result,0,4); return 0; }
 /* ImeDialog: text typed on the keyboard into the game window (title bar shows it).
  * OrbisImeDialogParam: user, type, languages(8), enter label, method, filter,
@@ -397,6 +432,24 @@ static ABI int32_t trophy_info(int32_t ctx,int32_t handle,int32_t id,void *detai
     (void)id; return trophy_game_info(ctx,handle,details,data);
 }
 
+/* The state of every trophy, as the flag array the game reads (128 bits) and their count. */
+static ABI int32_t trophy_destroy(int32_t id) { (void)id; return 0; }
+static ABI int32_t trophy_unlock_state(int32_t ctx,int32_t handle,uint32_t *flags,uint32_t *count) {
+    (void)ctx; (void)handle;
+    trophy_first_call("sceNpTrophyGetTrophyUnlockState");
+    if (!flags || !count) return TROPHY_INVALID;
+    memset(flags,0,TROPHY_MAX/8);
+    pthread_mutex_lock(&trophy_lock);
+    trophy_load();
+    uint32_t n=0;
+    for (int i=0;i<TROPHY_MAX;++i) {
+        if (trophy_known[i]) n=(uint32_t)i+1;
+        if (trophy_earned[i]) flags[i/32]|=UINT32_C(1)<<(i%32);
+    }
+    pthread_mutex_unlock(&trophy_lock);
+    *count=n; return 0;
+}
+
 /* ---- PlayGo: fully installed package ---- */
 static int playgo_handle, playgo_chunks=-1;
 static ABI int32_t playgo_init(const void *params) {
@@ -436,6 +489,22 @@ static ABI int32_t playgo_locus(int32_t handle,const uint16_t *ids,uint32_t coun
     return 0;
 }
 static ABI int32_t playgo_speed(int32_t handle,int32_t speed) { (void)speed; return handle==playgo_handle && handle ? 0 : PLAYGO_BAD_HANDLE; }
+
+static ABI int32_t playgo_language_mask(int32_t handle,uint64_t mask) { (void)mask; return handle==playgo_handle && handle ? 0 : PLAYGO_BAD_HANDLE; }
+
+/* ---- Sharing and streaming: screenshots, live streaming, Share Play and video recording are
+ * the PS4's own features; the game's switches for them are accepted and change nothing. ---- */
+static ABI int32_t accept_any(void) { return 0; }
+/* ---- Rudp (reliable UDP over the PSN connection): the library starts, no peer is reached ---- */
+#define RUDP_NOT_ACCEPTABLE ((int32_t)0x80770012)
+static ABI int32_t rudp_unreachable(void) { return RUDP_NOT_ACCEPTABLE; }
+static ABI int32_t rudp_nothing(void) { return 0; }
+static ABI int32_t netctl_result(int32_t event,int32_t *error) { (void)event; if (error) *error=NET_CTL_NOT_CONNECTED; return 0; }
+static ABI int32_t user_color(int32_t user,int32_t *color) {
+    if (user!=USER_ID || !color) return USER_INVALID_ARGUMENT;
+    *color=0; /* blue, the first user's colour */
+    return 0;
+}
 
 /* ---- DiscMap: the game is fully installed, no disc bitmap exists ---- */
 #define DISC_MAP_NO_BITMAP ((int32_t)0x81100004)
@@ -572,6 +641,44 @@ static const RuntimeExport exports[]={
     {"sceAudioInOpen",audio_in_open},
     {"sceDiscMapIsRequestOnHDD",discmap_on_hdd}, {"sceDiscMap_8A828CAEE7EDD5E9",discmap_8a82},
     {"sceVoiceInit",ok_void}, {"sceVoiceEnd",ok_void},
+    /* What GODZILLA calls besides. */
+    {"sceMsgDialogClose",msg_close}, {"sceMsgDialogGetResult",msg_result},
+    {"sceSaveDataDialogClose",save_close}, {"sceSaveDataDialogGetResult",save_result},
+    {"sceSaveDataDialogIsReadyToDisplay",save_ready}, {"sceSaveDataDialogProgressBarSetValue",save_progress},
+    {"sceNpCommerceDialogClose",commerce_close}, {"sceNpCommerceDialogGetResult",cancelled_result},
+    {"sceErrorDialogInitialize",error_dialog_init}, {"sceErrorDialogOpen",error_dialog_open},
+    {"sceErrorDialogUpdateStatus",error_dialog_status}, {"sceErrorDialogClose",error_dialog_close},
+    {"sceErrorDialogTerminate",error_dialog_term},
+    {"sceNpFriendListDialogInitialize",friends_init}, {"sceNpFriendListDialogOpen",friends_open},
+    {"sceNpFriendListDialogUpdateStatus",friends_status}, {"sceNpFriendListDialogGetStatus",friends_status},
+    {"sceNpFriendListDialogGetResult",cancelled_result}, {"sceNpFriendListDialogClose",friends_close},
+    {"sceNpFriendListDialogTerminate",friends_term},
+    {"sceNpTrophyDestroyContext",trophy_destroy}, {"sceNpTrophyDestroyHandle",trophy_destroy},
+    {"sceNpTrophyGetTrophyUnlockState",trophy_unlock_state},
+    {"scePlayGoSetLanguageMask",playgo_language_mask},
+    {"sceScreenShotEnable",accept_any}, {"sceScreenShotDisable",accept_any},
+    {"sceScreenShotSetParam",accept_any}, {"sceScreenShotSetOverlayImage",accept_any},
+    {"sceGameLiveStreamingInitialize",accept_any}, {"sceGameLiveStreamingTerminate",accept_any},
+    {"sceGameLiveStreamingEnableLiveStreaming",accept_any}, {"sceGameLiveStreamingPermitLiveStreaming",accept_any},
+    {"sceGameLiveStreamingPermitServerSideRecording",accept_any},
+    {"sceSharePlayInitialize",accept_any}, {"sceSharePlayTerminate",accept_any},
+    {"sceSharePlaySetProhibition",accept_any}, {"sceVideoRecordingSetInfo",accept_any},
+    {"sceRudpInit",rudp_nothing}, {"sceRudpEnd",rudp_nothing}, {"sceRudpEnableInternalIOThread",rudp_nothing},
+    {"sceRudpSetEventHandler",rudp_nothing}, {"sceRudpSetOption",rudp_nothing},
+    {"sceRudpCreateContext",rudp_unreachable}, {"sceRudpBind",rudp_unreachable},
+    {"sceRudpInitiate",rudp_unreachable}, {"sceRudpTerminate",rudp_nothing},
+    {"sceRudpRead",rudp_unreachable}, {"sceRudpWrite",rudp_unreachable},
+    {"sceRudpFlush",rudp_nothing}, {"sceRudpNetFlush",rudp_nothing},
+    {"sceRudpGetNumberOfPacketsToRead",rudp_nothing}, {"sceRudpGetSizeReadable",rudp_nothing},
+    {"sceNetCtlGetResult",netctl_result},
+    {"sceNetGetSockInfo",net_unreachable}, {"sceNetGetStatisticsInfo",net_unreachable},
+    {"sceNpCreateRequest",np_request}, {"sceNpWebApiGetErrorCode",np_signed_out},
+    {"sceNpMatching2AbortContextStart",ok_void}, {"sceNpMatching2SignalingCancelPeerNetInfo",ok_void},
+    {"sceNpMatching2GetMemoryInfo",np_signed_out}, {"sceNpMatching2GetRoomDataExternalList",np_signed_out},
+    {"sceNpMatching2GetUserInfoList",np_signed_out}, {"sceNpMatching2SignalingGetConnectionInfo",np_signed_out},
+    {"sceNpMatching2SignalingGetLocalNetInfo",np_signed_out},
+    {"sceNpScoreGetFriendsRanking",np_signed_out}, {"sceNpScoreGetRankingByNpId",np_signed_out},
+    {"sceUserServiceGetUserColor",user_color},
 };
 uintptr_t runtime_services_resolve(const char *name) {
     const uintptr_t online=runtime_net_resolve(name); /* BB_ONLINE=1: the online module first */

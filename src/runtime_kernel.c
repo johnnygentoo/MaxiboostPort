@@ -127,6 +127,11 @@ static int sleep_ns(uint64_t ns) {
 static ABI int32_t kernel_usleep(uint32_t usec) { sleep_ns((uint64_t)usec*1000); return 0; }
 static ABI int32_t posix_usleep(uint32_t usec) { sleep_ns((uint64_t)usec*1000); return 0; }
 static ABI uint32_t posix_sleep(uint32_t seconds) { sleep_ns((uint64_t)seconds*1000000000); return 0; }
+static ABI int32_t kernel_sleep(uint32_t seconds) { sleep_ns((uint64_t)seconds*1000000000); return 0; }
+/* Locking pages in memory and syncing mappings: the game's memory is never paged out or backed
+ * by files it expects to be written back, so both succeed. */
+static ABI int32_t kernel_mlock(const void *address,uint64_t size) { (void)address; (void)size; return 0; }
+static ABI int32_t posix_msync(void *address,uint64_t size,int32_t flags) { (void)address; (void)size; (void)flags; return 0; }
 static ABI int32_t posix_nanosleep(const GuestTimespec *rq,GuestTimespec *rem) {
     if (!rq || rq->nsec<0 || rq->nsec>=1000000000 || rq->sec<0) return fail_posix(EINVAL);
     sleep_ns((uint64_t)rq->sec*1000000000+(uint64_t)rq->nsec);
@@ -293,6 +298,7 @@ static const RuntimeExport exports[]={
     {"sceKernelGetProcessTime",process_time}, {"sceKernelGetProcessTimeCounter",process_time_counter},
     {"sceKernelGetProcessTimeCounterFrequency",process_time_frequency},
     {"sceKernelReadTsc",read_tsc}, {"sceKernelGetTscFrequency",tsc_frequency},
+    {"sceKernelSleep",kernel_sleep}, {"sceKernelMlock",kernel_mlock}, {"msync",posix_msync},
     {"sceKernelUsleep",kernel_usleep}, {"usleep",posix_usleep}, {"sleep",posix_sleep},
     {"nanosleep",posix_nanosleep}, {"sceKernelNanosleep",kernel_nanosleep},
     {"sceKernelGettimezone",kernel_gettimezone}, {"gettimeofday",posix_gettimeofday},

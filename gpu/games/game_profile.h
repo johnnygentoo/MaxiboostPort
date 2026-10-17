@@ -36,6 +36,12 @@ struct Profile {
     /// A compute shader (GCN program hash) that only copies buffers, into memory the translator
     /// reads on the CPU: its stores go through to the game's memory; 0 = none known.
     std::uint64_t buffer_copy_shader = 0;
+    /// Edits to the game's code made once, before it runs (the image is still writable): hooks
+    /// at fixed addresses of one executable, such as Bloodborne's settings menu. nullptr = none.
+    void (*patch_image)(unsigned char* image, std::uint64_t size) = nullptr;
+    /// The game's malloc table in its libc.prx is where the heap watch expects it
+    /// (BbHeapSites: Bloodborne's link layout); off for other games.
+    bool heap_watch = false;
 };
 
 /// Chooses the profile for the game by its TITLE_ID (bbgpu_init). BB_GAME_PROFILE=none runs the
@@ -49,6 +55,12 @@ const Profile* Active();
 inline std::uint64_t BufferCopyShader() {
     const Profile* profile = Active();
     return profile ? profile->buffer_copy_shader : 0;
+}
+
+/// Whether the active profile has the heap watch (BbHeapSites).
+inline bool HeapWatch() {
+    const Profile* profile = Active();
+    return profile && profile->heap_watch;
 }
 
 /// Whether guest_rip is in code the active profile knows to write per-frame data.

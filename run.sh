@@ -61,7 +61,7 @@ if [[ -z ${PYTHON:-} ]]; then
 fi
 if [[ -z ${PYTHON:-} ]]; then echo 'Install Python 3 or set PYTHON.' >&2; exit 1; fi
 # BB_GAME_DIR: the game's folder (eboot.bin, sce_module, ...); default next to this directory.
-game=${BB_GAME_DIR:-../CUSA03173}
+game=${BB_GAME_DIR:-../CUSA02046}
 if [[ ! -f $game/eboot.bin ]]; then echo "No eboot.bin in $game (set BB_GAME_DIR)." >&2; exit 1; fi
 original_game=$game
 # BB_PROMPTS (playstation, xbox, switch, keyboard) and BB_GESTURES_NO_MOTION=1: the menu's button
@@ -101,7 +101,7 @@ fi
 # BB_RENDER_RES=WxH explicitly sets the game's render resolution (a patch at start).
 # Frame rate: BB_FPS=uncap (default; delta-time patch, vblank 480 Hz, frames shown at once),
 # 60/90 (fixed-timestep patches) or 30 (unpatched). BB_PATCHES adds patch names ("a;b").
-fps=${BB_FPS:-uncap}
+fps=${BB_FPS:-30}
 # bbport.ini output_res other than 1080p (720p for the Steam Deck, 1440p, 2160p): the whole game
 # renders at the preset's size of the output (a patch), the upscaler fills the output, the UI is
 # drawn at the output size. Preset and output changes need a restart.

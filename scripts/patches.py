@@ -3,193 +3,42 @@
 Patch addresses are PS4 virtual addresses (eboot base 0x400000); the loader's
 image places eboot vaddr 0 at image offset 0. Only literal writes are supported
 (bytes, bytes16/32/64, float32/64, utf8, utf16); pattern ("mask") patches are rejected.
+
+The built-in patches are patches/Godzilla.xml (GODZILLA 1.01). Frame rate and effect switches
+name patches in it; a name the file does not have yet is reported and skipped, so the port runs
+the game as it is until the patch is written.
 """
 import argparse
 import json
 import os
-import re
 import struct
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 EBOOT_BASE=0x400000
-# BB_FPS presets: patch names from patches/Bloodborne.xml (app version 01.09).
-# Above 60 FPS the sprint fix always goes with the frame rate patch: without it sprinting drops to
-# half speed (the game's wall detector measured distance per frame, a 30 FPS rule).
-FPS_PRESETS={'30':[],'60':['60 FPS++'],'90':['90 FPS++','Sprint Fix (High FPS)'],
-             'uncap':['Uncap FPS++','Sprint Fix (High FPS)']}
-# Upscaler presets (bbport.ini "preset", the in-game menu): output / render size ratio. The game
-# then renders at 1920x1080 / ratio and the port's temporal upscaler restores the output size.
+APP_VERSION='01.01'
+BUILTIN_XML=Path(__file__).resolve().parent.parent/'patches/Godzilla.xml'
+# BB_FPS presets: patch names from patches/Godzilla.xml. The game runs at 30 FPS.
+FPS_PRESETS={'30':[],'60':['60 FPS'],'uncap':['Uncap FPS']}
+# The game's own render size; outputs and upscaler presets scale host targets at run time
+# (live resolution changes) until a resolution patch for this executable exists.
 OUTPUT_SIZE=(1920,1080)
 PRESET_SCALES=[1.0,1.5,1.7,2.0,3.0]
-# The community patch changes two independent consumers: the game render/window setup
-# and the UI movie viewport. Keep the latter at native size so glyph rasterisation and
-# vector tessellation do not inherit the scene's FSR resolution.
-RESOLUTION_TEMPLATE='Resolution Patch 1280x720 (16:9)'
 # Effect switches (bbport.ini, in-game menu, launcher): key -> (patch when the key is 0, patch
 # when it is 1). The game reads these at start; a change applies after a restart.
 EFFECTS={
-    'effect_chromatic_aberration':('Disable Chromatic Aberration',None),
-    'effect_dof':('Disable DoF',None),
-    'effect_motion_blur':('Disable Motion Blur (perf increase)',None),
-    'effect_ssao':('Disable SSAO',None),
-    'effect_game_aa':('Disable AA',None),
-    'effect_dynamic_shadows':('Disable Dynamic Light Shadows (perf increase)',None),
-    'effect_ssr':(None,'Enable Screen Space Reflections (READ NOTE)'),
     'skip_intro':(None,'Skip Intro'),
-    'debug_camera':(None,'Restore Debug Camera'),
-    'debug_menu':(None,'Restore Debug Menu (READ NOTES)'),
-    # Cheats and gameplay tweaks (launcher "Cheats" page).
-    'cheat_no_death':(None,'Player No Dead (Read note)'),
-    'cheat_stealth':(None,'Player Stealth (Read note)'),
-    'cheat_silent':(None,'Player Silent (Read note)'),
-    'cheat_rally_no_decay':(None,'No Rally Decay'),
-    'cheat_enemy_control':(None,'Enemy Control'),
-    'tweak_no_rally':(None,'Disable Rally (HP Regain)'),
-    'tweak_camera_distance':(None,'Increased camera distance'),
-    'tweak_no_camera_rotation':(None,'Disable Camera Auto Rotation via Movement'),
-    'tweak_easy_run':(None,'Sensitive Analog Input (easier to run)'),
-    'tweak_ragdoll':(None,'DS1-like physics'),
-    # Loading and smoothness (from bbhost); the first two are on unless turned off.
-    'tweak_quick_reentry':(None,'Quick Re-entry'),
-    'tweak_fast_deflate':(None,'Fast Run-time Deflate'),
-    'tweak_post_processors':(None,'All Resource Post-Processors In Play'),
 }
-# Intel CPUs: the game's tone mapping turns black (DLC areas most; reported as darker than on the
-# PS4): the game code runs natively, and Intel's approximate float instructions differ from the
-# PS4's AMD CPU, so a block the game gates on a computed flag never runs. The community fix runs
-# it always; on by default on Intel. BB_INTEL_TONEMAP_FIX=0/1 forces it off or on.
-INTEL_TONEMAP='Intel Black Tonemap Fix'
-
-
-def intel_cpu(cpuinfo='/proc/cpuinfo'):
-    try:
-        with open(cpuinfo) as f:
-            return any(line.startswith('vendor_id') and 'GenuineIntel' in line for line in f)
-    except OSError:
-        return False
-
-
-# The title's PLAY ONLINE / PLAY OFFLINE dialog: the port has no PSN, the game goes straight to the
-# main menu offline. On by default (the launcher's switch); BB_SKIP_NETWORK_CHOICE=0 shows it.
-SKIP_NETWORK_CHOICE='Skip Online/Offline Choice'
-
-
-def skip_network_choice(env=os.environ):
-    return env.get('BB_SKIP_NETWORK_CHOICE','1')!='0'
-
-
-# The game's two per-frame GX command heaps are 256 KiB; a frame that fills one writes through a
-# NULL allocation (deadinside28/bloodborne_pc#162, #169). On by default, as Awaken's
-# BloodBorneButPc has it since 0.9.16 (the same two sites, for a GXWorker crash in a boss intro
-# with Model LOD -2 at 2560x1440); BB_GX_COMMAND_HEAP=0 keeps the game's size.
-GX_COMMAND_HEAP='Larger GX Command Heap (1 MiB)'
-
-
-def gx_command_heap(env=os.environ):
-    return env.get('BB_GX_COMMAND_HEAP','1')!='0'
-
-
-def intel_tonemap_fix(env=os.environ, cpuinfo='/proc/cpuinfo'):
-    forced=env.get('BB_INTEL_TONEMAP_FIX')
-    return forced=='1' if forced in ('0','1') else intel_cpu(cpuinfo)
-
-# model_lod: -2 highest, 0 the game's, 1 lower, 2 lowest.
-MODEL_LOD={'-2':'Model LOD -2 (Highest)','1':'Model LOD 1 (Lower)','2':'Model LOD 2 (Lowest)'}
-
-
-DEBUG_MENU='Restore Debug Menu (READ NOTES)'
-# What the patched game reads for the debug menu (BB_FILE_TRACE=1), under dvdroot_ps4. The game asks
-# for lower-case names; the PS4's file system and the port's runtime ignore case.
-DEBUG_MENU_FONTS=('adhoc/font/DbgFont14h.ccm','adhoc/font/DbgFont14h.tpf')
-DEBUG_MENU_SHADERS=('adhoc/FontShader/debugFont_vs.vpo','adhoc/FontShader/debugFont_ps.ppo')
-
-
-def find_ignoring_case(root, relative):
-    """`root`/`relative`, each component matched ignoring case; None when absent."""
-    path=Path(root)
-    for part in relative.split('/'):
-        exact=path/part
-        if exact.exists():
-            path=exact
-            continue
-        try:
-            matches=[e for e in path.iterdir() if e.name.casefold()==part.casefold()]
-        except OSError:
-            return None
-        if not matches:
-            return None
-        path=matches[0]
-    return path
-
-
-def debug_menu_problem(game):
-    """Why the debug menu patch cannot work with this game folder, or None."""
-    dvdroot=Path(game)/'dvdroot_ps4'
-    missing=[]
-    for relative in DEBUG_MENU_FONTS:
-        found=find_ignoring_case(dvdroot,relative)
-        if not found or not found.is_file() or found.stat().st_size==0:
-            missing.append(relative)
-    if not missing:
-        return None
-    hint=''
-    if all(find_ignoring_case(dvdroot,'font/'+r.rsplit('/',1)[1]) for r in missing):
-        hint=' (they are in dvdroot_ps4/font: the game reads them from dvdroot_ps4/adhoc/font)'
-    return ('the debug menu needs the font files from https://www.nexusmods.com/bloodborne/mods/253 '
-            f'in dvdroot_ps4 of the game folder or of a mod: missing {", ".join(missing)}{hint}')
-
-
-def validate_patch_requirements(names, game):
-    """The patches to apply: raises for conflicts; drops the debug menu (with a message) when its
-    font files are missing, as the game crashes opening the menu without them."""
-    if 'Restore Debug Camera' in names and 'Enemy Control' in names:
-        raise ValueError('Restore Debug Camera conflicts with Enemy Control; enable only one')
-    if DEBUG_MENU in names:
-        problem=debug_menu_problem(game)
-        if problem:
-            print(f'Patches: debug menu off: {problem}',file=sys.stderr)
-            return [n for n in names if n!=DEBUG_MENU]
-        absent=[r for r in DEBUG_MENU_SHADERS if not find_ignoring_case(Path(game)/'dvdroot_ps4',r)]
-        if absent:
-            print(f'Patches: debug menu: {", ".join(absent)} not found (the mod\'s font shaders); '
-                  'the menu may not draw',file=sys.stderr)
-    return names
-
-
-# Effects on when bbport.ini does not name them (files from before they existed).
-DEFAULT_ON={'tweak_quick_reentry','tweak_fast_deflate'}
 
 
 def effect_patches(settings):
     names=[]
     for key,(off,on) in EFFECTS.items():
-        if key not in settings and key not in DEFAULT_ON: continue
+        if key not in settings: continue
         name=on if settings.get(key,'1')=='1' else off
         if name: names.append(name)
-    # Enemy Control and the free camera use the same buttons: the free camera wins.
-    if 'Enemy Control' in names and 'Restore Debug Camera' in names:
-        names.remove('Enemy Control')
-        print('Patches: Enemy Control skipped (it conflicts with the free camera)')
-    # Rally that never decays means nothing without Rally.
-    if 'No Rally Decay' in names and 'Disable Rally (HP Regain)' in names:
-        names.remove('No Rally Decay')
-    lod=MODEL_LOD.get(settings.get('model_lod','0'))
-    if lod: names.append(lod)
     return names
-SCENE_WIDTH=0x02196A6B-EBOOT_BASE
-SCENE_HEIGHT=0x02196A7A-EBOOT_BASE
-UI_WIDTH=0x02358554-EBOOT_BASE
-UI_HEIGHT=0x0235855D-EBOOT_BASE
-# Outputs wider than 16:9: the community resolution patch for that size (Kyo's "Resolution Patch
-# WxH (21:9)" etc. in patches/Bloodborne.xml) also widens the game's logical screen -- the
-# projection aspect, the 2D layout width and the lock-on/HP-bar coordinates -- so the view
-# gets wider instead of stretched. bbport keeps its own scene/UI sizes (resolution_writes) and
-# heap patch, so only that patch's remaining writes are applied. bbport.ini aspect_patch=0
-# turns this off.
-HEAP_SITES={0x04B36DDA-EBOOT_BASE,0x04B36DE2-EBOOT_BASE}
-RESOLUTION_PATCH=re.compile(r'Resolution Patch (\d+)x(\d+) \(')
 
 
 def read_settings(path):
@@ -199,19 +48,6 @@ def read_settings(path):
             key,sep,value=line.partition('=')
             if sep and not line.startswith('#'): settings[key.strip()]=value.strip()
     return settings
-
-
-def render_size(settings,override=''):
-    """Render resolution for the upscaler preset, or None for native."""
-    if override:
-        w,h=(int(v) for v in override.lower().split('x'))
-        return (w,h)
-    if settings.get('upscaler','fsr3')=='off': return None
-    preset=int(settings.get('preset','0') or 0)
-    scale=PRESET_SCALES[max(0,min(preset,len(PRESET_SCALES)-1))]
-    if scale==1.0: return None
-    # Even sizes (the game has half-resolution buffers).
-    return tuple(max(2,round(v/scale/2)*2) for v in OUTPUT_SIZE)
 
 
 def output_size(settings):
@@ -224,69 +60,13 @@ def output_size(settings):
     return OUTPUT_SIZE
 
 
-def scaled_sizes(settings):
-    """(render, output) for an output other than 1080p (above it, or 720p for the Steam Deck):
-    the game renders at output / preset scale (or at the output size without upscaler) and the
-    upscaler fills the output. None at 1080p and for TAA (native, live host targets only)."""
-    out=output_size(settings)
-    if out==OUTPUT_SIZE or settings.get('upscaler')=='taa': return None
-    scale=1.0
-    if settings.get('upscaler','fsr3')!='off':
-        preset=int(settings.get('preset','0') or 0)
-        scale=PRESET_SCALES[max(0,min(preset,len(PRESET_SCALES)-1))]
-    render=tuple(max(2,round(v/scale/2)*2) for v in out)
-    # A scene of exactly 1920x1080 (4K Performance) is indistinguishable from the game's UI
-    # coordinate space, which the port's UI composition recognizes by that size.
-    if render==OUTPUT_SIZE: render=(1916,1078)
-    return render,out
-
-
-def resolution_writes(xml,size,app_version,segments,ui=OUTPUT_SIZE):
-    writes=compile_patches(xml,[RESOLUTION_TEMPLATE],app_version,segments)
-    replacements={SCENE_WIDTH:(0xB8,0x500,size[0]),
-                  SCENE_HEIGHT:(0xB8,0x2D0,size[1]),
-                  UI_WIDTH:(0xB8,0x500,ui[0]),
-                  UI_HEIGHT:(0xB9,0x2D0,ui[1])}
-    out=[]
-    seen=set()
-    for offset,data in writes:
-        if offset in replacements:
-            opcode,old,value=replacements[offset]
-            if data!=bytes([opcode])+old.to_bytes(3,'little') or offset in seen:
-                raise ValueError(f'unexpected resolution patch at {offset+EBOOT_BASE:#x}')
-            data=bytes([opcode])+value.to_bytes(3,'little')
-            seen.add(offset)
-        out.append((offset,data))
-    if seen!=replacements.keys():
-        raise ValueError('resolution patch is missing scene/UI viewport instructions')
-    return out
-
-
-def aspect_patch_name(xml,app_version,output):
-    """The community resolution patch for an output wider than 16:9: the one for this exact
-    size, else the closest-width one of the same aspect ratio. None for 16:9 and narrower
-    outputs, and for an aspect ratio no patch covers (that output is still stretched)."""
-    w,h=output
-    if w*9<=h*16: return None
-    same_aspect=[]
-    for meta in ET.parse(xml).getroot().iter('Metadata'):
-        m=RESOLUTION_PATCH.match(meta.get('Name',''))
-        if not m or meta.get('AppVer')!=app_version: continue
-        pw,ph=int(m[1]),int(m[2])
-        if pw*9<=ph*16: continue
-        if (pw,ph)==(w,h): return meta.get('Name')
-        if abs(pw/ph-w/h)<0.005: same_aspect.append((abs(pw-w),meta.get('Name')))
-    return min(same_aspect)[1] if same_aspect else None
-
-
-def aspect_writes(xml,output,app_version,segments):
-    """(patch name, writes) widening the game's view to the output's aspect, or (None, [])."""
-    name=aspect_patch_name(xml,app_version,output)
-    if not name: return None,[]
-    template=dict(compile_patches(xml,[RESOLUTION_TEMPLATE],app_version,segments))
-    skip={SCENE_WIDTH,SCENE_HEIGHT,UI_WIDTH,UI_HEIGHT}|HEAP_SITES
-    return name,[(offset,data) for offset,data in compile_patches(xml,[name],app_version,segments)
-                 if offset not in skip and template.get(offset)!=data]
+def available(xml, names, app_version):
+    """The names the XML has for this version; the others are reported."""
+    have={meta.get('Name') for meta in ET.parse(xml).getroot().iter('Metadata')
+          if meta.get('AppVer')==app_version}
+    for name in names:
+        if name not in have: print(f'Patches: {name!r} not available for GODZILLA {app_version} yet',file=sys.stderr)
+    return [n for n in names if n in have]
 
 
 def eboot_segments(elf):
@@ -330,9 +110,8 @@ def compile_patches(xml, names, app_version, segments):
 
 
 # Third-party patch files (shadPS4/GoldHEN XML) in the data directory's patches/ folder.
-# A file for any retail release applies: they share the 1.09 executable (game_check.py).
-BLOODBORNE_IDS={'CUSA00900','CUSA00207','CUSA00208','CUSA00299','CUSA01363',
-                'CUSA03179','CUSA03173','CUSA03014','CUSA03023'}
+# A file for any retail release applies when it has the same executable (game_check.py).
+GAME_IDS={'CUSA02046'}
 
 
 def same_app_version(value, app_version):
@@ -343,7 +122,7 @@ def same_app_version(value, app_version):
         return False
 
 
-def external_patches(directory, app_version='01.09', exclude=Path(__file__).resolve().parent.parent/'patches/Bloodborne.xml'):
+def external_patches(directory, app_version=APP_VERSION, exclude=BUILTIN_XML):
     """[(key, file, metadata)] of eboot patches for this version in directory/*.xml.
     key is "<file name>/<patch name>" (the launcher's selection, patches.json)."""
     found=[]
@@ -358,7 +137,7 @@ def external_patches(directory, app_version='01.09', exclude=Path(__file__).reso
             print(f'Patches: {path.name}: {error}',file=sys.stderr)
             continue
         ids={e.text.strip() for e in root.iter('ID') if e.text}
-        if ids and not ids&BLOODBORNE_IDS: continue
+        if ids and not ids&GAME_IDS: continue
         for meta in root.iter('Metadata'):
             if same_app_version(meta.get('AppVer'),app_version) and meta.get('AppElf','eboot.bin')=='eboot.bin':
                 found.append((f'{path.name}/{meta.get("Name")}',path,meta))
@@ -400,68 +179,34 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--patches-dir',type=Path,help='third-party patch XML files (shadPS4 format)')
     p.add_argument('--patches-config',type=Path,help='patches.json: enabled/disabled external patches')
-    p.add_argument('--xml',type=Path,default=Path(__file__).resolve().parent.parent/'patches/Bloodborne.xml')
-    p.add_argument('--fps',choices=sorted(FPS_PRESETS),default='uncap')
+    p.add_argument('--xml',type=Path,default=BUILTIN_XML)
+    p.add_argument('--fps',choices=sorted(FPS_PRESETS),default='30')
     p.add_argument('--extra',default='',help='additional patch names, separated by ";"')
-    p.add_argument('--app-version',default='01.09')
+    p.add_argument('--app-version',default=APP_VERSION)
     p.add_argument('--out',type=Path,default=Path(__file__).resolve().parent.parent/'out')
     p.add_argument('--settings',type=Path,default=Path(__file__).resolve().parent.parent/'bbport.ini')
-    p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('BB_GAME_DIR','../CUSA03173')))
-    p.add_argument('--render-res',default='',help='render resolution WxH (overrides the preset)')
+    p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('BB_GAME_DIR','CUSA02046')))
+    p.add_argument('--render-res',default='',help='render resolution WxH (needs a resolution patch)')
+    p.add_argument('--output-res',default='',help='output resolution WxH')
     p.add_argument('--print-preset-size',action='store_true',help='print the selected preset size, if reduced')
-    p.add_argument('--output-res',default='',help='output resolution WxH (the upscaler\'s; the UI stays 1920x1080)')
     p.add_argument('--print-scaled',action='store_true',
-                   help='print "RENDER OUTPUT" (WxH) when bbport.ini selects an output other than 1080p')
+                   help='print "RENDER OUTPUT" when a resolution patch renders the game at another size')
     a=p.parse_args()
-    if a.print_scaled:
-        sizes=scaled_sizes(read_settings(a.settings))
-        if sizes: print(f'{sizes[0][0]}x{sizes[0][1]} {sizes[1][0]}x{sizes[1][1]}')
-        return
-    if a.print_preset_size:
-        settings=read_settings(a.settings)
-        if 'BB_UPSCALER' in os.environ:
-            settings['upscaler']='fsr3' if os.environ['BB_UPSCALER']=='fsr3' else 'off'
-        if 'BB_UPSCALE_PRESET' in os.environ:
-            settings['preset']=os.environ['BB_UPSCALE_PRESET']
-        size=render_size(settings)
-        if size: print(f'{size[0]}x{size[1]}')
-        return
+    if a.print_scaled or a.print_preset_size:
+        return  # no resolution patch yet: other sizes are live (host targets scaled at run time)
     names=FPS_PRESETS[a.fps]+[n.strip() for n in a.extra.split(';') if n.strip()]
     names+=[n for n in effect_patches(read_settings(a.settings)) if n not in names]
-    if intel_tonemap_fix() and INTEL_TONEMAP not in names:
-        names.append(INTEL_TONEMAP)
-    if skip_network_choice() and SKIP_NETWORK_CHOICE not in names:
-        names.append(SKIP_NETWORK_CHOICE)
-    if gx_command_heap() and GX_COMMAND_HEAP not in names:
-        names.append(GX_COMMAND_HEAP)
-    names=validate_patch_requirements(names,a.game_dir)
+    names=available(a.xml,names,a.app_version)
     segments=eboot_segments((a.out/'eboot.elf').read_bytes())
     writes=compile_patches(a.xml,names,a.app_version,segments)
-    size=render_size(read_settings(a.settings),a.render_res) if a.render_res else None
-    # The UI keeps the game's 1920x1080 coordinates even for a larger output: the port draws
-    # it into the output-size image with a viewport scaled by output / 1920
-    # (UiComposition::NativeViewport), so it is rasterized at the output resolution.
-    ui=OUTPUT_SIZE
-    if size:
-        writes+=resolution_writes(a.xml,size,a.app_version,segments,ui)
-        if size[0]*size[1]>OUTPUT_SIZE[0]*OUTPUT_SIZE[1]:
-            heap='Increased Graphics Heap Sizes'
-            writes+=compile_patches(a.xml,[heap],a.app_version,segments)
-            names.append(heap)
-        print(f'Patches: scene {size[0]}x{size[1]}; UI {ui[0]}x{ui[1]}')
-    settings=read_settings(a.settings)
-    output=tuple(int(v) for v in a.output_res.lower().split('x')) if a.output_res else output_size(settings)
-    if settings.get('aspect_patch','1')!='0':
-        aspect_name,aspect=aspect_writes(a.xml,output,a.app_version,segments)
-        if aspect:
-            writes+=aspect
-            print(f'Patches: aspect {output[0]}x{output[1]} from {aspect_name!r} ({len(aspect)} writes)')
+    if a.render_res:
+        print('Patches: no resolution patch for this executable; --render-res ignored',file=sys.stderr)
     if a.patches_dir:
         # After the built-in ones: an external patch of the same bytes wins.
         writes+=compile_external(external_selection(external_patches(a.patches_dir,a.app_version,a.xml),
                                                     a.patches_config),segments)
     # BBPATCH2: the patch base, so the loader can rebase pointers the patches write into
-    # relocated slots (60/90 FPS++ replace function pointers).
+    # relocated slots.
     blob=struct.pack('<8sQQ',b'BBPATCH2',EBOOT_BASE,len(writes))
     for offset,data in writes: blob+=struct.pack('<QQ',offset,len(data))+data
     (a.out/'patches.bin').write_bytes(blob)

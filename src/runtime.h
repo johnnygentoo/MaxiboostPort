@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 #ifndef _WIN32
 #include <setjmp.h>
 /* Recovery point for speculative guest memory reads on this thread (probe.c fault handler). */
@@ -46,6 +47,8 @@ void runtime_thread_attach_main(void);
 int32_t *runtime_errno(void);
 uintptr_t runtime_sema_resolve(const char *name);
 void runtime_sema_report(void);
+uintptr_t runtime_eventflag_resolve(const char *name);
+void runtime_eventflag_report(void);
 unsigned runtime_sema_waiters(uint32_t id);
 uintptr_t runtime_time_resolve(const char *name);
 void runtime_content_configure(const uint32_t values[5]);
@@ -54,6 +57,12 @@ void runtime_content_report(void);
 typedef struct { const char *name; void *function; } RuntimeExport;
 #define RUNTIME_LOOKUP(table, nid) runtime_lookup(table, sizeof(table)/sizeof(*(table)), nid)
 const char *runtime_symbol(const char *nid);
+/* Whether a scoped import ("NID#lib#module") is the one named by scoped: the NIDs are compared,
+ * the library and module letters differ from one executable to another. */
+static inline int runtime_nid_is(const char *name, const char *scoped) {
+    size_t length=strcspn(scoped,"#");
+    return !strncmp(name,scoped,length) && (name[length]=='#' || !name[length]);
+}
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *nid);
 uintptr_t runtime_kernel_resolve(const char *name);
 uintptr_t runtime_file_resolve(const char *name);

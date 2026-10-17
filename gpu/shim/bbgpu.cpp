@@ -378,8 +378,9 @@ extern "C" int bbgpu_handle_fault(void* ucontext, void* address) {
 }
 
 extern "C" void bbgpu_patch_image(unsigned char* image, uint64_t size) {
-    BbGnmHooks::PatchImage(image, size);
-    BbGameMenu::PatchImage(image, size);
+    if (const Game::Profile* profile = Game::Active(); profile && profile->patch_image) {
+        profile->patch_image(image, size);
+    }
 }
 
 extern "C" unsigned bbgpu_symbol_count(void) {

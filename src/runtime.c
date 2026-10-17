@@ -91,6 +91,7 @@ void runtime_report(void) {
     runtime_mutex_report();
     runtime_rwlock_report();
     runtime_sema_report();
+    runtime_eventflag_report();
     runtime_content_report();
     runtime_memory_report();
     runtime_ajm_report();
@@ -205,29 +206,29 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (!(capabilities & 1)) return 0;
     if (is_data) {
         static int32_t need_libc_internal = 1; /* SDK marker variable referenced by Fios2 */
-        if (!strcmp(name, "f7uOxY9mM1U#p#J")) return (uintptr_t)&stack_canary;
-        if (!strcmp(name, "ZT4ODD2Ts9o#libSceLibcInternal")) return (uintptr_t)&need_libc_internal;
+        if (runtime_nid_is(name,"f7uOxY9mM1U#p#J")) return (uintptr_t)&stack_canary;
+        if (runtime_nid_is(name,"ZT4ODD2Ts9o#libSceLibcInternal")) return (uintptr_t)&need_libc_internal;
         return 0;
     }
     /* Exact scoped imports for CUSA03173; the suffix identifies library/module. */
-    if (!strcmp(name, "bzQExy189ZI#q#q")) return (uintptr_t)init_env;
-    if (!strcmp(name, "8G2LB+A3rzg#q#q")) return (uintptr_t)guest_atexit;
-    if (!strcmp(name, "tsvEmnenz48#q#q")) return (uintptr_t)guest_cxa_atexit;
-    if (!strcmp(name, "uMei1W9uyNo#q#q")) return (uintptr_t)guest_libc_exit;
+    if (runtime_nid_is(name,"bzQExy189ZI#q#q")) return (uintptr_t)init_env;
+    if (runtime_nid_is(name,"8G2LB+A3rzg#q#q")) return (uintptr_t)guest_atexit;
+    if (runtime_nid_is(name,"tsvEmnenz48#q#q")) return (uintptr_t)guest_cxa_atexit;
+    if (runtime_nid_is(name,"uMei1W9uyNo#q#q")) return (uintptr_t)guest_libc_exit;
     /* Not imported by the current eboot, exposed for ABI tests/future use. */
-    if (!strcmp(name, "H2e8t5ScQGc#q#q")) return (uintptr_t)guest_finalize;
-    if (!strcmp(name, "3GPpjQdAMTw#q#q")) return (uintptr_t)guard_acquire;
-    if (!strcmp(name, "9rAeANT2tyE#q#q")) return (uintptr_t)guard_release;
-    if (!strcmp(name, "2emaaluWzUw#q#q")) return (uintptr_t)guard_abort;
-    if (!strcmp(name, "Ou3iL1abvng#p#J")) return (uintptr_t)stack_fail;
-    if (!strcmp(name, "8zTFvBIAIN8#q#q")) return (uintptr_t)guest_memset;
-    if (!strcmp(name, "Q3VBxCXhUHs#q#q")) return (uintptr_t)guest_memcpy;
-    if (!strcmp(name, "+P6FRGH4LfA#q#q")) return (uintptr_t)guest_memmove;
-    if (!strcmp(name, "DfivPArhucg#q#q")) return (uintptr_t)guest_memcmp;
-    if (!strcmp(name, "j4ViWNHEgww#q#q")) return (uintptr_t)guest_strlen;
-    if (!strcmp(name, "vNe1w4diLCs#p#J")) return (uintptr_t)guest_tls_get_addr;
-    if (!strcmp(name, "959qrazPIrg#p#J")) return (uintptr_t)guest_procparam;
-    if (!strcmp(name, "p5EcQeEeJAE#p#J")) return (uintptr_t)guest_set_heap_api;
+    if (runtime_nid_is(name,"H2e8t5ScQGc#q#q")) return (uintptr_t)guest_finalize;
+    if (runtime_nid_is(name,"3GPpjQdAMTw#q#q")) return (uintptr_t)guard_acquire;
+    if (runtime_nid_is(name,"9rAeANT2tyE#q#q")) return (uintptr_t)guard_release;
+    if (runtime_nid_is(name,"2emaaluWzUw#q#q")) return (uintptr_t)guard_abort;
+    if (runtime_nid_is(name,"Ou3iL1abvng#p#J")) return (uintptr_t)stack_fail;
+    if (runtime_nid_is(name,"8zTFvBIAIN8#q#q")) return (uintptr_t)guest_memset;
+    if (runtime_nid_is(name,"Q3VBxCXhUHs#q#q")) return (uintptr_t)guest_memcpy;
+    if (runtime_nid_is(name,"+P6FRGH4LfA#q#q")) return (uintptr_t)guest_memmove;
+    if (runtime_nid_is(name,"DfivPArhucg#q#q")) return (uintptr_t)guest_memcmp;
+    if (runtime_nid_is(name,"j4ViWNHEgww#q#q")) return (uintptr_t)guest_strlen;
+    if (runtime_nid_is(name,"vNe1w4diLCs#p#J")) return (uintptr_t)guest_tls_get_addr;
+    if (runtime_nid_is(name,"959qrazPIrg#p#J")) return (uintptr_t)guest_procparam;
+    if (runtime_nid_is(name,"p5EcQeEeJAE#p#J")) return (uintptr_t)guest_set_heap_api;
     uintptr_t mutex = runtime_mutex_resolve(name);
     if (mutex) return mutex;
     uintptr_t thread = runtime_thread_resolve(name);
@@ -236,6 +237,8 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (content) return content;
     uintptr_t timer = runtime_time_resolve(name);
     if (timer) return timer;
+    uintptr_t flag = runtime_eventflag_resolve(name);
+    if (flag) return flag;
     uintptr_t sema = runtime_sema_resolve(name);
     if (sema) return sema;
     uintptr_t rwlock = runtime_rwlock_resolve(name);
@@ -263,10 +266,14 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
 static const struct { const char *nid, *symbol; } import_names[]={
 #include "import_names.inc"
 };
-/* Symbol name for a scoped NID, or NULL when this eboot/libc never imports it. */
+/* Symbol name for a scoped NID ("NID#lib#module"), or NULL when no supported game imports it.
+ * The NID alone decides: it is a hash of the symbol name, while the library and module letters
+ * are indices into each executable's own tables (Bloodborne's libc is #q#q, GODZILLA's #Bi#q). */
 const char *runtime_symbol(const char *nid) {
+    size_t length=strcspn(nid,"#");
     for (size_t i=0;i<sizeof(import_names)/sizeof(*import_names);++i)
-        if (!strcmp(nid,import_names[i].nid)) return import_names[i].symbol;
+        if (!strncmp(nid,import_names[i].nid,length) && import_names[i].nid[length]=='#')
+            return import_names[i].symbol;
     return NULL;
 }
 /* Same symbol name means same contract whether imported from libkernel or

@@ -351,8 +351,14 @@ static int32_t memory_io(void *buffer, uint64_t size, int64_t offset, int write)
 }
 static ABI int32_t memory_get(int32_t user, void *buffer, uint64_t size, int64_t offset) { (void)user; return memory_io(buffer,size,offset,0); }
 static ABI int32_t memory_set(int32_t user, void *buffer, uint64_t size, int64_t offset) { (void)user; return memory_io(buffer,size,offset,1); }
+/* Backups: the PS4 keeps a copy of a save made at unmount, to restore a damaged one. The port's
+ * saves are plain files the user can copy; there is no backup to check or restore. */
+static ABI int32_t backup_none(const void *param) { (void)param; return ERR_NOT_FOUND; }
+static ABI int32_t save_umount_backup(const MountPoint *point) { return save_umount(point); }
 
 static const RuntimeExport exports[]={
+    {"sceSaveDataCheckBackupData",backup_none}, {"sceSaveDataRestoreBackupData",backup_none},
+    {"sceSaveDataUmountWithBackup",save_umount_backup},
     {"sceSaveDataInitialize",save_initialize}, {"sceSaveDataInitialize2",save_initialize},
     {"sceSaveDataInitialize3",save_initialize}, {"sceSaveDataTerminate",save_terminate},
     {"sceSaveDataMount",save_mount}, {"sceSaveDataMount2",save_mount2}, {"sceSaveDataUmount",save_umount},

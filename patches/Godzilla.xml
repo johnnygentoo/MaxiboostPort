@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<!-- gzport's built-in patches for GODZILLA (CUSA02046) 1.01, in the shadPS4/GoldHEN format.
+     Addresses are PS4 virtual addresses (eboot base 0x400000). -->
+<Patch>
+    <TitleID>
+        <ID>CUSA02046</ID>
+    </TitleID>
+</Patch>

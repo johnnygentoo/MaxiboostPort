@@ -120,13 +120,43 @@ static ABI int32_t addon_list(uint32_t service,void *list,uint32_t capacity,uint
     if (count) printf("Runtime: AppContent add-ons reported installed (%s): %u\n",root,(unsigned)count);
     ++lists; return 0;
 }
+/* One add-on by its entitlement label: installed when <user>/addcont/<title>/<label> is a folder. */
+#define ERR_ADDCONT_NOT_FOUND ((int32_t)0x80D90005)
+static ABI int32_t addon_info(uint32_t service_label,const char *label,AddonInfo *info) {
+    (void)service_label;
+    if (!label || !info) return (int32_t)0x80D90002; /* PARAMETER */
+    char root[4096];
+    snprintf(root,sizeof(root),"%s/addcont",runtime_file_user_dir());
+    DIR *titles=opendir(root);
+    int found=0;
+    for (struct dirent *t; titles && !found && (t=readdir(titles));) {
+        if (t->d_name[0]=='.') continue;
+        char path[8192]; struct stat entry;
+        snprintf(path,sizeof(path),"%s/%s/%.16s",root,t->d_name,label);
+        found=!stat(path,&entry) && S_ISDIR(entry.st_mode);
+    }
+    if (titles) closedir(titles);
+    ++queries;
+    if (!found) return ERR_ADDCONT_NOT_FOUND;
+    memset(info,0,sizeof(*info)); memcpy(info->label,label,strnlen(label,LABEL_SIZE-1));
+    info->status=ADDON_INSTALLED;
+    return 0;
+}
+/* Entitlement keys decrypt add-on data, which dumps carry decrypted: no key is needed. */
+static ABI int32_t entitlement_key(uint32_t service_label,const char *label,void *key) {
+    (void)service_label; (void)label;
+    if (key) memset(key,0,16);
+    return ERR_ADDCONT_NOT_FOUND;
+}
 uintptr_t runtime_content_resolve(const char *name) {
-    if (!strcmp(name,"g8cM39EUZ6o#M#N")) return (uintptr_t)module_load;
-    if (!strcmp(name,"fMP5NHUOaMk#M#N")) return (uintptr_t)module_loaded;
-    if (!strcmp(name,"eR2bZFAAU0Q#M#N")) return (uintptr_t)module_unload;
-    if (!strcmp(name,"R9lA82OraNs#c#d")) return (uintptr_t)content_init;
-    if (!strcmp(name,"99b82IKXpH4#c#d")) return (uintptr_t)param_int;
-    if (!strcmp(name,"xnd8BJzAxmk#c#d")) return (uintptr_t)addon_list;
+    if (runtime_nid_is(name,"m47juOmH0VE#G#H")) return (uintptr_t)addon_info;        /* sceAppContentGetAddcontInfo */
+    if (runtime_nid_is(name,"XTWR0UXvcgs#G#H")) return (uintptr_t)entitlement_key;   /* sceAppContentGetEntitlementKey */
+    if (runtime_nid_is(name,"g8cM39EUZ6o#M#N")) return (uintptr_t)module_load;
+    if (runtime_nid_is(name,"fMP5NHUOaMk#M#N")) return (uintptr_t)module_loaded;
+    if (runtime_nid_is(name,"eR2bZFAAU0Q#M#N")) return (uintptr_t)module_unload;
+    if (runtime_nid_is(name,"R9lA82OraNs#c#d")) return (uintptr_t)content_init;
+    if (runtime_nid_is(name,"99b82IKXpH4#c#d")) return (uintptr_t)param_int;
+    if (runtime_nid_is(name,"xnd8BJzAxmk#c#d")) return (uintptr_t)addon_list;
     return 0;
 }
 void runtime_content_report(void) {
