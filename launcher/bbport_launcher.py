@@ -25,6 +25,7 @@ from pathlib import Path
 from bbport_assets import fsr411_problem
 from bbport_i18n import language, set_language, system_game_language, tr
 import bbport_cache
+import bbport_defaults
 import bbport_steam
 import bbport_update
 
@@ -57,6 +58,8 @@ PACKAGED = bool(os.environ.get("BB_PREBUILT"))
 DATA_DIR = Path(os.environ.get("BB_DATA_DIR", PORT_DIR))
 CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "gzport-launcher"
 CONFIG_FILE = CONFIG_DIR / "settings.json"
+# The player's own defaults (bbport_defaults): "Restore my defaults" on the Settings page.
+DEFAULTS_FILE = CONFIG_DIR / "defaults.json"
 MAX_LOG_LINES = 5000
 # The memory model (run.sh: BB_PC_MODEL): "auto" leaves it to the GPU (the new one on AMD, the
 # 0.3 one elsewhere), or either by hand. The new one goes through the layer's memory module on
@@ -192,6 +195,8 @@ INI_DEFAULTS = {
     "pad_invert_look_y": "0",
     **{key: "1" if default else "0" for key, _, default in GAME_PATCHES},
 }
+# Kept when the built-in defaults are restored (no defaults.json): where the player's things are.
+KEPT_ON_BUILTIN_RESTORE = ("game_dir", "user_dir", "dlc_dir", "patches_dir", "trophy_key")
 
 
 def load_settings():
@@ -231,23 +236,7 @@ def load_ini():
 def save_ini(values, lines):
     """Rewrites the edited keys in place, appends missing ones, keeps comments and others; a key
     whose value is None is removed (a control binding back to its default)."""
-    written = set()
-    out = []
-    for line in lines:
-        if "=" in line and not line.lstrip().startswith("#"):
-            key = line.split("=", 1)[0].strip()
-            if key in values:
-                if values[key] is not None:
-                    out.append(f"{key}={values[key]}")
-                written.add(key)
-                continue
-        out.append(line)
-    if not lines:
-        out.append("# bbport settings (in-game menu: Insert / L3+R3)")
-    for key, value in values.items():
-        if key not in written and value is not None:
-            out.append(f"{key}={value}")
-    ini_path().write_text("\n".join(out) + "\n", encoding="utf-8")
+    ini_path().write_text("\n".join(bbport_defaults.ini_lines(values, lines)) + "\n", encoding="utf-8")
 
 
 def patches_dir(settings):
@@ -1033,6 +1022,22 @@ class LauncherWindow(Adw.ApplicationWindow):
                                       text=self.settings["extra_env"])
         dev.add(self.extra_row)
         page.add(dev)
+
+        # The player's own defaults (defaults.json), else the built-in ones.
+        defaults = Adw.PreferencesGroup(title=tr("Настройки по умолчанию"))
+        self.restore_defaults_row = Adw.ActionRow(title=tr("Восстановить мои настройки по умолчанию"))
+        restore_button = Gtk.Button(label=tr("Вернуть"), valign=Gtk.Align.CENTER)
+        restore_button.connect("clicked", self.on_restore_defaults)
+        self.restore_defaults_row.add_suffix(restore_button)
+        defaults.add(self.restore_defaults_row)
+        save_defaults = Adw.ActionRow(title=tr("Сохранить текущие как мои настройки по умолчанию"),
+                                      subtitle=tr("Настройки лаунчера и bbport.ini, без назначений кнопок"))
+        save_button = Gtk.Button(label=tr("Сохранить"), valign=Gtk.Align.CENTER)
+        save_button.connect("clicked", self.on_save_defaults)
+        save_defaults.add_suffix(save_button)
+        defaults.add(save_defaults)
+        self.show_defaults()
+        page.add(defaults)
         return page
 
     def on_ui_language(self, row, _param):
@@ -1484,6 +1489,81 @@ class LauncherWindow(Adw.ApplicationWindow):
 
     def environment(self):
         return game_environment(self.settings)
+
+    # --- defaults ------------------------------------------------------------------------
+
+    def show_defaults(self):
+        """Where a restore takes the settings from: defaults.json, else the built-in ones."""
+        self.restore_defaults_row.set_subtitle(
+            tr("Из {}").format(DEFAULTS_FILE) if DEFAULTS_FILE.is_file() else
+            tr("Своих настроек по умолчанию пока нет: восстанавливаются встроенные (папки и ключ "
+               "трофеев не меняются)"))
+
+    def on_restore_defaults(self, _button):
+        if self.process is not None:
+            self.alert(tr("Восстановить мои настройки по умолчанию"), tr("Сначала закройте игру"))
+            return
+        try:
+            defaults = bbport_defaults.load(DEFAULTS_FILE)
+        except (OSError, ValueError) as error:
+            self.alert(tr("Не удалось прочитать {}").format(DEFAULTS_FILE), str(error))
+            return
+        dialog = Adw.AlertDialog(heading=tr("Восстановить настройки по умолчанию?"), body=tr(
+            "Настройки лаунчера и bbport.ini станут такими, как в {}. Остальные строки bbport.ini, "
+            "в том числе назначения кнопок, не меняются").format(DEFAULTS_FILE)
+            if defaults is not None else tr(
+            "Своих настроек по умолчанию нет: настройки лаунчера и bbport.ini станут встроенными. "
+            "Папки, ключ трофеев и назначения кнопок не меняются"))
+        dialog.add_response("cancel", tr("Отмена"))
+        dialog.add_response("restore", tr("Вернуть"))
+        dialog.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
+
+        def answered(_dialog, response):
+            if response == "restore" and self.process is None:
+                self.restore_defaults(defaults)
+
+        dialog.connect("response", answered)
+        dialog.present(self)
+
+    def restore_defaults(self, defaults):
+        """Writes the defaults (None: the built-in ones) into settings.json and bbport.ini, then
+        rebuilds the window from them: every row shows the restored value, so the next store()
+        reads it back instead of the value the row had before."""
+        self.store()  # what the rows show, for the keys the defaults do not name
+        self.settings, ini = bbport_defaults.restore(self.settings, defaults, DEFAULTS, INI_DEFAULTS,
+                                                     KEPT_ON_BUILTIN_RESTORE)
+        save_settings(self.settings)
+        self.ini.update(ini)
+        save_ini(self.ini, self.ini_lines)
+        self.ini, self.ini_lines = load_ini()
+        set_language(self.settings.get("ui_language", ""))
+        self.build()
+        self.toasts.add_toast(Adw.Toast(title=tr("Настройки по умолчанию восстановлены")))
+
+    def on_save_defaults(self, _button):
+        dialog = Adw.AlertDialog(heading=tr("Сохранить текущие настройки как свои по умолчанию?"),
+                                 body=tr("Они запишутся в {} вместо прежних, и «Вернуть» будет "
+                                         "восстанавливать их").format(DEFAULTS_FILE))
+        dialog.add_response("cancel", tr("Отмена"))
+        dialog.add_response("save", tr("Сохранить"))
+        dialog.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
+
+        def answered(_dialog, response):
+            if response != "save":
+                return
+            self.store()
+            # The launcher's settings and the bbport.ini keys it edits (INI_DEFAULTS).
+            try:
+                bbport_defaults.save(DEFAULTS_FILE, {key: self.settings[key] for key in DEFAULTS},
+                                     {key: self.ini[key] for key in INI_DEFAULTS})
+            except OSError as error:
+                self.alert(tr("Не удалось сохранить {}").format(DEFAULTS_FILE), str(error))
+                return
+            self.show_defaults()
+            self.toasts.add_toast(Adw.Toast(title=tr("Текущие настройки сохранены как ваши по умолчанию")))
+
+        dialog.connect("response", answered)
+        dialog.present(self)
 
     # --- Steam ---------------------------------------------------------------------------
 

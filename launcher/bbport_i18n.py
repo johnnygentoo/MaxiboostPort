@@ -709,6 +709,40 @@ EN = {
         'Touchpad, left half',
     'Тачпад, правая половина':
         'Touchpad, right half',
+    'Настройки по умолчанию':
+        'Defaults',
+    'Восстановить мои настройки по умолчанию':
+        'Restore my defaults',
+    'Вернуть':
+        'Restore',
+    'Сохранить текущие как мои настройки по умолчанию':
+        'Save current as my defaults',
+    'Настройки лаунчера и bbport.ini, без назначений кнопок':
+        "The launcher's and bbport.ini's settings, without button bindings",
+    'Сохранить':
+        'Save',
+    'Из {}':
+        'From {}',
+    'Своих настроек по умолчанию пока нет: восстанавливаются встроенные (папки и ключ трофеев не меняются)':
+        'No defaults of your own yet: the built-in ones are restored (folders and the trophy key stay)',
+    'Не удалось прочитать {}':
+        'Could not read {}',
+    'Восстановить настройки по умолчанию?':
+        'Restore the defaults?',
+    'Настройки лаунчера и bbport.ini станут такими, как в {}. Остальные строки bbport.ini, в том числе назначения кнопок, не меняются':
+        "The launcher's and bbport.ini's settings become those in {}. The other lines of bbport.ini, button bindings included, stay as they are",
+    'Своих настроек по умолчанию нет: настройки лаунчера и bbport.ini станут встроенными. Папки, ключ трофеев и назначения кнопок не меняются':
+        "No defaults of your own: the launcher's and bbport.ini's settings become the built-in ones. Folders, the trophy key and button bindings stay as they are",
+    'Настройки по умолчанию восстановлены':
+        'Defaults restored',
+    'Сохранить текущие настройки как свои по умолчанию?':
+        'Save the current settings as your defaults?',
+    'Они запишутся в {} вместо прежних, и «Вернуть» будет восстанавливать их':
+        'They are written to {}, replacing the previous ones, and “Restore” brings them back',
+    'Не удалось сохранить {}':
+        'Could not save {}',
+    'Текущие настройки сохранены как ваши по умолчанию':
+        'Current settings saved as your defaults',
 }
 
 PT_BR = {
@@ -1472,6 +1506,40 @@ PT_BR = {
         'Touchpad, metade esquerda',
     'Тачпад, правая половина':
         'Touchpad, metade direita',
+    'Настройки по умолчанию':
+        'Padrões',
+    'Восстановить мои настройки по умолчанию':
+        'Restaurar meus padrões',
+    'Вернуть':
+        'Restaurar',
+    'Сохранить текущие как мои настройки по умолчанию':
+        'Salvar as atuais como meus padrões',
+    'Настройки лаунчера и bbport.ini, без назначений кнопок':
+        'Configurações do launcher e do bbport.ini, sem os mapeamentos de botões',
+    'Сохранить':
+        'Salvar',
+    'Из {}':
+        'De {}',
+    'Своих настроек по умолчанию пока нет: восстанавливаются встроенные (папки и ключ трофеев не меняются)':
+        'Você ainda não tem padrões próprios: os padrões internos são restaurados (as pastas e a chave de troféus ficam)',
+    'Не удалось прочитать {}':
+        'Não foi possível ler {}',
+    'Восстановить настройки по умолчанию?':
+        'Restaurar os padrões?',
+    'Настройки лаунчера и bbport.ini станут такими, как в {}. Остальные строки bbport.ini, в том числе назначения кнопок, не меняются':
+        'As configurações do launcher e do bbport.ini passam a ser as de {}. As outras linhas do bbport.ini, incluindo os mapeamentos de botões, não mudam',
+    'Своих настроек по умолчанию нет: настройки лаунчера и bbport.ini станут встроенными. Папки, ключ трофеев и назначения кнопок не меняются':
+        'Você não tem padrões próprios: as configurações do launcher e do bbport.ini voltam às internas. As pastas, a chave de troféus e os mapeamentos de botões não mudam',
+    'Настройки по умолчанию восстановлены':
+        'Padrões restaurados',
+    'Сохранить текущие настройки как свои по умолчанию?':
+        'Salvar as configurações atuais como seus padrões?',
+    'Они запишутся в {} вместо прежних, и «Вернуть» будет восстанавливать их':
+        'Elas são gravadas em {} no lugar das anteriores, e “Restaurar” volta a elas',
+    'Не удалось сохранить {}':
+        'Não foi possível salvar {}',
+    'Текущие настройки сохранены как ваши по умолчанию':
+        'Configurações atuais salvas como seus padrões',
 }
 
 
@@ -2146,6 +2214,40 @@ ES = {
         'Panel táctil, mitad izquierda',
     'Тачпад, правая половина':
         'Panel táctil, mitad derecha',
+    'Настройки по умолчанию':
+        'Valores predeterminados',
+    'Восстановить мои настройки по умолчанию':
+        'Restaurar mis valores predeterminados',
+    'Вернуть':
+        'Restaurar',
+    'Сохранить текущие как мои настройки по умолчанию':
+        'Guardar los actuales como mis valores predeterminados',
+    'Настройки лаунчера и bbport.ini, без назначений кнопок':
+        'Ajustes del launcher y de bbport.ini, sin las asignaciones de botones',
+    'Сохранить':
+        'Guardar',
+    'Из {}':
+        'De {}',
+    'Своих настроек по умолчанию пока нет: восстанавливаются встроенные (папки и ключ трофеев не меняются)':
+        'Aún no tienes valores predeterminados propios: se restauran los integrados (las carpetas y la clave de trofeos se mantienen)',
+    'Не удалось прочитать {}':
+        'No se pudo leer {}',
+    'Восстановить настройки по умолчанию?':
+        '¿Restaurar los valores predeterminados?',
+    'Настройки лаунчера и bbport.ini станут такими, как в {}. Остальные строки bbport.ini, в том числе назначения кнопок, не меняются':
+        'Los ajustes del launcher y de bbport.ini pasan a ser los de {}. Las demás líneas de bbport.ini, incluidas las asignaciones de botones, no cambian',
+    'Своих настроек по умолчанию нет: настройки лаунчера и bbport.ini станут встроенными. Папки, ключ трофеев и назначения кнопок не меняются':
+        'No tienes valores predeterminados propios: los ajustes del launcher y de bbport.ini vuelven a los integrados. Las carpetas, la clave de trofeos y las asignaciones de botones no cambian',
+    'Настройки по умолчанию восстановлены':
+        'Valores predeterminados restaurados',
+    'Сохранить текущие настройки как свои по умолчанию?':
+        '¿Guardar los ajustes actuales como tus valores predeterminados?',
+    'Они запишутся в {} вместо прежних, и «Вернуть» будет восстанавливать их':
+        'Se escriben en {} en lugar de los anteriores, y «Restaurar» vuelve a ellos',
+    'Не удалось сохранить {}':
+        'No se pudo guardar {}',
+    'Текущие настройки сохранены как ваши по умолчанию':
+        'Ajustes actuales guardados como tus valores predeterminados',
 }
 
 
@@ -2820,6 +2922,40 @@ IT = {
         'Touchpad, metà sinistra',
     'Тачпад, правая половина':
         'Touchpad, metà destra',
+    'Настройки по умолчанию':
+        'Predefiniti',
+    'Восстановить мои настройки по умолчанию':
+        'Ripristina i miei predefiniti',
+    'Вернуть':
+        'Ripristina',
+    'Сохранить текущие как мои настройки по умолчанию':
+        'Salva le attuali come miei predefiniti',
+    'Настройки лаунчера и bbport.ini, без назначений кнопок':
+        'Impostazioni del launcher e di bbport.ini, senza le assegnazioni dei tasti',
+    'Сохранить':
+        'Salva',
+    'Из {}':
+        'Da {}',
+    'Своих настроек по умолчанию пока нет: восстанавливаются встроенные (папки и ключ трофеев не меняются)':
+        'Non hai ancora predefiniti tuoi: vengono ripristinati quelli integrati (le cartelle e la chiave dei trofei restano)',
+    'Не удалось прочитать {}':
+        'Impossibile leggere {}',
+    'Восстановить настройки по умолчанию?':
+        'Ripristinare i predefiniti?',
+    'Настройки лаунчера и bbport.ini станут такими, как в {}. Остальные строки bbport.ini, в том числе назначения кнопок, не меняются':
+        'Le impostazioni del launcher e di bbport.ini diventano quelle di {}. Le altre righe di bbport.ini, comprese le assegnazioni dei tasti, non cambiano',
+    'Своих настроек по умолчанию нет: настройки лаунчера и bbport.ini станут встроенными. Папки, ключ трофеев и назначения кнопок не меняются':
+        'Non hai predefiniti tuoi: le impostazioni del launcher e di bbport.ini tornano a quelle integrate. Le cartelle, la chiave dei trofei e le assegnazioni dei tasti non cambiano',
+    'Настройки по умолчанию восстановлены':
+        'Predefiniti ripristinati',
+    'Сохранить текущие настройки как свои по умолчанию?':
+        'Salvare le impostazioni attuali come tuoi predefiniti?',
+    'Они запишутся в {} вместо прежних, и «Вернуть» будет восстанавливать их':
+        'Vengono scritte in {} al posto delle precedenti, e «Ripristina» le riporta',
+    'Не удалось сохранить {}':
+        'Impossibile salvare {}',
+    'Текущие настройки сохранены как ваши по умолчанию':
+        'Impostazioni attuali salvate come tuoi predefiniti',
 }
 
 
@@ -3494,6 +3630,40 @@ FR = {
         'Pavé tactile, moitié gauche',
     'Тачпад, правая половина':
         'Pavé tactile, moitié droite',
+    'Настройки по умолчанию':
+        'Valeurs par défaut',
+    'Восстановить мои настройки по умолчанию':
+        'Restaurer mes valeurs par défaut',
+    'Вернуть':
+        'Restaurer',
+    'Сохранить текущие как мои настройки по умолчанию':
+        'Enregistrer les réglages actuels comme mes valeurs par défaut',
+    'Настройки лаунчера и bbport.ini, без назначений кнопок':
+        'Réglages du lanceur et de bbport.ini, sans les affectations des boutons',
+    'Сохранить':
+        'Enregistrer',
+    'Из {}':
+        'Depuis {}',
+    'Своих настроек по умолчанию пока нет: восстанавливаются встроенные (папки и ключ трофеев не меняются)':
+        'Pas encore de valeurs par défaut personnelles : les valeurs intégrées sont restaurées (les dossiers et la clé des trophées restent)',
+    'Не удалось прочитать {}':
+        'Impossible de lire {}',
+    'Восстановить настройки по умолчанию?':
+        'Restaurer les valeurs par défaut ?',
+    'Настройки лаунчера и bbport.ini станут такими, как в {}. Остальные строки bbport.ini, в том числе назначения кнопок, не меняются':
+        'Les réglages du lanceur et de bbport.ini deviennent ceux de {}. Les autres lignes de bbport.ini, affectations des boutons comprises, ne changent pas',
+    'Своих настроек по умолчанию нет: настройки лаунчера и bbport.ini станут встроенными. Папки, ключ трофеев и назначения кнопок не меняются':
+        'Pas de valeurs par défaut personnelles : les réglages du lanceur et de bbport.ini reviennent aux valeurs intégrées. Les dossiers, la clé des trophées et les affectations des boutons ne changent pas',
+    'Настройки по умолчанию восстановлены':
+        'Valeurs par défaut restaurées',
+    'Сохранить текущие настройки как свои по умолчанию?':
+        'Enregistrer les réglages actuels comme vos valeurs par défaut ?',
+    'Они запишутся в {} вместо прежних, и «Вернуть» будет восстанавливать их':
+        'Ils sont écrits dans {} à la place des précédents, et « Restaurer » y revient',
+    'Не удалось сохранить {}':
+        "Impossible d'enregistrer {}",
+    'Текущие настройки сохранены как ваши по умолчанию':
+        'Réglages actuels enregistrés comme vos valeurs par défaut',
 }
 
 
@@ -4168,6 +4338,40 @@ DE = {
         'Touchpad, linke Hälfte',
     'Тачпад, правая половина':
         'Touchpad, rechte Hälfte',
+    'Настройки по умолчанию':
+        'Standardwerte',
+    'Восстановить мои настройки по умолчанию':
+        'Meine Standardwerte wiederherstellen',
+    'Вернуть':
+        'Wiederherstellen',
+    'Сохранить текущие как мои настройки по умолчанию':
+        'Aktuelle als meine Standardwerte speichern',
+    'Настройки лаунчера и bbport.ini, без назначений кнопок':
+        'Einstellungen des Launchers und der bbport.ini, ohne Tastenbelegungen',
+    'Сохранить':
+        'Speichern',
+    'Из {}':
+        'Aus {}',
+    'Своих настроек по умолчанию пока нет: восстанавливаются встроенные (папки и ключ трофеев не меняются)':
+        'Noch keine eigenen Standardwerte: die eingebauten werden wiederhergestellt (Ordner und Trophäenschlüssel bleiben)',
+    'Не удалось прочитать {}':
+        '{} konnte nicht gelesen werden',
+    'Восстановить настройки по умолчанию?':
+        'Standardwerte wiederherstellen?',
+    'Настройки лаунчера и bbport.ini станут такими, как в {}. Остальные строки bbport.ini, в том числе назначения кнопок, не меняются':
+        'Die Einstellungen des Launchers und der bbport.ini werden zu denen aus {}. Die übrigen Zeilen der bbport.ini, Tastenbelegungen eingeschlossen, bleiben unverändert',
+    'Своих настроек по умолчанию нет: настройки лаунчера и bbport.ini станут встроенными. Папки, ключ трофеев и назначения кнопок не меняются':
+        'Keine eigenen Standardwerte: die Einstellungen des Launchers und der bbport.ini werden auf die eingebauten gesetzt. Ordner, Trophäenschlüssel und Tastenbelegungen bleiben unverändert',
+    'Настройки по умолчанию восстановлены':
+        'Standardwerte wiederhergestellt',
+    'Сохранить текущие настройки как свои по умолчанию?':
+        'Aktuelle Einstellungen als Ihre Standardwerte speichern?',
+    'Они запишутся в {} вместо прежних, и «Вернуть» будет восстанавливать их':
+        'Sie werden in {} anstelle der bisherigen gespeichert, und „Wiederherstellen“ kehrt zu ihnen zurück',
+    'Не удалось сохранить {}':
+        '{} konnte nicht gespeichert werden',
+    'Текущие настройки сохранены как ваши по умолчанию':
+        'Aktuelle Einstellungen als Ihre Standardwerte gespeichert',
 }
 
 
@@ -4785,6 +4989,40 @@ ZH_CN = {
         '触摸板左侧',
     'Тачпад, правая половина':
         '触摸板右侧',
+    'Настройки по умолчанию':
+        '默认设置',
+    'Восстановить мои настройки по умолчанию':
+        '恢复我的默认设置',
+    'Вернуть':
+        '恢复',
+    'Сохранить текущие как мои настройки по умолчанию':
+        '将当前设置保存为我的默认设置',
+    'Настройки лаунчера и bbport.ini, без назначений кнопок':
+        '启动器和 bbport.ini 的设置，不含按键映射',
+    'Сохранить':
+        '保存',
+    'Из {}':
+        '来自 {}',
+    'Своих настроек по умолчанию пока нет: восстанавливаются встроенные (папки и ключ трофеев не меняются)':
+        '尚无自己的默认设置：将恢复内置默认值（文件夹和奖杯密钥保持不变）',
+    'Не удалось прочитать {}':
+        '无法读取 {}',
+    'Восстановить настройки по умолчанию?':
+        '恢复默认设置？',
+    'Настройки лаунчера и bbport.ini станут такими, как в {}. Остальные строки bbport.ini, в том числе назначения кнопок, не меняются':
+        '启动器和 bbport.ini 的设置将变为 {} 中的设置。bbport.ini 的其他行（包括按键映射）保持不变',
+    'Своих настроек по умолчанию нет: настройки лаунчера и bbport.ini станут встроенными. Папки, ключ трофеев и назначения кнопок не меняются':
+        '没有自己的默认设置：启动器和 bbport.ini 的设置将恢复为内置默认值。文件夹、奖杯密钥和按键映射保持不变',
+    'Настройки по умолчанию восстановлены':
+        '已恢复默认设置',
+    'Сохранить текущие настройки как свои по умолчанию?':
+        '将当前设置保存为您的默认设置？',
+    'Они запишутся в {} вместо прежних, и «Вернуть» будет восстанавливать их':
+        '它们将写入 {} 并替换之前的设置，“恢复”会回到这些设置',
+    'Не удалось сохранить {}':
+        '无法保存 {}',
+    'Текущие настройки сохранены как ваши по умолчанию':
+        '当前设置已保存为您的默认设置',
 }
 
 # Translations by language code; Russian is the key itself. Strings missing in a translation
