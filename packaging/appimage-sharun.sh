@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Builds dist/GODZILLA-gzport-x86_64.AppImage without Nix: the port's current build (run
+# Builds dist/GUNDAM-VERSUS-gvport-x86_64.AppImage without Nix: the port's current build (run
 # build.sh first), its scripts and the GTK4 launcher, with every library they load (glibc, Python
 # and PyGObject, GTK 4, libadwaita, SDL3, FFmpeg, Mesa's Vulkan drivers) collected from this
 # system by quick-sharun (github.com/pkgforge-dev/Anylinux-AppImages). The AppImage then runs on
 # other distributions too; build it on an up-to-date Arch Linux (or CachyOS) with the launcher's
 # dependencies installed. NVIDIA's driver comes from the host at run time.
 # Running it opens the launcher; `--play` starts the game with the launcher's saved settings.
-# Data (generated files, saves, bbport.ini): ~/.local/share/gzport (BB_DATA_DIR), apart from a
+# Data (generated files, saves, bbport.ini): ~/.local/share/gvport (BB_DATA_DIR), apart from a
 # Bloodborne port's ~/.local/share/bbport.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/.."
@@ -58,7 +58,7 @@ find "$d" -name __pycache__ -type d -prune -exec rm -rf {} +
 ln -s ../../bin "$d/bin"
 
 # The AppImage's main program: the launcher (or, with --play, the game alone).
-cat > "$appdir/bin/godzilla" <<'EOF'
+cat > "$appdir/bin/gundam" <<'EOF'
 #!/bin/sh
 # Entry point of the AppImage (AppRun runs it with APPDIR set and APPDIR/bin first on PATH).
 export BB_PREBUILT=1
@@ -68,7 +68,7 @@ export BB_DLSS_DIR="$APPDIR/share/bbport/dlss"
 export BB_NET_MODULE="$APPDIR/share/bbport/net/libbbnet.so"
 [ -x "$APPDIR/bin/bbbridge-cli" ] && export BB_BRIDGE_CLI="$APPDIR/bin/bbbridge-cli"
 [ -x "$APPDIR/bin/pkgextract" ] && export BB_PKGEXTRACT="$APPDIR/bin/pkgextract"
-export BB_DATA_DIR="${BB_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/gzport}"
+export BB_DATA_DIR="${BB_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/gvport}"
 mkdir -p "$BB_DATA_DIR"
 # deadinside28#172: Steam's Game Mode runs a non-Steam game in pressure-vessel, which points
 # Vulkan at its own driver and layer manifests. They are not the user's choice: dropped (kept as
@@ -84,13 +84,13 @@ done
 [ -n "${pressure_vessel-}" ] && export DISABLE_GAMESCOPE_WSI=1
 exec "$APPDIR/bin/python3" "$APPDIR/share/bbport/launcher/bbport_launcher.py" "$@"
 EOF
-chmod +x "$appdir/bin/godzilla"
-sed -e 's|@LAUNCHER@|godzilla|' -e 's|@ICON@|godzilla|' \
-    launcher/io.github.gzport.Launcher.desktop.in > "$work/godzilla.desktop"
-# The AppImage's icon: the launcher's own (launcher/godzilla.svg), as a PNG when librsvg can draw it.
-icon=$root/launcher/godzilla.svg
+chmod +x "$appdir/bin/gundam"
+sed -e 's|@LAUNCHER@|gundam|' -e 's|@ICON@|gundam|' \
+    launcher/io.github.gvport.Launcher.desktop.in > "$work/gundam.desktop"
+# The AppImage's icon: the launcher's own (launcher/gundam.svg), as a PNG when librsvg can draw it.
+icon=$root/launcher/gundam.svg
 if command -v rsvg-convert >/dev/null; then
-    rsvg-convert -w 256 -h 256 "$icon" -o "$work/godzilla.png" && icon=$work/godzilla.png
+    rsvg-convert -w 256 -h 256 "$icon" -o "$work/gundam.png" && icon=$work/gundam.png
 fi
 
 # GTK, libadwaita and their typelibs are loaded by PyGObject at run time (not linked): named here.
@@ -101,7 +101,7 @@ pydyn=$(python3 -c 'import sysconfig; print(sysconfig.get_path("platstdlib"))')/
 pil=$(python3 -c 'import os, PIL; print(os.path.dirname(PIL.__file__))')
 cd "$work"
 export APPDIR=$appdir TMPDIR=$work/tmp OUTPATH=$work
-export MAIN_BIN=godzilla DESKTOP=$work/godzilla.desktop ICON=$icon
+export MAIN_BIN=gundam DESKTOP=$work/gundam.desktop ICON=$icon
 export DEPLOY_PYTHON=1 DEPLOY_GTK=1 GTK_DIR=gtk-4.0 DEPLOY_SDL=1 DEPLOY_VULKAN=1 DEPLOY_PIPEWIRE=1
 # Strace mode starts the programs to find what they dlopen: the game needs its game files.
 export STRACE_MODE=0
@@ -158,5 +158,5 @@ done
 "$quick" --make-appimage
 
 mkdir -p "$root/dist"
-mv -f "$work"/*.AppImage "$root/dist/GODZILLA-gzport-x86_64.AppImage"
-ls -lh "$root/dist/GODZILLA-gzport-x86_64.AppImage"
+mv -f "$work"/*.AppImage "$root/dist/GUNDAM-VERSUS-gvport-x86_64.AppImage"
+ls -lh "$root/dist/GUNDAM-VERSUS-gvport-x86_64.AppImage"

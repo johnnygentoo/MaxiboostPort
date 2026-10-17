@@ -542,7 +542,7 @@ int main(int argc, char **argv) {
     if (fread(image, 1, size, f) != size || fgetc(f) != EOF) fail("incorrect memory image size");
     fclose(f);
     if (!cpu_only) {
-        char title[128]="GODZILLA", serial[16]="UNKNOWN", sfo[4096];
+        char title[128]="GUNDAM VERSUS", serial[16]="UNKNOWN", sfo[4096];
         uint32_t attributes=0;
         snprintf(sfo,sizeof(sfo),"%s/sce_sys/param.sfo",app0 ? app0 : ".");
         sfo_value(sfo,"TITLE",title,sizeof(title),NULL);

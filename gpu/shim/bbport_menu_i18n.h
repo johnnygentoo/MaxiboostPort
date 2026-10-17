@@ -17,13 +17,13 @@ inline const char* MenuTranslation(MenuLanguage language, const char* english) {
     static constexpr int First = int(MenuLanguage::Spanish);
     using Row = std::array<const char*, int(MenuLanguage::Count) - First>;
     static const std::unordered_map<std::string_view, Row> table{
-    {"GODZILLA - Graphics  (Insert / L3+R3)###bbport_settings",
-     {"GODZILLA - Gráficos  (Insert / L3+R3)###bbport_settings",
-      "GODZILLA - Grafica  (Insert / L3+R3)###bbport_settings",
-      "GODZILLA - Graphismes  (Insert / L3+R3)###bbport_settings",
-      "GODZILLA - Grafik  (Insert / L3+R3)###bbport_settings",
-      "GODZILLA - Gráficos  (Insert / L3+R3)###bbport_settings",
-      "GODZILLA - 图形  (Insert / L3+R3)###bbport_settings"}},
+    {"GUNDAM VERSUS - Graphics  (Insert / L3+R3)###bbport_settings",
+     {"GUNDAM VERSUS - Gráficos  (Insert / L3+R3)###bbport_settings",
+      "GUNDAM VERSUS - Grafica  (Insert / L3+R3)###bbport_settings",
+      "GUNDAM VERSUS - Graphismes  (Insert / L3+R3)###bbport_settings",
+      "GUNDAM VERSUS - Grafik  (Insert / L3+R3)###bbport_settings",
+      "GUNDAM VERSUS - Gráficos  (Insert / L3+R3)###bbport_settings",
+      "GUNDAM VERSUS - 图形  (Insert / L3+R3)###bbport_settings"}},
     {"You have earned a trophy.",
      {"Has conseguido un trofeo.",
       "Hai ottenuto un trofeo.",

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=GUNDAM VERSUS
+GenericName=gvport launcher
+Comment=Launcher for gvport, the native Linux port of GUNDAM VERSUS (PS4)
+Exec=@LAUNCHER@
+Path=@PATH@
+Icon=@ICON@
+Terminal=false
+Categories=Game;
+Keywords=Gundam;Versus;gvport;PS4;mecha;
+StartupWMClass=io.github.gvport.Launcher
