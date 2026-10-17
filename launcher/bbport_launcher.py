@@ -181,7 +181,8 @@ DEFAULTS = {
 
 # bbport.ini keys the launcher edits; the rest of the file is kept.
 INI_DEFAULTS = {
-    "upscaler": "fsr4",
+    # Off while this game's frame is not mapped for them (UPSCALERS_AVAILABLE).
+    "upscaler": "fsr4" if UPSCALERS_AVAILABLE else "off",
     "preset": "4",
     "sharpen": "1",
     "sharpness": "0.50",
@@ -1472,7 +1473,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.save_patch_profile()
         save_settings(s)
         self.ini.update({
-            "upscaler": combo_value(self.upscaler_row),
+            "upscaler": combo_value(self.upscaler_row) if UPSCALERS_AVAILABLE else "off",
             "preset": str(combo_value(self.preset_row)),
             "sharpen": "1" if self.sharpen_row.get_active() else "0",
             "sharpness": f"{self.sharpness_row.get_value():.2f}",
