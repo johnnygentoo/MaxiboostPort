@@ -3,23 +3,11 @@ import os
 import struct
 import tempfile
 import unittest
-import zlib
 from pathlib import Path
 from unittest import mock
 
 import game_check
 from test_prepare import fixture
-
-
-def dcx(payload, packed=None):
-    """A DFLT .dcx file as the game's (sizes big-endian, zlib data at 0x4C)."""
-    packed = zlib.compress(payload) if packed is None else packed
-    header = bytearray(0x4C)
-    header[0:4], header[0x18:0x1C], header[0x24:0x28], header[0x28:0x2C] = (
-        b'DCX\0', b'DCS\0', b'DCP\0', b'DFLT')
-    struct.pack_into('>II', header, 0x1C, len(payload), len(packed))
-    header[0x44:0x48] = b'DCA\0'
-    return bytes(header) + packed
 
 
 def param_sfo(entries):
@@ -39,11 +27,15 @@ def param_sfo(entries):
 
 
 class GameCheckTests(unittest.TestCase):
-    def game(self, title, version, eboot=None):
+    def game(self, title, version, eboot=None, files=True):
         path = Path(self.tmp.name)
         (path / 'sce_sys').mkdir(exist_ok=True)
         (path / 'sce_sys/param.sfo').write_bytes(param_sfo({'APP_VER': version, 'TITLE_ID': title}))
         (path / 'eboot.bin').write_bytes(fixture() if eboot is None else eboot)
+        if files:
+            (path / 'system.pac').write_bytes(b'pac')
+            (path / 'game_en.pac').write_bytes(b'pac')
+            (path / 'sound').mkdir(exist_ok=True)
         return path
 
     def setUp(self):
@@ -53,72 +45,42 @@ class GameCheckTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_base_game_without_the_update(self):
-        self.assertEqual(game_check.problem(self.game('CUSA03173', '01.00')),
-                         ('missing_update', 'CUSA03173', '01.00'))
+    def test_base_game_by_its_version(self):
+        self.assertEqual(game_check.problem(self.game('CUSA02046', '01.00')),
+                         ('missing_update', 'CUSA02046', '01.00'))
+
+    def test_base_game_by_its_executable(self):
+        game = self.game('CUSA02046', '01.01')
+        with mock.patch.object(game_check, 'BASE_IMAGE', game_check.image_sha256(game)):
+            self.assertEqual(game_check.problem(game)[0], 'missing_update')
 
     def test_update_metadata_with_an_old_executable(self):
-        self.assertEqual(game_check.problem(self.game('CUSA03173', '01.09'))[0], 'wrong_eboot')
+        self.assertEqual(game_check.problem(self.game('CUSA02046', '01.01'))[0], 'wrong_eboot')
 
-    def test_every_retail_base_game_without_the_update(self):
-        for title in game_check.SUPPORTED_TITLES:
-            with self.subTest(title=title):
-                self.assertEqual(game_check.problem(self.game(title, '01.00'))[0], 'missing_update')
-
-    def test_other_edition(self):
-        # The EU alpha test: not a retail release.
-        self.assertEqual(game_check.problem(self.game('CUSA01322', '01.09'))[0], 'other_title')
+    def test_other_title(self):
+        self.assertEqual(game_check.problem(self.game('CUSA03173', '01.09'))[0], 'other_title')
 
     def test_unreadable_executable(self):
-        self.assertEqual(game_check.problem(self.game('CUSA03173', '01.09', b'junk'))[0], 'unreadable')
+        self.assertEqual(game_check.problem(self.game('CUSA02046', '01.01', b'junk'))[0], 'unreadable')
 
     def test_supported_image_passes(self):
-        game = self.game('CUSA03173', '01.09')
+        game = self.game('CUSA02046', '01.01')
         with mock.patch.object(game_check, 'SUPPORTED_IMAGE', game_check.image_sha256(game)):
             self.assertIsNone(game_check.problem(game))
 
-    def shaders(self, game, data):
-        folder = game / game_check.CHECKED_FOLDER
-        folder.mkdir(parents=True, exist_ok=True)
-        (folder / 'gxshader.shaderbnd.dcx').write_bytes(data)
-
-    def test_intact_shaders_pass(self):
-        game = self.game('CUSA03173', '01.09')
-        self.shaders(game, dcx(bytes(range(256)) * 64))
-        with mock.patch.object(game_check, 'SUPPORTED_IMAGE', game_check.image_sha256(game)):
-            self.assertIsNone(game_check.problem(game))
-
-    def test_damaged_shaders(self):
-        # As LibOrbisPkg on .NET 6+ (issue #81): part of the data replaced by stale bytes.
-        game = self.game('CUSA03173', '01.09')
-        packed = bytearray(zlib.compress(os.urandom(4096)))
-        packed[len(packed) // 2:] = packed[:len(packed) - len(packed) // 2]
-        self.shaders(game, dcx(os.urandom(4096), bytes(packed)))
+    def test_incomplete_folder(self):
+        game = self.game('CUSA02046', '01.01', files=False)
         with mock.patch.object(game_check, 'SUPPORTED_IMAGE', game_check.image_sha256(game)):
             self.assertEqual(game_check.problem(game)[0], 'damaged_files')
-        self.assertEqual(game_check.broken_files(game),
-                         [f'{game_check.CHECKED_FOLDER}/gxshader.shaderbnd.dcx'])
-
-    def test_other_compressions_are_not_checked(self):
-        game = self.game('CUSA03173', '01.09')
-        data = bytearray(dcx(b'x' * 100))
-        data[0x28:0x2C] = b'KRAK'
-        self.shaders(game, bytes(data[:0x50]))
-        self.assertEqual(game_check.broken_files(game), [])
-
-    def test_eboot_with_the_60fps_patch(self):
-        game = self.game('CUSA00900', '01.09')
-        with mock.patch.object(game_check, 'LANCE_60FPS_IMAGE', game_check.image_sha256(game)):
-            self.assertEqual(game_check.problem(game)[0], 'patched_eboot')
+        self.assertEqual(game_check.missing_files(game), list(game_check.REQUIRED_FILES))
 
     def test_skip_switch(self):
         os.environ['BB_SKIP_GAME_CHECK'] = '1'
-        self.assertIsNone(game_check.problem(self.game('CUSA03173', '01.00')))
+        self.assertIsNone(game_check.problem(self.game('CUSA02046', '01.00')))
 
     def test_every_problem_is_explained(self):
-        for kind in ('missing_update', 'wrong_eboot', 'patched_eboot', 'other_title',
-                     'unreadable', 'damaged_files'):
-            self.assertIn('CUSA', game_check.explain(kind, 'CUSA03173', '01.00'))
+        for kind in ('missing_update', 'wrong_eboot', 'other_title', 'unreadable', 'damaged_files'):
+            self.assertIn('CUSA02046', game_check.explain(kind, 'CUSA02046', '01.00'))
 
 
 if __name__ == '__main__':

@@ -98,12 +98,16 @@ if [[ ${BB_AUTO_RENDER_RES:-} == 1 ]]; then
     unset BB_RENDER_RES BB_OUTPUT_RES BB_AUTO_RENDER_RES
 fi
 # BB_RENDER_RES=WxH explicitly sets the game's render resolution (a patch at start).
-# Frame rate: BB_FPS=30 (default: the game's own rate, unpatched), 60 or uncap (frame-rate
-# patches from patches/Godzilla.xml, once written; scripts/patches.py FPS_PRESETS). BB_PATCHES adds
-# patch names ("a;b").
-fps=${BB_FPS:-30}
+# Frame rate: BB_FPS=60 (default: the game's own rate, unpatched) or uncap (a frame-rate patch
+# from patches/Godzilla.xml, once written; scripts/patches.py FPS_PRESETS). BB_PATCHES adds patch
+# names ("a;b").
+fps=${BB_FPS:-60}
+# The temporal upscalers need the game's scene color, depth and motion, which the GPU library knows
+# for Bloodborne only (its shaders and scene constants): off for GODZILLA until its frame is
+# mapped. Higher resolutions render natively instead (output_res below). BB_UPSCALER overrides.
+export BB_UPSCALER=${BB_UPSCALER:-off}
 # bbport.ini output_res other than 1080p (720p for the Steam Deck, 1440p, 2160p): the whole game
-# renders at the preset's size of the output (a patch), the upscaler fills the output, the UI is
+# renders natively at the output size (a patch: scripts/patches.py resolution_writes), the UI is
 # drawn at the output size. Preset and output changes need a restart.
 # Live resolution changes keep the guest at 1920x1080 and scale host targets at run time instead
 # (output and presets change in the menu without a restart, but post-processing stays at 1080p

@@ -111,9 +111,9 @@ OUTPUT_RES = [("1280×720 (Steam Deck)", "1280x720"), ("1920×1080", "1920x1080"
 GAME_PATCHES = [
     ("skip_intro", "Пропуск заставок при запуске", False),
 ]
-# Frame rate (BB_FPS; scripts/patches.py FPS_PRESETS). The game runs at 30 FPS; 60 and uncapped
-# need frame-rate patches for the 1.01 executable and are offered once patches/Godzilla.xml has them.
-FPS_MODES = [("30 (как на PS4)", "30"), ("60 (патч)", "60"), ("Без ограничения (патч)", "uncap")]
+# Frame rate (BB_FPS; scripts/patches.py FPS_PRESETS). The game runs at 60 FPS; uncapped
+# needs a frame-rate patch for the 1.01 executable and is offered once patches/Godzilla.xml has it.
+FPS_MODES = [("60 (как на PS4)", "60"), ("Без ограничения (патч)", "uncap")]
 PRESENT_MODES = [("Mailbox", "Mailbox"), ("FIFO (VSync)", "Fifo"),
                  ("FIFO Relaxed", "FifoRelaxed"), ("Immediate", "Immediate")]
 # A third element is a note shown under the row's title while that choice is selected: the
@@ -152,7 +152,7 @@ DEFAULTS = {
     "gamepad": "",
     "gamepad_name": "",
     "display": "",
-    "fps_mode": "30",
+    "fps_mode": "60",
     "fps_limit": 0,
     "draw_pipe": "",
     "readbacks": "",
@@ -388,8 +388,8 @@ def game_environment(s):
         env["BB_DISPLAY"] = s["display"]
     if s["hdr"]:
         env["BB_HDR"] = "1"
-    # Only a preset whose patches exist (an older choice falls back to the game's 30 FPS).
-    env["BB_FPS"] = s["fps_mode"] if s["fps_mode"] in [value for _, value in fps_modes()] else "30"
+    # Only a preset whose patches exist (an older choice falls back to the game's 60 FPS).
+    env["BB_FPS"] = s["fps_mode"] if s["fps_mode"] in [value for _, value in fps_modes()] else "60"
     if s["fps_limit"] > 0:
         env["BB_FPS_LIMIT"] = str(s["fps_limit"])
     if s["draw_pipe"]:
@@ -957,7 +957,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.fps_row = combo_row(
             tr("Режим"),
             tr("Какой патч частоты кадров применить к игре") if len(modes) > 1 else
-            tr("Игра идёт с 30 FPS. 60 FPS и без ограничения: нужен патч частоты кадров, его пока нет"),
+            tr("Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет"),
             modes, self.settings["fps_mode"])
         self.fps_row.set_sensitive(len(modes) > 1)
         frames.add(self.fps_row)

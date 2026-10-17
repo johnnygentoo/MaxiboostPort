@@ -24,6 +24,18 @@ class RestartResolutionTests(unittest.TestCase):
             struct.pack_into('<HH', elf, 0x36, 56, 1)
             struct.pack_into('<IIQQQQQQ', elf, 64, 1, 0, 0, 0, 0, 0, 0x6000000, 0)
             (out / 'eboot.elf').write_bytes(elf)
+            # The prepared image the resolution patch checks: 1920x1080 and the display clamp
+            # where the 1.01 executable has them.
+            sys.path.insert(0, str(ROOT / 'scripts'))
+            import patches
+            image = bytearray(0x670000)
+            for wa, ha in patches.RESOLUTION_SITES:
+                struct.pack_into('<I', image, wa, 1920)
+                struct.pack_into('<I', image, ha, 1080)
+            for at, original, _ in patches.RESOLUTION_CLAMP:
+                image[at:at + len(original)] = original
+            (out / 'boot.bin').write_bytes(struct.pack('<8s6Q', b'BBPROBE2', len(image), 0, 0, 0, 0, 0)
+                                           + bytes(image))
             (data / 'eboot.bin').touch()
             config = data / 'bbport.ini'
             config.write_text('upscaler=fsr3\npreset=1\noutput_res=1280x720\n' + ini_extra)
@@ -73,8 +85,9 @@ class RestartResolutionTests(unittest.TestCase):
 
     def test_outputs_other_than_1080p_patch_the_render_size_and_restarts_recompute_it(self):
         rows = self.run_restarts()
-        # 720p Quality, 720p Ultra Performance after a restart, then 1080p (live host targets).
-        self.assertEqual([row['BB_RENDER_RES'] for row in rows], ['854x480', '426x240', None])
+        # The game renders natively at the output: 720p, 720p again after a restart (another
+        # upscaler preset changes nothing), then 1080p (the game's own size, no patch).
+        self.assertEqual([row['BB_RENDER_RES'] for row in rows], ['1280x720', '1280x720', None])
         self.assertEqual([row['BB_OUTPUT_RES'] for row in rows], ['1280x720', '1280x720', None])
         self.assertEqual([row['BB_AUTO_RENDER_RES'] for row in rows], ['1', '1', None])
 
@@ -88,17 +101,17 @@ class RestartResolutionTests(unittest.TestCase):
         # Only the first launch matters here: the probe rewrites bbport.ini for the restarts.
         self.assertIsNone(self.run_restarts(ini_extra='live_resolution=1\n')[0]['BB_RENDER_RES'])
         self.assertEqual(self.run_restarts(ini_extra='live_resolution=0\n', caps=1)[0]['BB_RENDER_RES'],
-                         '854x480')
+                         '1280x720')
         # Unset: off (the startup patch), whatever the GPU; auto asks the GPU check.
-        self.assertEqual(self.run_restarts(caps=1)[0]['BB_RENDER_RES'], '854x480')
+        self.assertEqual(self.run_restarts(caps=1)[0]['BB_RENDER_RES'], '1280x720')
         self.assertIsNone(self.run_restarts(ini_extra='live_resolution=auto\n', caps=1)[0]['BB_RENDER_RES'])
         self.assertEqual(self.run_restarts(ini_extra='live_resolution=auto\n', caps=0)[0]['BB_RENDER_RES'],
-                         '854x480')
+                         '1280x720')
 
     def test_live_resolution_without_sed_or_grep(self):
         # A missing sed ended run.sh (exit 127) before the game in the AppImage on NixOS.
         self.assertEqual(self.run_restarts(ini_extra='live_resolution=0\n', caps=1,
-                                           bare_path=True)[0]['BB_RENDER_RES'], '854x480')
+                                           bare_path=True)[0]['BB_RENDER_RES'], '1280x720')
         self.assertIsNone(self.run_restarts(ini_extra='live_resolution=auto\n', caps=1,
                                             bare_path=True)[0]['BB_RENDER_RES'])
 
