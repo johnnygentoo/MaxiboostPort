@@ -514,7 +514,11 @@ static int32_t sampler_blocks(Voice *v,const unsigned char *p,uint32_t size) {
         v->blocks[v->nblocks].b=blocks[i]; v->blocks[v->nblocks].repeated=0; ++v->nblocks;
     }
     v->accepts=(flags&BLOCKS_CONTINUE)!=0;
-    if (!append) block_restart(v);
+    if (!append) {
+        /* A new waveform after one stopped inside a superframe: a fresh decoder (rare). */
+        if (v->at9 && v->at9_frame_in_superframe) voice_release_decoder(v);
+        block_restart(v);
+    }
     return 0;
 }
 static int32_t matrix_levels(Voice *v,const unsigned char *p,uint32_t size) {
@@ -660,7 +664,18 @@ static int decode_more(Voice *v) {
     v->frame_count=v->frame_pos=0;
     const uint32_t channels=v->channels;
     while (!v->frame_count) {
-        if (v->played>=b->b.samples) return 0;
+        if (v->played>=b->b.samples) {
+            /* The block ends inside a superframe: its other frames are decoded and dropped, so
+               the decoder starts the next block at a superframe (LibAtrac9 counts them). */
+            int16_t drop[256*MAX_CH];
+            while (v->type==WAVE_ATRAC9 && v->at9 && v->at9_frame_in_superframe && v->read_bytes<b->b.size) {
+                int used=0;
+                if (Atrac9Decode(v->at9,src+v->read_bytes,drop,&used)) break;
+                v->read_bytes+=(uint32_t)used;
+                if (++v->at9_frame_in_superframe==(uint32_t)v->at9_info.framesInSuperframe) v->at9_frame_in_superframe=0;
+            }
+            return 0;
+        }
         uint32_t produced=0;
         if (v->type==WAVE_ATRAC9) {
             if (!v->at9 || v->read_bytes>=b->b.size) return 0;
@@ -836,6 +851,19 @@ static ABI int32_t system_render(uintptr_t handle,const RenderBufferInfo *buffer
             }
         } else if (out->buffer && out->size) memset(out->buffer,0,out->size);
     }
+    /* BB_NGS2_WAV=<file>: the first output as rendered (32-bit float, the output's channels),
+       to check the sound without listening; the header's sizes are left open. */
+    static FILE *wav; static int wav_checked;
+    if (!wav_checked) {
+        wav_checked=1;
+        const char *path=getenv("BB_NGS2_WAV");
+        if (path && path[0] && count && (wav=fopen(path,"wb"))) {
+            const uint32_t ch=buffers[0].channels<=MAX_CH ? buffers[0].channels : MAX_CH, rate=s->sample_rate;
+            const uint32_t header[]={0x46464952u,0xffffffffu,0x45564157u,0x20746d66u,16,(ch<<16)|3u,rate,rate*ch*4,(32u<<16)|(ch*4),0x61746164u,0xffffffffu};
+            fwrite(header,sizeof(header),1,wav);
+        }
+    }
+    if (wav && count && buffers[0].channels) fwrite(mix[0],sizeof(float),(size_t)grain*(buffers[0].channels<=MAX_CH ? buffers[0].channels : MAX_CH),wav);
     ++s->renders; ++renders;
     pthread_mutex_unlock(&s->lock);
     return 0;
