@@ -92,6 +92,8 @@ void runtime_report(void) {
     runtime_rwlock_report();
     runtime_sema_report();
     runtime_eventflag_report();
+    runtime_ngs2_report();
+    runtime_font_report();
     runtime_content_report();
     runtime_memory_report();
     runtime_ajm_report();
@@ -251,6 +253,10 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (services) return services;
     uintptr_t ajm = runtime_ajm_resolve(name);
     if (ajm) return ajm;
+    uintptr_t font = runtime_font_resolve(name);
+    if (font) return font;
+    uintptr_t ngs2 = runtime_ngs2_resolve(name);
+    if (ngs2) return ngs2;
     uintptr_t audio = runtime_audio_resolve(name);
     if (audio) return audio;
     uintptr_t pad = runtime_pad_resolve(name);
