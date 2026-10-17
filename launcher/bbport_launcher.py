@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""GODZILLA launcher for gzport, the native Linux port (GTK4 / libadwaita).
+"""GUNDAM VERSUS launcher for gvport, the native Linux port (GTK4 / libadwaita).
 
 Picks the game folder, edits the port's settings (bbport.ini: upscaler, preset, ...) and the
 start-up tweaks passed as environment variables to run.sh, starts and stops the game and shows
-its output. Launcher settings live in ~/.config/gzport-launcher/settings.json; the packaged
-port's data in ~/.local/share/gzport (BB_DATA_DIR). Nothing of a Bloodborne install
+its output. Launcher settings live in ~/.config/gvport-launcher/settings.json; the packaged
+port's data in ~/.local/share/gvport (BB_DATA_DIR). Nothing of a Bloodborne install
 (bbport-launcher, ~/.local/share/bbport) is read or written.
 Texts: bbport_i18n (the Russian text is the key; English, Spanish, Italian, French, German,
 Brazilian Portuguese and Simplified Chinese).
@@ -56,7 +56,7 @@ import trophies  # noqa: E402
 # Packaged (AppImage): generated files, saves and bbport.ini live in BB_DATA_DIR.
 PACKAGED = bool(os.environ.get("BB_PREBUILT"))
 DATA_DIR = Path(os.environ.get("BB_DATA_DIR", PORT_DIR))
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "gzport-launcher"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "gvport-launcher"
 CONFIG_FILE = CONFIG_DIR / "settings.json"
 # The player's own defaults (bbport_defaults): "Restore my defaults" on the Settings page.
 DEFAULTS_FILE = CONFIG_DIR / "defaults.json"
@@ -102,10 +102,10 @@ FSR411_BUILD_ERRORS = {
 UI_LANGUAGES = [("Как в системе", ""), ("Русский", "ru"), ("English", "en"), ("Português (Brasil)", "pt_BR"),
                 ("Español", "es"), ("Italiano", "it"), ("Français", "fr"), ("Deutsch", "de"),
                 ("简体中文", "zh_CN")]
-# The temporal upscalers need the game's scene color, depth and motion (the GPU library knows them
-# from the game profile (gpu/games): GODZILLA's camera, scene and HUD are mapped (experimental).
-# Without an upscaler, other outputs render natively.
-UPSCALERS_AVAILABLE = True
+# The temporal upscalers need the game's scene color, depth and motion, which the GPU library learns
+# from the game profile (gpu/games). GUNDAM VERSUS' frame is not mapped yet (its camera, scene pass
+# and HUD), so they stay off until it is (docs/upscaler.md); other outputs render natively.
+UPSCALERS_AVAILABLE = False
 UPSCALERS = [("FSR 4", "fsr4"), ("FSR 4.1.1", "fsr411"), ("FSR 3", "fsr3"),
              ("DLSS (NVIDIA RTX)", "dlss"),
              ("TAA (нативное сглаживание)", "taa"), ("Выключен", "off")]
@@ -113,14 +113,14 @@ PRESETS = [("Native AA", 0), ("Quality (x1.5)", 1), ("Balanced (x1.7)", 2),
            ("Performance (x2)", 3), ("Ultra Performance (x3)", 4)]
 OUTPUT_RES = [("1280×720 (Steam Deck)", "1280x720"), ("1920×1080", "1920x1080"), ("2560×1440", "2560x1440"), ("3840×2160", "3840x2160")]
 # Game patches applied at start (scripts/patches.py EFFECTS: a bbport.ini key and the patch of
-# patches/Godzilla.xml it turns on): bbport.ini key, title, default. A switch whose patch the file
-# does not have yet for 1.01 is shown greyed out.
+# built-in patch file, scripts/patches.py BUILTIN_XML, it turns on): bbport.ini key, title, default. A switch whose patch the file
+# does not have yet for 1.13 is shown greyed out.
 GAME_PATCHES = [
     ("skip_intro", "Пропуск заставок при запуске", False),
 ]
-# Frame rate (BB_FPS; scripts/patches.py FPS_PRESETS). The game runs at 60 FPS; uncapped
-# needs a frame-rate patch for the 1.01 executable and is offered once patches/Godzilla.xml has it.
-FPS_MODES = [("60 (как на PS4)", "60"), ("Без ограничения (патч)", "uncap")]
+# Frame rate (BB_FPS; scripts/patches.py FPS_PRESETS). The game runs at 60 FPS; a higher rate
+# needs a frame-rate patch for the 1.13 executable, not written yet: then it is listed here too.
+FPS_MODES = [("60 (как на PS4)", "60")]
 PRESENT_MODES = [("Mailbox", "Mailbox"), ("FIFO (VSync)", "Fifo"),
                  ("FIFO Relaxed", "FifoRelaxed"), ("Immediate", "Immediate")]
 # A third element is a note shown under the row's title while that choice is selected: the
@@ -128,9 +128,9 @@ PRESENT_MODES = [("Mailbox", "Mailbox"), ("FIFO (VSync)", "Fifo"),
 DRAW_PIPE = [("Авто", "", "Включён при 8 и более потоках процессора"), ("Включён", "1"),
              ("Выключен", "0", "Стабильнее, но медленнее")]
 # The game's language: the PS4 system language ("": from the desktop's locale). The North American
-# release has English, French, Spanish and Brazilian Portuguese text (game_en/fr/ns/bp.pac).
-LANGUAGES = [("Как в системе", ""), ("Английский", "1"), ("Французский", "2"), ("Испанский", "3"),
-             ("Португальский (Бразилия)", "17")]
+# release (CUSA08790) is played in English; which other text languages its archives hold is not
+# checked yet, so only English is offered by name.
+LANGUAGES = [("Как в системе", ""), ("Английский", "1")]
 LIVE_RESOLUTION = [("Авто (по видеокарте)", "auto"), ("Выключена (быстрее)", "0"), ("Включена", "1")]
 READBACKS = [("Relaxed", "", "По умолчанию"), ("Выключены", "0"), ("Precise", "2")]
 # Background pre-upload of the game's GPU memory into VRAM (BB_PREUPLOAD): auto = on with a discrete GPU.
@@ -140,10 +140,12 @@ PREUPLOAD = [("Обычная", "", "Без лишней видеопамяти"
 
 def default_game_dir():
     """From a checkout: the dump beside it or inside it (gitignored), else where run.sh looks."""
-    for folder in (PORT_DIR.parent / "CUSA02046", PORT_DIR / "CUSA02046"):
+    # CUSA08790-full: the base game with the 1.13 update hardlinked over it (the README).
+    for folder in (PORT_DIR / "CUSA08790-full", PORT_DIR.parent / "CUSA08790-full",
+                   PORT_DIR.parent / "CUSA08790", PORT_DIR / "CUSA08790"):
         if (folder / "eboot.bin").is_file():
             return folder
-    return PORT_DIR.parent / "CUSA02046"
+    return PORT_DIR / "CUSA08790-full"
 
 
 DEFAULTS = {
@@ -244,7 +246,7 @@ def patches_dir(settings):
 
 
 def builtin_patches():
-    """The patch names patches/Godzilla.xml has for the supported version (scripts/patches.py
+    """The patch names the built-in patch file (BUILTIN_XML) has for the supported version (scripts/patches.py
     reports and skips the others)."""
     try:
         root = ET.parse(BUILTIN_XML).getroot()
@@ -254,7 +256,7 @@ def builtin_patches():
 
 
 def patch_available(key, have=None):
-    """Whether the game patch switch `key` (GAME_PATCHES) has its patch in patches/Godzilla.xml."""
+    """Whether the game patch switch `key` (GAME_PATCHES) has its patch in the built-in patch file."""
     have = builtin_patches() if have is None else have
     return all(name in have for name in PATCH_EFFECTS.get(key, ()) if name)
 
@@ -265,7 +267,7 @@ def fps_modes(have=None):
     return [mode for mode in FPS_MODES if all(name in have for name in FPS_PRESETS.get(mode[1], ()))]
 
 
-LAUNCHER_ICON = PORT_DIR / "launcher" / "godzilla.svg"
+LAUNCHER_ICON = PORT_DIR / "launcher" / "gundam.svg"
 
 
 def game_icon(game_dir):
@@ -367,7 +369,7 @@ def game_environment(s):
         env["BB_USER_DIR"] = s["user_dir"]
     if s.get("dlc_dir"):
         env["BB_DLC_DIR"] = str(Path(s["dlc_dir"]).expanduser())
-    # Loose-file mods (scripts/mods.py) replace files under Bloodborne's dvdroot_ps4; GODZILLA's
+    # Loose-file mods (scripts/mods.py) replace files under Bloodborne's dvdroot_ps4; GUNDAM VERSUS'
     # files are .pac archives at the folder's root, so none are laid over the game. The menu's
     # button prompts (scripts/menu_prompts.py) edit Bloodborne's menu files: run.sh skips them.
     env["BB_MODS_ENABLED"] = "0"
@@ -617,7 +619,7 @@ THANKS = (
         _github("Monochrome0907", "Нашёл, при каких эффектах зависают загрузки на NVIDIA"),
     )),
     ("Другие благодарности", (
-        ("ayozetr", "bloodborne_linux: порт для Linux, на котором построен gzport",
+        ("ayozetr", "bloodborne_linux: порт для Linux, на котором построен gvport",
          "https://github.com/ayozetr/bloodborne_linux"),
         ("shadPS4", "Рендерер и компилятор шейдеров", "https://github.com/shadps4-emu/shadPS4"),
         ("pkgforge-dev", "Инструмент для сборки AppImage",
@@ -630,7 +632,7 @@ THANKS = (
 
 class LauncherWindow(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="GODZILLA")
+        super().__init__(application=app, title="GUNDAM VERSUS")
         self.set_default_size(760, 820)
         self.settings = load_settings()
         set_language(self.settings.get("ui_language", ""))
@@ -646,13 +648,13 @@ class LauncherWindow(Adw.ApplicationWindow):
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
         # The brand: the game's icon from the player's dump (or the launcher's) and its name.
-        brand = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER, css_classes=["gz-brand"])
+        brand = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER, css_classes=["gv-brand"])
         self.brand_icon = Gtk.Image(pixel_size=34)
         brand.append(self.brand_icon)
         names = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
-        names.append(Gtk.Label(label="GODZILLA", xalign=0, css_classes=["gz-title"]))
-        names.append(Gtk.Label(label=tr("gzport — нативный порт для Linux"), xalign=0,
-                               css_classes=["gz-subtitle"]))
+        names.append(Gtk.Label(label="GUNDAM VERSUS", xalign=0, css_classes=["gv-title"]))
+        names.append(Gtk.Label(label=tr("gvport — нативный порт для Linux"), xalign=0,
+                               css_classes=["gv-subtitle"]))
         brand.append(names)
         header.pack_start(brand)
         self.stack = Adw.ViewStack()
@@ -718,7 +720,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         game = Adw.PreferencesGroup(title=tr("Игра"))
         # The game from your own PS4 packages: extracted, the update merged, the add-ons apart.
         self.pkg_row = Adw.ActionRow(title=tr("Установить из PKG"),
-                                     subtitle=tr("Игра, обновление 1.01 и DLC из ваших файлов .pkg"))
+                                     subtitle=tr("Игра, обновление 1.13 и DLC из ваших файлов .pkg"))
         self.pkg_button = Gtk.Button(label=tr("Выбрать .pkg…"), valign=Gtk.Align.CENTER)
         self.pkg_button.connect("clicked", self.on_install_pkg)
         self.pkg_row.add_suffix(self.pkg_button)
@@ -778,7 +780,7 @@ class LauncherWindow(Adw.ApplicationWindow):
 
         self.patches_group = Adw.PreferencesGroup(
             title=tr("Сторонние патчи"),
-            description=tr("XML-патчи в формате shadPS4 для версии 01.01 из папки патчей. "
+            description=tr("XML-патчи в формате shadPS4 для версии 01.13 из папки патчей. "
                            "Применяются при запуске."))
         self.patches_folder_row = Adw.ActionRow(title=tr("Папка патчей"))
         self.patches_folder_row.add_suffix(flat_button("folder-open-symbolic", tr("Выбрать папку патчей"),
@@ -892,7 +894,7 @@ class LauncherWindow(Adw.ApplicationWindow):
             title=tr("Апскейлер"),
             description=tr("Хранится в bbport.ini; в игре меняется через меню (Insert или L3+R3)")
             if UPSCALERS_AVAILABLE else tr(
-                "Для GODZILLA пока недоступен: игра рисует кадр прямо в разрешении вывода"))
+                "Для GUNDAM VERSUS пока недоступен: кадр игры ещё не размечен"))
         self.upscaler_row = combo_row(tr("Апскейлер"), None, UPSCALERS, self.ini["upscaler"])
         self.upscaler_row.connect("notify::selected", lambda *_: self.update_upscaler_status())
         upscaler.add(self.upscaler_row)
@@ -935,7 +937,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         upscaler.add(self.show_fps_row)
         page.add(upscaler)
 
-        # Built-in patches (patches/Godzilla.xml): a switch is live once its patch exists for 1.01.
+        # Built-in patches (scripts/patches.py BUILTIN_XML): a switch is live once its patch exists for 1.13.
         have = builtin_patches()
         effects = Adw.PreferencesGroup(title=tr("Патчи игры"),
                                        description=tr("Применяется при запуске игры"))
@@ -945,7 +947,7 @@ class LauncherWindow(Adw.ApplicationWindow):
                                 active=self.ini.get(key, "1" if default else "0") == "1")
             if not patch_available(key, have):
                 row.set_sensitive(False)
-                row.set_subtitle(tr("Нужен патч для версии 1.01, его пока нет"))
+                row.set_subtitle(tr("Нужен патч для версии 1.13, его пока нет"))
             self.effect_rows[key] = row
             effects.add(row)
         page.add(effects)
@@ -1158,7 +1160,7 @@ class LauncherWindow(Adw.ApplicationWindow):
             self.alert(tr("Импорт сохранений"), tr("Сначала закройте игру"))
             return
         shadps4 = Path.home() / ".local/share/shadPS4"
-        self.choose_folder(tr("Папка с сохранениями GODZILLA"),
+        self.choose_folder(tr("Папка с сохранениями GUNDAM VERSUS"),
                            shadps4 if shadps4.is_dir() else Path.home(), self.confirm_import_saves)
 
     def confirm_import_saves(self, folder):
@@ -1168,7 +1170,7 @@ class LauncherWindow(Adw.ApplicationWindow):
                 "Это копия с PS4 на флешке (sdimg_*): она зашифрована ключами консоли. Экспортируйте "
                 "сохранение без шифрования на PS4 (Apollo Save Tool) или через Save Wizard")
                 if save_import.encrypted_ps4_save(folder)
-                else tr("В этой папке нет сохранений GODZILLA (SAVEDATA00 с DATA.BIN)"))
+                else tr("В этой папке нет сохранений GUNDAM VERSUS (SAVEDATA00 с DATA.BIN)"))
             return
         source, when = found[0]
         dialog = Adw.AlertDialog(heading=tr("Импортировать сохранения?"), body=tr(
@@ -1248,13 +1250,13 @@ class LauncherWindow(Adw.ApplicationWindow):
         path = self.game_dir()
         ok = bool(self.settings["game_dir"]) and (path / "eboot.bin").is_file()
         self.game_row.set_subtitle(str(path) if self.settings["game_dir"] else tr("не выбрана"))
-        # The title ID of the release in the folder (CUSA02046), from its param.sfo.
+        # The title ID of the release in the folder (CUSA08790), from its param.sfo.
         try:
             title_id = str(sfo((path / "sce_sys/param.sfo").read_bytes()).get("TITLE_ID", "")) if ok else ""
         except (OSError, ValueError, IndexError):
             title_id = ""
         self.game_row.set_title(tr("Папка игры ({})").format(title_id) if title_id else tr("Папка игры"))
-        # The port's hooks and patches are those of the 1.01 executable (scripts/game_check.py):
+        # The port's hooks and patches are those of the 1.13 executable (scripts/game_check.py):
         # the base game 1.00 needs its update merged in.
         problem = self.game_problem(path) if ok else None
         if not ok:
@@ -1263,15 +1265,15 @@ class LauncherWindow(Adw.ApplicationWindow):
             kind, title, version = problem
             missing = ", ".join(game_check.missing_files(path)) or ", ".join(game_check.REQUIRED_FILES)
             tooltip = {
-                "missing_update": tr("Нужно обновление 1.01: скопируйте файлы дампа обновления 1.01 в папку игры с заменой (найдена версия {})").format(version),
-                "wrong_eboot": tr("eboot.bin не от версии 1.01: скопируйте eboot.bin из дампа обновления 1.01 в папку игры с заменой"),
-                "other_title": tr("Это не GODZILLA (найдено {}): нужна GODZILLA (CUSA02046) с обновлением 1.01").format(title),
+                "missing_update": tr("Нужно обновление 1.13: скопируйте файлы дампа обновления 1.13 в папку игры с заменой (найдена версия {})").format(version),
+                "wrong_eboot": tr("eboot.bin не от версии 1.13: скопируйте eboot.bin из дампа обновления 1.13 в папку игры с заменой"),
+                "other_title": tr("Это не GUNDAM VERSUS (найдено {}): нужна GUNDAM VERSUS (CUSA08790) с обновлением 1.13").format(title),
                 "unreadable": tr("eboot.bin не читается как расшифрованный исполняемый файл PS4: сделайте дамп заново"),
-                "damaged_files": tr("В папке игры нет: {}. Распакуйте игру и обновление 1.01 заново").format(missing),
+                "damaged_files": tr("В папке игры нет: {}. Распакуйте игру и обновление 1.13 заново").format(missing),
             }.get(kind) or game_check.explain(kind, title, version)
             self.game_row.set_subtitle(f"{path}\n{tooltip}")
         else:
-            tooltip = tr("GODZILLA {}, версия 1.01").format(title_id or "")
+            tooltip = tr("GUNDAM VERSUS {}, версия 1.13").format(title_id or "")
         self.game_status.set_from_icon_name("object-select-symbolic" if ok and not problem else "dialog-warning-symbolic")
         self.game_status.set_tooltip_text(tooltip)
         self.launch_button.set_sensitive(ok or self.process is not None)
@@ -1568,7 +1570,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     # --- Steam ---------------------------------------------------------------------------
 
     def on_add_to_steam(self, _button):
-        """GODZILLA in the Steam library: a non-Steam game that runs --play (no window)."""
+        """GUNDAM VERSUS in the Steam library: a non-Steam game that runs --play (no window)."""
         steam = bbport_steam.steam_folder()
         configs = bbport_steam.user_configs(steam) if steam else []
         flatpak = bool(steam) and bbport_steam.is_flatpak(steam)
@@ -1648,14 +1650,14 @@ class LauncherWindow(Adw.ApplicationWindow):
         icon = str(self.steam_icon())
         try:
             for config in configs:
-                bbport_steam.add_shortcut(config / "shortcuts.vdf", "GODZILLA", exe,
+                bbport_steam.add_shortcut(config / "shortcuts.vdf", "GUNDAM VERSUS", exe,
                                           start_dir, icon, options)
         except (OSError, ValueError) as error:
             self.alert("Steam", tr("Не удалось добавить игру в Steam: {}").format(error))
             return
         if restart:
             bbport_steam.start_steam(bbport_steam.is_flatpak(steam))
-        self.toasts.add_toast(Adw.Toast(title=tr("GODZILLA добавлена в библиотеку Steam"), timeout=6))
+        self.toasts.add_toast(Adw.Toast(title=tr("GUNDAM VERSUS добавлена в библиотеку Steam"), timeout=6))
 
     def steam_icon(self):
         """The shortcut's icon: a copy of the game's icon0.png kept with the launcher's settings
@@ -1732,7 +1734,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     def build_about_page(self):
         page = Adw.PreferencesPage()
         about = Adw.PreferencesGroup(title=tr("О программе"))
-        app = Adw.ActionRow(title="GODZILLA · gzport",
+        app = Adw.ActionRow(title="GUNDAM VERSUS · gvport",
                             subtitle=tr("Нативный порт для Linux, версия {}").format(bbport_update.VERSION))
         self.about_icon = Gtk.Image(pixel_size=48)
         app.add_prefix(self.about_icon)
@@ -1761,8 +1763,8 @@ class LauncherWindow(Adw.ApplicationWindow):
         page.add(about)
         # The game's owners, under everything, as plain text.
         owners = Adw.PreferencesGroup()
-        owners.add(Gtk.Label(label=tr("GODZILLA — товарный знак Toho Co., Ltd.; игра для PS4 издана "
-                                      "Bandai Namco Entertainment. Этот проект с ними не связан."),
+        owners.add(Gtk.Label(label=tr("GUNDAM VERSUS © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco "
+                                      "Entertainment. Этот проект с ними не связан."),
                              wrap=True, justify=Gtk.Justification.CENTER,
                              css_classes=["dim-label", "caption"]))
         page.add(owners)
@@ -1780,7 +1782,7 @@ class LauncherWindow(Adw.ApplicationWindow):
                 row.connect("activated", lambda _row, link=url: self.open_uri(link))
                 group.add(row)
             page.add(group)
-        page.set_description(tr("Авторы bbport и bloodborne_linux, на которых построен gzport, "
+        page.set_description(tr("Авторы bbport и bloodborne_linux, на которых построен gvport, "
                                 "и все, кто им помогал"))
         dialog = Adw.PreferencesDialog(title=tr("Благодарности"))
         dialog.add(page)
@@ -1907,7 +1909,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     def on_export_log(self, _button):
         text = self.log_text()
         dialog = Gtk.FileDialog(title=tr("Экспорт журнала"))
-        dialog.set_initial_name(f"gzport-{time.strftime('%Y%m%d_%H%M%S')}.log")
+        dialog.set_initial_name(f"gvport-{time.strftime('%Y%m%d_%H%M%S')}.log")
 
         def finish(dialog, result):
             try:
@@ -2256,7 +2258,7 @@ class LauncherWindow(Adw.ApplicationWindow):
 
 class LauncherApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="io.github.gzport.Launcher",
+        super().__init__(application_id="io.github.gvport.Launcher",
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
 
     def do_startup(self):
@@ -2283,7 +2285,7 @@ def play():
     # No window sets the launcher's language here, and the in-game menu takes it (BB_MENU_LANGUAGE).
     set_language(settings.get("ui_language", ""))
     if not (Path(settings["game_dir"]).expanduser() / "eboot.bin").is_file():
-        print("gzport: choose the game folder in the launcher first", file=sys.stderr)
+        print("gvport: choose the game folder in the launcher first", file=sys.stderr)
         return 1
     os.chdir(PORT_DIR)
     env = game_environment(settings)

@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(ROOT / 'launcher'))
 import bbport_defaults  # noqa: E402
 
-BUILTIN = {'game_dir': '/default/CUSA02046', 'trophy_key': '', 'fullscreen': False, 'hdr': False,
+BUILTIN = {'game_dir': '/default/CUSA08790', 'trophy_key': '', 'fullscreen': False, 'hdr': False,
            'present_mode': 'Mailbox', 'fps_limit': 0, 'save_log': False}
 BUILTIN_INI = {'upscaler': 'fsr4', 'preset': '4', 'output_res': '1920x1080', 'show_fps': '1'}
 KEEP = ('game_dir', 'trophy_key')
@@ -82,7 +82,7 @@ class FileTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
-        self.path = Path(temp.name) / 'gzport-launcher' / 'defaults.json'
+        self.path = Path(temp.name) / 'gvport-launcher' / 'defaults.json'
 
     def test_missing_file_is_none(self):
         self.assertIsNone(bbport_defaults.load(self.path))
