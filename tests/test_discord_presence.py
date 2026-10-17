@@ -1,55 +1,26 @@
 from paths import ROOT  # noqa: F401
-import tempfile
+import subprocess
+import sys
 import unittest
-from pathlib import Path
 
 import discord_presence as presence
 
 
-class AreaTests(unittest.TestCase):
-    def test_areas_by_map(self):
-        self.assertEqual(presence.area_name('m24_01'), 'Central Yharnam')
-        self.assertEqual(presence.area_name('M21_00\n'), "Hunter's Dream")
-        self.assertEqual(presence.area_name('m29_10'), presence.CHALICE_DUNGEON)
-        self.assertIsNone(presence.area_name('m99_99'))
-        self.assertIsNone(presence.area_name(None))
-
-    def test_every_map_folder_of_the_game_has_a_name(self):
-        # The game's map folders (dvdroot_ps4/map/mXX_YY_00_00), test maps and m29 aside.
-        maps = ['m21_00', 'm21_01', 'm22_00', 'm23_00', 'm24_00', 'm24_01', 'm24_02', 'm25_00',
-                'm26_00', 'm27_00', 'm28_00', 'm32_00', 'm33_00', 'm34_00', 'm35_00', 'm36_00']
-        self.assertEqual(sorted(presence.AREAS), maps)
-
-
-class StateTests(unittest.TestCase):
-    def test_area_and_partners(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            self.assertEqual(presence.read_state(tmp), (None, []))
-            (Path(tmp) / 'area').write_text('m24_01\n')
-            (Path(tmp) / 'coop').write_text('Hunter\n\nFriend_2\n')
-            self.assertEqual(presence.read_state(tmp), ('m24_01', ['Hunter', 'Friend_2']))
-            (Path(tmp) / 'coop').write_text('')
-            self.assertEqual(presence.read_state(tmp), ('m24_01', []))
-        self.assertEqual(presence.read_state(None), (None, []))
-
-
 class ActivityTests(unittest.TestCase):
-    def test_before_an_area(self):
-        value = presence.activity(True, 100)
-        self.assertEqual(value['details'], 'Online')
-        self.assertNotIn('state', value)
+    def test_the_game_and_the_time_played(self):
+        value = presence.activity(100)
+        self.assertEqual(value['details'], 'GODZILLA')
+        self.assertEqual(value['timestamps'], {'start': 100})
+        self.assertNotIn('Bloodborne', str(value))
 
-    def test_area_and_session(self):
-        self.assertEqual(presence.activity(False, 100, 'm24_01')['state'], 'Offline')
-        value = presence.activity(True, 100, 'm21_00', ['Hunter'])
-        self.assertEqual((value['details'], value['state']), ("Hunter's Dream", 'Co-op with Hunter'))
-        self.assertEqual(presence.activity(True, 100, 'm24_01', ['A', 'B'])['state'],
-                         'Co-op with A, B')
 
-    def test_unknown_map_shows_the_session(self):
-        value = presence.activity(True, 100, 'm99_99', ['Hunter'])
-        self.assertEqual(value['details'], 'Co-op with Hunter')
-        self.assertNotIn('state', value)
+class ClientIdTests(unittest.TestCase):
+    def test_without_an_application_id_nothing_is_shown(self):
+        script = ROOT / 'scripts/discord_presence.py'
+        run = subprocess.run([sys.executable, str(script), '--pid', '1', '--client-id', ''],
+                             capture_output=True, text=True, timeout=10)
+        self.assertEqual(run.returncode, 0)
+        self.assertIn('Rich Presence off', run.stdout)
 
 
 if __name__ == '__main__':
