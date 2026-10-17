@@ -99,6 +99,10 @@ FSR411_BUILD_ERRORS = {
 UI_LANGUAGES = [("Как в системе", ""), ("Русский", "ru"), ("English", "en"), ("Português (Brasil)", "pt_BR"),
                 ("Español", "es"), ("Italiano", "it"), ("Français", "fr"), ("Deutsch", "de"),
                 ("简体中文", "zh_CN")]
+# The temporal upscalers need the game's scene color, depth and motion (the GPU library knows them
+# for Bloodborne only): shown, but off for GODZILLA until its frame is mapped (run.sh sets
+# BB_UPSCALER=off). Other outputs render natively instead.
+UPSCALERS_AVAILABLE = False
 UPSCALERS = [("FSR 4", "fsr4"), ("FSR 4.1.1", "fsr411"), ("FSR 3", "fsr3"),
              ("DLSS (NVIDIA RTX)", "dlss"),
              ("TAA (нативное сглаживание)", "taa"), ("Выключен", "off")]
@@ -894,7 +898,9 @@ class LauncherWindow(Adw.ApplicationWindow):
 
         upscaler = Adw.PreferencesGroup(
             title=tr("Апскейлер"),
-            description=tr("Хранится в bbport.ini; в игре меняется через меню (Insert или L3+R3)"))
+            description=tr("Хранится в bbport.ini; в игре меняется через меню (Insert или L3+R3)")
+            if UPSCALERS_AVAILABLE else tr(
+                "Для GODZILLA пока недоступен: игра рисует кадр прямо в разрешении вывода"))
         self.upscaler_row = combo_row(tr("Апскейлер"), None, UPSCALERS, self.ini["upscaler"])
         self.upscaler_row.connect("notify::selected", lambda *_: self.update_upscaler_status())
         upscaler.add(self.upscaler_row)
@@ -1210,10 +1216,12 @@ class LauncherWindow(Adw.ApplicationWindow):
                 "DLSS не найден: выберите библиотеку NVIDIA ниже (и нужна сборка с мостом DLSS). Игра включит FSR 3.1")
         else:
             hint = tr("Сглаживание в разрешении вывода без модели FSR") if value == "taa" else None
-        self.preset_row.set_sensitive(value not in ("taa", "off"))
-        self.sharpen_row.set_sensitive(value != "off")
-        self.sharpness_row.set_sensitive(value != "off")
-        self.upscaler_row.set_subtitle(hint or "")
+        self.preset_row.set_sensitive(UPSCALERS_AVAILABLE and value not in ("taa", "off"))
+        self.sharpen_row.set_sensitive(UPSCALERS_AVAILABLE and value != "off")
+        self.sharpness_row.set_sensitive(UPSCALERS_AVAILABLE and value != "off")
+        for row in (self.upscaler_row, self.fsr411_row, self.dlss_row, self.motion_row):
+            row.set_sensitive(UPSCALERS_AVAILABLE)
+        self.upscaler_row.set_subtitle((hint or "") if UPSCALERS_AVAILABLE else "")
 
     def game_problem(self, path):
         """game_check.problem for the folder, kept until its eboot.bin or param.sfo changes (the

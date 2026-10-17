@@ -681,6 +681,8 @@ EN = {
         'No GODZILLA saves in this folder (SAVEDATA00 with DATA.BIN)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'The game runs at 60 FPS, as on the PS4. Above 60 FPS needs a frame-rate patch, not available yet',
+    'Для GODZILLA пока недоступен: игра рисует кадр прямо в разрешении вывода':
+        'Not available for GODZILLA yet: the game renders its frame at the output resolution itself',
     'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
         'The game, update 1.01 and DLC from your .pkg files',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
@@ -1442,6 +1444,8 @@ PT_BR = {
         'Não há saves do GODZILLA nesta pasta (SAVEDATA00 com DATA.BIN)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'O jogo roda a 60 FPS, como no PS4. Acima de 60 FPS precisa de um patch de taxa de quadros, ainda indisponível',
+    'Для GODZILLA пока недоступен: игра рисует кадр прямо в разрешении вывода':
+        'Ainda indisponível para GODZILLA: o jogo desenha o quadro na própria resolução de saída',
     'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
         'O jogo, a atualização 1.01 e as DLC dos seus arquivos .pkg',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
@@ -2114,6 +2118,8 @@ ES = {
         'No hay partidas de GODZILLA en esta carpeta (SAVEDATA00 con DATA.BIN)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'El juego va a 60 FPS, como en PS4. Más de 60 FPS necesita un parche de tasa de fotogramas, aún no disponible',
+    'Для GODZILLA пока недоступен: игра рисует кадр прямо в разрешении вывода':
+        'Aún no disponible para GODZILLA: el juego dibuja el fotograma directamente a la resolución de salida',
     'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
         'El juego, la actualización 1.01 y los DLC desde tus archivos .pkg',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
@@ -2786,6 +2792,8 @@ IT = {
         'Nessun salvataggio di GODZILLA in questa cartella (SAVEDATA00 con DATA.BIN)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'Il gioco gira a 60 FPS, come su PS4. Oltre i 60 FPS serve una patch del frame rate, non ancora disponibile',
+    'Для GODZILLA пока недоступен: игра рисует кадр прямо в разрешении вывода':
+        'Non ancora disponibile per GODZILLA: il gioco disegna il fotogramma direttamente alla risoluzione d\'uscita',
     'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
         'Il gioco, l’aggiornamento 1.01 e i DLC dai tuoi file .pkg',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
@@ -3458,6 +3466,8 @@ FR = {
         'Aucune sauvegarde de GODZILLA dans ce dossier (SAVEDATA00 avec DATA.BIN)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         "Le jeu tourne à 60 FPS, comme sur PS4. Au-delà de 60 FPS, il faut un correctif de fréquence d'images, pas encore disponible",
+    'Для GODZILLA пока недоступен: игра рисует кадр прямо в разрешении вывода':
+        'Pas encore disponible pour GODZILLA : le jeu dessine l\'image directement à la résolution de sortie',
     'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
         'Le jeu, la mise à jour 1.01 et les DLC depuis vos fichiers .pkg',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
@@ -4130,6 +4140,8 @@ DE = {
         'Keine GODZILLA-Spielstände in diesem Ordner (SAVEDATA00 mit DATA.BIN)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'Das Spiel läuft mit 60 FPS wie auf der PS4. Mehr als 60 FPS braucht einen Bildraten-Patch, der noch nicht verfügbar ist',
+    'Для GODZILLA пока недоступен: игра рисует кадр прямо в разрешении вывода':
+        'Für GODZILLA noch nicht verfügbar: das Spiel zeichnet das Bild direkt in der Ausgabeauflösung',
     'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
         'Das Spiel, Update 1.01 und DLC aus Ihren .pkg-Dateien',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
@@ -4745,6 +4757,8 @@ ZH_CN = {
         '此文件夹中没有 GODZILLA 存档（含 DATA.BIN 的 SAVEDATA00）',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         '游戏以 60 FPS 运行，与 PS4 一致。高于 60 FPS 需要帧率补丁，目前尚无',
+    'Для GODZILLA пока недоступен: игра рисует кадр прямо в разрешении вывода':
+        'GODZILLA 暂不可用：游戏直接以输出分辨率绘制画面',
     'Игра, обновление 1.01 и DLC из ваших файлов .pkg':
         '从你的 .pkg 文件安装游戏、1.01 更新和 DLC',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':

@@ -16,18 +16,40 @@ gzport points them at GODZILLA and drops what only Bloodborne had.
 
 ## Status
 
-The game boots and plays. It runs at its own 30 FPS: 60 FPS, uncapped frame rate and other game
-patches need patches for the 1.01 executable that are not written yet (`patches/Godzilla.xml`),
-and the launcher offers them once they exist.
+The game boots, plays its intro movie, title screen and missions with music, voices and effects,
+subtitles in its own font, saves and trophies. Tested on Linux with an AMD Radeon RX 7800 XT
+(Mesa/RADV) and a DualSense; a full play-through has not been verified yet.
+
+- **60 FPS**, the game's own rate (it flips every vblank). A higher frame rate needs a patch for
+  the 1.01 executable that is not written yet; the launcher offers it once `patches/Godzilla.xml`
+  has it.
+- **Native resolutions:** at an output other than 1080p (720p for the Steam Deck, 1440p, 4K)
+  the whole game renders at that size: a patch at start sets the frame size the game builds its
+  render targets and display buffers from, and the HUD scales with it. 1440p and 4K hold 60 FPS
+  on an RX 7800 XT.
+- **Upscalers (FSR 3.1/4, DLSS, TAA) are off** for this game: they need its scene color, depth
+  and motion, which the GPU library knows for Bloodborne only. Mapping GODZILLA's frame
+  (PhyreEngine) is the next step for them.
+
+## What gzport adds to bbport
+
+The runtime implements the PS4 libraries GODZILLA uses that Bloodborne does not:
+
+- **libSceNgs2**, the PS4's audio renderer (`src/runtime_ngs2.c`): sampler, submixer and
+  mastering racks, ATRAC9 (LibAtrac9) and PCM waveforms with their loops, streamed voice lines,
+  patches through matrices and ports into the game's output buffers.
+- **libSceFont** (`src/runtime_font.c`): FreeType draws the game's own fonts into its glyph
+  surfaces; the PS4's system font set is the host's Noto Sans (and Noto Sans CJK).
+- Kernel event flags, the dialogs, Share Play, screenshot, streaming and Rudp calls of an offline
+  console, and imports resolved by NID for any executable's library layout.
 
 ## Features
 
 - **Launcher** (GTK 4 / libadwaita) with every setting in one window, in English, Spanish,
   Italian, French, German, Portuguese, Russian and Simplified Chinese. It shows your dump's own
   icon and checks the game folder (the 1.01 executable, the files a whole extraction has).
-- **Upscaling:** AMD FSR 3.1, FSR 4 and FSR 4.1.1 (built from your own AMD DLL), **NVIDIA DLSS**
-  on GeForce RTX, and native-resolution TAA. Output from 720p to 4K. Settings also in the
-  in-game overlay (Insert or L3+R3).
+- **Output from 720p to 4K**, rendered natively (above). Settings also in the in-game overlay
+  (Insert or L3+R3).
 - **Two memory models:** the new one, where the GPU works with the game's memory as in a PC game
   (the default on AMD), and the one of 0.3 (the default elsewhere); the launcher switches them.
 - **Controls:** keyboard and mouse or any SDL gamepad, every button remappable, sticks swapped,
@@ -77,7 +99,8 @@ On Arch Linux (or CachyOS, Manjaro…):
 ```bash
 sudo pacman -S --needed base-devel cmake ninja python python-gobject gtk4 libadwaita sdl3 \
     vulkan-headers vulkan-icd-loader glslang spirv-headers spirv-cross ffmpeg boost fmt \
-    robin-map xxhash zydis miniz protobuf nlohmann-json openssl miniupnpc python-pillow ttf-dejavu
+    robin-map xxhash zydis miniz protobuf nlohmann-json openssl miniupnpc python-pillow ttf-dejavu \
+    freetype2 noto-fonts noto-fonts-cjk
 paru -S magic_enum vulkan-memory-allocator xbyak   # from the AUR
 
 bash build.sh
@@ -140,6 +163,11 @@ drivers, so the shortcut starts the game outside it with `flatpak-spawn --host`.
 - [IFreemz/shadPS4-Bloodborne-DLSS-FSR](https://github.com/IFreemz/shadPS4-Bloodborne-DLSS-FSR):
   the DLSS bridge, and the [NVIDIA DLSS SDK](https://github.com/NVIDIA/DLSS).
 - [FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) by FireBurn and the AMD FidelityFX SDK.
+- [KytyPS5](https://github.com/KytyPS5/KytyPS5) and [AnyPS5](https://github.com/boykopovar/AnyPS5)
+  (GPL-2.0): the NGS2 parameter IDs and rendering semantics gzport's own Ngs2 follows, and
+  shadPS4's headers for the PS4 layouts of Ngs2 and libSceFont.
+- [LibAtrac9](https://github.com/Thealexbarney/LibAtrac9) by Alex Barney (MIT) and
+  [FreeType](https://freetype.org).
 - [quick-sharun](https://github.com/pkgforge-dev/Anylinux-AppImages) for the AppImage.
 - [ps4-pkg-extractor](https://github.com/paulomanrique/ps4-pkg-extractor) by paulomanrique
   (Unlicense), on [orbis-pkg-util](https://crates.io/crates/orbis-pkg-util): the launcher's
