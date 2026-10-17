@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Discord Rich Presence while the game runs: GODZILLA and the time played. run.sh starts it next
+"""Discord Rich Presence while the game runs: GUNDAM VERSUS and the time played. run.sh starts it next
 to the game with BB_DISCORD=1; it ends with the game.
 
 Discord shows the name of the Discord application whose id the helper signs in with ("Playing
-<name>"). gzport has no application of its own: BB_DISCORD_CLIENT_ID (or --client-id) names one
-made on Discord's developer portal (call it GODZILLA); without it the helper does nothing.
+<name>"). gvport has no application of its own: BB_DISCORD_CLIENT_ID (or --client-id) names one
+made on Discord's developer portal (call it GUNDAM VERSUS); without it the helper does nothing.
 
 Discord's local IPC: a Unix socket discord-ipc-N in the runtime directory (also inside the
 Flatpak, Snap and Vesktop sandboxes' directories). Frames are a little-endian op code and length,
@@ -80,8 +80,8 @@ def connect(client_id, env=os.environ):
 def activity(start):
     """What Discord shows under the application's name: the game and the time played."""
     return {
-        'details': 'GODZILLA',
-        'state': 'gzport · native Linux port',
+        'details': 'GUNDAM VERSUS',
+        'state': 'gvport · native Linux port',
         'timestamps': {'start': start},
     }
 

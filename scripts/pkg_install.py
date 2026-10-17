@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Install GODZILLA from your own PS4 package files (.pkg): the game, its updates and add-ons.
+"""Install GUNDAM VERSUS from your own PS4 package files (.pkg): the game, its updates and add-ons.
 
     pkg_install.py --dest DIR GAME.pkg [UPDATE.pkg ...] [DLC.pkg ...]
 
@@ -9,7 +9,7 @@ the game (category gd) goes to DIR/<title ID>, updates (gp) are merged into it o
 add-ons (ac) go to DIR/DLC/<label> (the launcher's DLC folder). The packages are extracted with
 pkgextract (github.com/paulomanrique/ps4-pkg-extractor, Unlicense) into a new folder under DIR, so
 nothing already there is replaced: a game folder that exists stops the install. game_check.py
-checks the result (GODZILLA CUSA02046 with the 1.01 executable, the files a whole extraction has).
+checks the result (GUNDAM VERSUS CUSA08790 with the 1.13 executable, the files a whole extraction has).
 
 The last lines are GAME_DIR=<path> and, with add-ons, DLC_DIR=<path>, for the launcher.
 """
@@ -25,7 +25,7 @@ from game_check import explain, problem  # noqa: E402
 from prepare import sfo  # noqa: E402
 
 PKG_MAGIC = b'\x7fCNT'
-# The content ID (UP0700-CUSA02046_00-PS4GODZILLA00000): the publisher, the title ID and the
+# The content ID (UP0700-CUSA08790_00-GUNDAMVSPKG00001): the publisher, the title ID and the
 # package's label, at 0x40 in the header.
 CONTENT_ID = slice(0x40, 0x40 + 36)
 
@@ -104,7 +104,7 @@ def install(pkgs, dest, extractor=None, log=print):
         raise InstallError(f'not enough space in {dest}: {needed / 2**30:.1f} GiB needed, '
                            f'{free / 2**30:.1f} GiB free')
     extractor = extractor_path(extractor)
-    work = dest / f'.gzport-install-{os.getpid()}'
+    work = dest / f'.gvport-install-{os.getpid()}'
     work.mkdir()
     try:
         games, updates, addons = [], [], []
@@ -145,7 +145,7 @@ def install(pkgs, dest, extractor=None, log=print):
     if found:
         log('Install: ' + explain(*found))
     else:
-        log('Install: the game is ready (GODZILLA 1.01)')
+        log('Install: the game is ready (GUNDAM VERSUS 1.13)')
     return game_dir, dlc_dir
 
 

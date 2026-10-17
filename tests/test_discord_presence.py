@@ -9,7 +9,7 @@ import discord_presence as presence
 class ActivityTests(unittest.TestCase):
     def test_the_game_and_the_time_played(self):
         value = presence.activity(100)
-        self.assertEqual(value['details'], 'GODZILLA')
+        self.assertEqual(value['details'], 'GUNDAM VERSUS')
         self.assertEqual(value['timestamps'], {'start': 100})
         self.assertNotIn('Bloodborne', str(value))
 

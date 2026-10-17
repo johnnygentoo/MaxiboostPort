@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Import GODZILLA saves from another build: shadPS4, another port's folder, a PS4 save exported
+"""Import GUNDAM VERSUS saves from another build: shadPS4, another port's folder, a PS4 save exported
 decrypted (Apollo Save Tool, Save Wizard), a copy on a USB stick.
 
     save_import.py --user USER_DIR [--game GAME_DIR] SOURCE
 
-GODZILLA keeps its progress in one save folder, SAVEDATA00, holding DATA.BIN (read and written by
-the game itself), so the files need no conversion: they are copied in as user 1's saves, under the
-game's save id (param.sfo's INSTALL_DIR_SAVEDATA, else TITLE_ID: CUSA02046; the same rule as
+Saves are looked for in one save folder, SAVEDATA00, holding DATA.BIN (read and written by the
+game itself): GODZILLA's layout, kept from gzport. GUNDAM VERSUS' own save folder and file names
+are not checked yet (TODO once the game saves under the port). The files need no conversion: they are copied in as user 1's saves, under the
+game's save id (param.sfo's INSTALL_DIR_SAVEDATA, else TITLE_ID: CUSA08790; the same rule as
 src/probe.c). The saves already there are first copied to USER_DIR/savedata-backups/<date>/, and
 the new ones are staged next to them and swapped in, so a failed copy leaves them as they were. A
 console's own USB copy (sdimg_SAVEDATA00) is encrypted with that console's keys and cannot be
@@ -45,7 +46,7 @@ def save_files(folder):
 
 
 def is_save_folder(folder):
-    """SAVEDATA00 itself or an export named after it (CUSA02046_SAVEDATA00), holding DATA.BIN."""
+    """SAVEDATA00 itself or an export named after it (CUSA08790_SAVEDATA00), holding DATA.BIN."""
     folder = Path(folder)
     return folder.name.upper().endswith(SAVE_DIR) and \
         any(p.name.upper() == SAVE_FILE for p in save_files(folder))
@@ -122,7 +123,7 @@ def import_saves(source, user_dir, game_dir=None, now=None):
     """Copies source's save files in as user 1's saves; returns (target, backup folder or None)."""
     source = Path(source).expanduser()
     if not is_save_folder(source):
-        raise SaveImportError(f'{source} has no GODZILLA save ({SAVE_DIR} with {SAVE_FILE})')
+        raise SaveImportError(f'{source} has no GUNDAM VERSUS save ({SAVE_DIR} with {SAVE_FILE})')
     user_dir = Path(user_dir).expanduser()
     target = user_dir / 'savedata/1' / save_id(user_dir, game_dir) / SAVE_DIR
     if source.resolve() == target.resolve():
@@ -170,7 +171,7 @@ def main():
     if not found:
         reason = ('it is a PS4 USB copy (sdimg_*), encrypted with the console\'s keys: export it '
                   'decrypted on the PS4 (Apollo Save Tool) or with Save Wizard'
-                  if encrypted_ps4_save(a.source) else f'no GODZILLA saves ({SAVE_DIR}, {SAVE_FILE})')
+                  if encrypted_ps4_save(a.source) else f'no GUNDAM VERSUS saves ({SAVE_DIR}, {SAVE_FILE})')
         print(f'Import failed: {reason}', file=sys.stderr)
         return 1
     try:

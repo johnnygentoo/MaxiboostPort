@@ -68,7 +68,7 @@ class PkgInstallTests(unittest.TestCase):
         self.assertEqual(dlc_dir, self.dest.resolve() / 'DLC')
         self.assertTrue((dlc_dir / 'SPEXPANSIONDLC03/sce_sys/param.sfo').is_file())
         self.assertEqual(sorted(p.name for p in self.dest.iterdir()), ['CUSA00900', 'DLC'])
-        self.assertIn('Install: the game is ready (GODZILLA 1.01)', self.lines)
+        self.assertIn('Install: the game is ready (GUNDAM VERSUS 1.13)', self.lines)
 
     def test_an_existing_game_folder_is_never_replaced(self):
         game = package(self.root / 'a.pkg', 'EP9000-CUSA03173_00-BLOODBORNE0000EU', 'gd', '01.09',

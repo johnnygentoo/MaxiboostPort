@@ -4,7 +4,7 @@
 
 The dump's sce_sys/trophy/trophy00.trp holds the icons (PNG) and the trophy lists (TROPCONF.ESFM,
 TROP.ESFM and TROP_xx.ESFM per language). The lists are encrypted: AES-128-CBC with a key made by
-encrypting the game's NP communication id (sce_sys/npbind.dat: GODZILLA's is NPWR08361_00) with
+encrypting the game's NP communication id (sce_sys/npbind.dat: GUNDAM VERSUS' is NPWR11246_00) with
 the PS4's trophy key, which the player supplies (shadPS4's TrophyKey). Without it, the icons only
 (for Bloodborne, NPWR05818_00, PSN's English names: BLOODBORNE_ENGLISH).
 

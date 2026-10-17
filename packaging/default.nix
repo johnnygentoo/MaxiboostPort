@@ -120,7 +120,7 @@ let
       <dir>/usr/share/fonts</dir>
       <dir>/usr/local/share/fonts</dir>
       <dir prefix="xdg">fonts</dir>
-      <cachedir prefix="xdg">gzport/fontconfig</cachedir>
+      <cachedir prefix="xdg">gvport/fontconfig</cachedir>
       <include ignore_missing="yes">${pkgs.fontconfig.out}/etc/fonts/conf.d</include>
     </fontconfig>
   '';
@@ -167,7 +167,7 @@ pkgs.stdenv.mkDerivation {
     ln -s ${dxilSpirv}/bin/dxil-spirv $d/tools/fsr4cap/bin/dxil-spirv
     install -m644 ${fsr4capExe} $d/tools/fsr4cap/bin/fsr4cap.exe
     # FSR 4.1.1 models only with BB_PACKAGE_FSR411=1 (see above); otherwise run.sh finds them in
-    # the data directory (~/.local/share/gzport/fsr4_411).
+    # the data directory (~/.local/share/gvport/fsr4_411).
     if [ -d fsr4_411 ]; then
       ${pkgs.python3}/bin/python3 - <<'PY'
     import sys
@@ -216,7 +216,7 @@ pkgs.stdenv.mkDerivation {
       --prefix PATH : ${lib.makeBinPath [ pkgs.bash pkgs.coreutils pkgs.util-linux pkgs.procps
                                           pkgs.gawk pkgs.gnused pkgs.gnugrep pkgs.spirv-tools
                                           pkgs.systemdMinimal ]} \
-      --run 'export BB_DATA_DIR=''${BB_DATA_DIR:-''${XDG_DATA_HOME:-$HOME/.local/share}/gzport}; mkdir -p "$BB_DATA_DIR"'
+      --run 'export BB_DATA_DIR=''${BB_DATA_DIR:-''${XDG_DATA_HOME:-$HOME/.local/share}/gvport}; mkdir -p "$BB_DATA_DIR"'
     # The game alone, without the launcher (settings from the data directory's bbport.ini).
     makeShellWrapper ${pkgs.python3}/bin/python3 $out/bin/bbport-game \
       ${common}      --add-flags "$out/share/bbport/launcher/bbport_vulkan.py ${pkgs.bash}/bin/bash $out/share/bbport/run.sh" \
@@ -224,7 +224,7 @@ pkgs.stdenv.mkDerivation {
       --set PYTHON ${gamePython}/bin/python3 \
       --set BB_BUNDLED_VK_DRIVER_FILES ${icds} \
       --prefix PATH : ${lib.makeBinPath [ pkgs.bash pkgs.coreutils pkgs.procps ]} \
-      --run 'export BB_DATA_DIR=''${BB_DATA_DIR:-''${XDG_DATA_HOME:-$HOME/.local/share}/gzport}; mkdir -p "$BB_DATA_DIR"'
+      --run 'export BB_DATA_DIR=''${BB_DATA_DIR:-''${XDG_DATA_HOME:-$HOME/.local/share}/gvport}; mkdir -p "$BB_DATA_DIR"'
   '';
   meta.mainProgram = "bbport";
 }
