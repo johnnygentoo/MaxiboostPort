@@ -39,6 +39,10 @@ void runtime_rwlock_report(void);
 void runtime_set_libc_tls(const void *data, uint64_t filesz, uint64_t memsz);
 void runtime_set_module_tls(uint64_t module, const void *data, uint64_t filesz, uint64_t memsz);
 void runtime_set_procparam(void *param);
+/* gzport: where the linker put libc.prx (its load address differs per game; NULL without it). */
+void runtime_set_libc_module(const unsigned char *base, uint64_t size);
+extern const unsigned char *runtime_libc_module;
+extern uint64_t runtime_libc_module_size;
 void **runtime_application_heap_api(void);
 uintptr_t runtime_thread_resolve(const char *name);
 void runtime_thread_report(void);

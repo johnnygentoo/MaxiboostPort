@@ -281,7 +281,8 @@ static SDL_Gamepad *current_gamepad(void) {
     return gamepad;
 }
 /* bbport (frame stats): the game's libc heap, read every 5 s from a game thread (it reads the pad)
- * with libc.prx's malloc_stats (export stub at libc.prx+0x1f8c0; malloc_stats_fast returns 1 in this libc, the module at image +0x56e0000):
+ * with libc.prx's malloc_stats (export stub at libc.prx+0x1f8c0; malloc_stats_fast returns 1 in this libc;
+ * gzport: the module is where the linker put it, image +0x56e0000 in Bloodborne, +0xb40000 in GODZILLA):
  * in use now and at most, and what it took from the system. A heap that keeps growing is a leak. */
 typedef struct { uint16_t size, version; uint32_t reserved; uint64_t max_system, system, max_in_use, in_use; } MallocManagedSize;
 static void report_guest_heap(void) {
@@ -290,7 +291,8 @@ static void report_guest_heap(void) {
     const uint64_t now=now_us();
     if (!enabled || now-last<5000000) return;
     last=now;
-    const uint8_t *stub=(const uint8_t *)(0x800000000ull+0x56e0000+0x1f8c0);
+    if (!runtime_libc_module || runtime_libc_module_size<0x1f8c0+6) { enabled=0; return; }
+    const uint8_t *stub=runtime_libc_module+0x1f8c0;
     if (stub[0]!=0xff || stub[1]!=0x25) return; /* another libc */
     ABI int (*stats)(MallocManagedSize *)=(ABI int (*)(MallocManagedSize *))(uintptr_t)stub;
     MallocManagedSize m={.size=sizeof(m),.version=1};

@@ -25,6 +25,11 @@ static _Atomic size_t memory_calls;
 static struct { const void *data; uint64_t filesz, memsz; } tls_modules[TLS_MODULES];
 static _Thread_local unsigned char *tls_blocks[TLS_MODULES];
 static void *process_param;
+const unsigned char *runtime_libc_module;
+uint64_t runtime_libc_module_size;
+void runtime_set_libc_module(const unsigned char *base, uint64_t size) {
+    runtime_libc_module=base; runtime_libc_module_size=size;
+}
 void runtime_set_procparam(void *param) {
     process_param=param;
     /* bbport: the game's libc heap settings (SceProcParam +0x30: SceLibcParam; its +0x10.. pointers to
