@@ -78,6 +78,14 @@ static int32_t ensure_mutex(GuestMutex **mutex) {
     pthread_mutex_unlock(&static_init);
     return e;
 }
+/* BB_MUTEX_TRACE=1: the first errors a guest gets from a mutex (non-owner unlock, relock). */
+static void mutex_error_note(const char *what, GuestMutex **mutex, int32_t e, void *caller) {
+    static int trace=-1, told;
+    if (trace<0) { const char *v=getenv("BB_MUTEX_TRACE"); trace=v && v[0]=='1'; }
+    if (!e || e==(int32_t)UINT32_C(0x80020010) || !trace || told++>=20) return;
+    printf("Mutex: %s %p -> %#x (caller guest+%#lx)\n",what,(void *)*mutex,(unsigned)e,
+           (unsigned long)((uintptr_t)caller-UINT64_C(0x800000000)));
+}
 static ABI int32_t mutex_lock(GuestMutex **mutex) {
     int32_t e = ensure_mutex(mutex);
     if (e) return e;
@@ -89,6 +97,7 @@ static ABI int32_t mutex_lock(GuestMutex **mutex) {
     }
     e = orbis_error(r);
     if (!e) ++locks;
+    mutex_error_note("lock",mutex,e,__builtin_return_address(0));
     return e;
 }
 static ABI int32_t mutex_trylock(GuestMutex **mutex) {
@@ -103,6 +112,7 @@ static ABI int32_t mutex_unlock(GuestMutex **mutex) {
     if ((uintptr_t)*mutex < 2) return orbis_error(EPERM);
     int32_t e = orbis_error(pthread_mutex_unlock(&(*mutex)->native));
     if (!e) ++unlocks;
+    mutex_error_note("unlock",mutex,e,__builtin_return_address(0));
     return e;
 }
 static ABI int32_t mutex_destroy(GuestMutex **mutex) {

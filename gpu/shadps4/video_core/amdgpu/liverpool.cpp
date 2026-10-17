@@ -8,7 +8,10 @@
 #include <sys/resource.h>
 #include <sys/uio.h>
 #include <unistd.h>
+#include <algorithm>
 #include <array>
+#include <string>
+#include <vector>
 #include <optional>
 #include <utility>
 #include <time.h>
@@ -384,6 +387,36 @@ bool PipelinedOpcode(PM4ItOpcode opcode) {
 } // namespace
 
 namespace {
+// bbport: BB_LABEL_WATCH=<hex address> (or <hex start>-<hex end>): every fence or data write
+// the command stream makes within 256 bytes of it (or in the range), decoded (the guest waits on
+// one that never comes: was it issued?).
+void WatchLabel(const char* what, VAddr address, u64 value, u32 size, int queue = -1) {
+    // Comma-separated: <hex address> (256 bytes around it) or <hex start>-<hex end>.
+    static const std::vector<std::pair<u64, u64>> watch = [] {
+        std::vector<std::pair<u64, u64>> ranges;
+        for (const char* at = std::getenv("BB_LABEL_WATCH"); at && *at;) {
+            char* rest = nullptr;
+            const u64 start = std::strtoull(at, &rest, 16);
+            if (rest && *rest == '-') {
+                ranges.emplace_back(start, std::strtoull(rest + 1, &rest, 16));
+            } else {
+                ranges.emplace_back(start > 256 ? start - 256 : 0, start + 256);
+            }
+            at = rest && *rest == ',' ? rest + 1 : nullptr;
+        }
+        return ranges;
+    }();
+    if (std::none_of(watch.begin(), watch.end(), [&](const auto& r) {
+            return address + size > r.first && address < r.second;
+        })) {
+        return;
+    }
+    std::printf("Label: %s%s %#llx = %#llx (%u bytes)\n", what,
+                queue < 0 ? "" : (" q" + std::to_string(queue)).c_str(),
+                static_cast<unsigned long long>(address), static_cast<unsigned long long>(value), size);
+    std::fflush(stdout);
+}
+
 // bbport: a label written straight into guest memory (no backing view): one store. A memcpy of a
 // variable 4 or 8 bytes is two overlapping stores in glibc; a thread preempted between them
 // wrote the label again after the guest had freed its block (runtime_memory_write_backing).
@@ -439,6 +472,9 @@ void SignalEop(const PM4CmdEventWriteEop& eop, u64 seq) {
 // the draw recording thread when the draw pipeline is in use).
 void RunEventWriteEop(Vulkan::Rasterizer& rasterizer, const u8* data) {
     const auto eop = *reinterpret_cast<const PM4CmdEventWriteEop*>(data);
+    WatchLabel("EOP", reinterpret_cast<VAddr>(eop.Address<u8>()),
+               eop.data_sel.Value() == DataSelect::Data32Low ? eop.DataDWord() : eop.DataQWord(),
+               static_cast<u32>(eop.data_sel.Value()));
     if (eop.data_sel.Value() != DataSelect::None) {
         BbStats::eop_decoded.fetch_add(1, std::memory_order_relaxed);
     }
@@ -620,6 +656,8 @@ void RunGpuClockCopy(Vulkan::Rasterizer& rasterizer, const u8* data) {
 void RunWriteData(Vulkan::Rasterizer& rasterizer, const u8* data) {
     const auto* header = reinterpret_cast<const PM4Header*>(data);
     const auto* write_data = reinterpret_cast<const PM4CmdWriteData*>(data);
+    WatchLabel("WriteData", write_data->Address<VAddr>(), write_data->data[0],
+               (header->type3.count.Value() - 2) * sizeof(u32));
     // bbport BB_GUEST_IN_PLACE: the GPU writes it in stream order, as the command processor
     // does. A CPU store here lands before the GPU has run the work recorded before it, which may
     // still read the old value (the game orders such writes after its own fences and
@@ -662,6 +700,8 @@ void WriteEosLabel(void* address, u64 value, u32 num_bytes) {
 
 void RunEventWriteEos(Vulkan::Rasterizer& rasterizer, const u8* data) {
     const auto& event_eos = *reinterpret_cast<const PM4CmdEventWriteEos*>(data);
+    WatchLabel("EOS", reinterpret_cast<VAddr>(event_eos.Address()), event_eos.DataDWord(),
+               static_cast<u32>(event_eos.command.Value()));
     // BB_HONEST_LABELS: end of shader work, so written once the GPU has finished it.
     if (Vulkan::Rasterizer::HonestLabels() &&
         event_eos.command == PM4CmdEventWriteEos::Command::SignalFence) {
@@ -1962,6 +2002,10 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
                 if (dma_data->dst_addr_lo == 0x3022C || !rasterizer) {
                     break;
                 }
+                if (dma_data->dst_sel == DmaDataDst::Memory || dma_data->dst_sel == DmaDataDst::MemoryUsingL2) {
+                    WatchLabel(dma_data->src_sel == DmaDataSrc::Data ? "DmaData fill" : "DmaData copy",
+                               dma_data->DstAddress<VAddr>(), dma_data->data, dma_data->NumBytes());
+                }
                 // bbport: what the copy reads on the recording thread is known here: a later
                 // DumpConstRam waits only if it overlaps it (unlisted, every dump waited for the
                 // copy; ~150 of those waits a second).
@@ -2018,6 +2062,7 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
                 // like DMA_DATA.
                 const auto* copy_data = reinterpret_cast<const PM4CmdCopyData*>(header);
                 const u32 num_bytes = copy_data->count_sel.Value() ? 8 : 4;
+                WatchLabel("CopyData", copy_data->DstAddress<VAddr>(), copy_data->SrcAddress<u64>(), num_bytes);
                 const auto src = copy_data->src_sel.Value();
                 const auto dst = copy_data->dst_sel.Value();
                 const bool to_memory = dst == CopyDataDst::MemorySync ||
@@ -2341,6 +2386,16 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
 
     auto base_addr = reinterpret_cast<VAddr>(acb.data());
     size_t acb_size = acb.size_bytes();
+    // bbport: BB_ASC_TRACE=<queue>: every packet that compute queue decodes (a stalled queue).
+    static const int asc_trace = [] {
+        const char* env = std::getenv("BB_ASC_TRACE");
+        return env ? std::atoi(env) : -1;
+    }();
+    const bool tracing = asc_trace == int(vqid);
+    if (tracing) {
+        std::printf("ASC q%u: %s %#llx, %zu dwords\n", vqid, is_indirect ? "indirect" : "task",
+                    static_cast<unsigned long long>(base_addr), acb.size());
+    }
     while (!acb.empty()) {
         ProcessCommands();
         if (rasterizer) {
@@ -2348,7 +2403,19 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
         }
 
         auto* header = reinterpret_cast<const PM4Header*>(acb.data());
-        u32 next_dw_off = header->type3.NumWords() + 1;
+        // bbport: a type-2 packet (padding) is one dword whatever its count bits say. Measured as
+        // a type-3 packet, the filler GUNDAM VERSUS puts in the last dword of a compute ring (0x80000000:
+        // two dwords) looked split across the ring's end; the next submission then resumed that
+        // "packet" one dword in, decoded the middle of its first packet as a header and buffered
+        // the whole submission away as another split packet: its fence was never written and every
+        // queue waiting for it (and the game, for the frame) waited forever.
+        u32 next_dw_off = header->type == 2 ? 1 : header->type3.NumWords() + 1;
+        if (tracing) {
+            std::printf("ASC q%u: %#llx type %u opcode %#x\n", vqid,
+                        static_cast<unsigned long long>(reinterpret_cast<VAddr>(acb.data())),
+                        u32(header->type.Value()), u32(header->type3.opcode.Value()));
+            std::fflush(stdout);
+        }
 
         // If we have a buffered packet, use it.
         if (queue.tmp_dwords > 0) [[unlikely]] {
@@ -2410,6 +2477,10 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
             const auto* dma_data = reinterpret_cast<const PM4DmaData*>(header);
             if (dma_data->dst_addr_lo == 0x3022C || !rasterizer) {
                 break;
+            }
+            if (dma_data->dst_sel == DmaDataDst::Memory || dma_data->dst_sel == DmaDataDst::MemoryUsingL2) {
+                WatchLabel(dma_data->src_sel == DmaDataSrc::Data ? "compute DmaData fill" : "compute DmaData copy",
+                           dma_data->DstAddress<VAddr>(), dma_data->data, dma_data->NumBytes(), int(vqid));
             }
             ASSERT(dma_data->command.das == 0);
             if (dma_data->src_sel == DmaDataSrc::Data && dma_data->dst_sel == DmaDataDst::Gds) {
@@ -2547,6 +2618,7 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
             const auto* write_data = reinterpret_cast<const PM4CmdWriteData*>(header);
             ASSERT(write_data->dst_sel.Value() == 2 || write_data->dst_sel.Value() == 5);
             const u32 data_size = (header->type3.count.Value() - 2) * 4;
+            WatchLabel("compute WriteData", write_data->Address<VAddr>(), write_data->data[0], data_size, int(vqid));
             if (!write_data->wr_one_addr.Value()) {
                 BbFreeCheck::Check(write_data->Address<u64>(), data_size, write_data->data,
                                    BbFreeCheck::ComputeWriteData);
@@ -2571,7 +2643,14 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
                     mem_semaphore->Signal();
                 }
             } else {
+                const auto wait_start = std::chrono::steady_clock::now();
+                bool wait_told = false;
                 while (!mem_semaphore->Signaled()) {
+                    if (!wait_told && std::chrono::steady_clock::now() - wait_start > std::chrono::seconds(2)) {
+                        wait_told = true;
+                        std::printf("GPU: compute queue %u waits on a memory semaphore\n", vqid);
+                        std::fflush(stdout);
+                    }
                     if (rasterizer && rasterizer->HasUnsubmittedSignals()) {
                         rasterizer->Flush();
                     }
@@ -2584,7 +2663,22 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
         case PM4ItOpcode::WaitRegMem: {
             const auto* wait_reg_mem = reinterpret_cast<const PM4CmdWaitRegMem*>(header);
             ASSERT(wait_reg_mem->engine.Value() == PM4CmdWaitRegMem::Engine::Me);
+            // bbport: a compute wait unmet for a long time says what it waits for (once each).
+            const auto wait_start = std::chrono::steady_clock::now();
+            bool wait_told = false;
             while (!wait_reg_mem->Test(regs.reg_array)) {
+                if (!wait_told && std::chrono::steady_clock::now() - wait_start > std::chrono::seconds(2)) {
+                    wait_told = true;
+                    const bool memory = wait_reg_mem->mem_space.Value() == PM4CmdWaitRegMem::MemSpace::Memory;
+                    std::printf("GPU: compute queue %u waits on %s %#llx: (value %#x & %#x) function %u ref %#x\n",
+                                vqid, memory ? "memory" : "register",
+                                memory ? static_cast<unsigned long long>(wait_reg_mem->Address<VAddr>())
+                                       : static_cast<unsigned long long>(wait_reg_mem->Reg()),
+                                memory ? *wait_reg_mem->Address() : regs.reg_array[wait_reg_mem->Reg()],
+                                wait_reg_mem->mask, static_cast<u32>(wait_reg_mem->function.Value()),
+                                wait_reg_mem->ref);
+                    std::fflush(stdout);
+                }
                 // BB_HONEST_LABELS: the value may come from a fence waiting for work not
                 // submitted yet; this thread would spin on it forever.
                 if (rasterizer && rasterizer->HasUnsubmittedSignals()) {
@@ -2597,6 +2691,9 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
         case PM4ItOpcode::ReleaseMem: {
             // BB_HONEST_LABELS: written once the GPU has finished the work before it (not a GDS store,
             // which needs the GPU copy recorded here).
+            WatchLabel("compute ReleaseMem", reinterpret_cast<const PM4CmdReleaseMem*>(header)->Address<VAddr>(),
+                       reinterpret_cast<const PM4CmdReleaseMem*>(header)->DataQWord(),
+                       static_cast<u32>(reinterpret_cast<const PM4CmdReleaseMem*>(header)->data_sel.Value()), int(vqid));
             if (const auto* rm = reinterpret_cast<const PM4CmdReleaseMem*>(header);
                 rasterizer && Vulkan::Rasterizer::HonestLabels() &&
                 rm->data_sel.Value() != DataSelect::GdsMemStore) {
@@ -2673,6 +2770,11 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
             *queue.read_addr += next_dw_off;
             *queue.read_addr %= queue.ring_size_dw;
         }
+    }
+    if (tracing) {
+        std::printf("ASC q%u: %s %#llx done\n", vqid, is_indirect ? "indirect" : "task",
+                    static_cast<unsigned long long>(base_addr));
+        std::fflush(stdout);
     }
 
     FIBER_EXIT;
@@ -2812,6 +2914,12 @@ void Liverpool::SubmitAsc(u32 gnm_vqid, std::span<const u32> acb) {
     auto& queue = mapped_queues[gnm_vqid];
 
     const auto vqid = gnm_vqid - 1;
+    // bbport: with BB_LABEL_WATCH, the compute submissions in order (which queue got work).
+    static const bool watching = std::getenv("BB_LABEL_WATCH") != nullptr;
+    if (watching) {
+        std::printf("Label: submit q%u (%zu dwords at %p)\n", vqid, acb.size(),
+                    static_cast<const void*>(acb.data()));
+    }
     const auto& task = ProcessCompute(acb, vqid);
     {
         std::scoped_lock lock{queue.m_access};

@@ -236,6 +236,14 @@ static void dump_frames(ucontext_t *uc) {
     char arg[]="  tid=0000000000000000 rdi=0000000000000000\n";
     write_hex(arg+6,tid); write_hex(arg+27,(uint64_t)uc->uc_mcontext.gregs[REG_RDI]);
     { ssize_t written_=write(2,arg,sizeof(arg)-1); (void)written_; }
+    /* The registers a guest wait loop keeps its pointers in (a polled GPU label, its object). */
+    { static const int regs[]={REG_RAX,REG_RBX,REG_RCX,REG_RDX,REG_RSI,REG_R12,REG_R13,REG_R14,REG_R15};
+      static const char names[][4]={"rax","rbx","rcx","rdx","rsi","r12","r13","r14","r15"};
+      char text[]="  reg=0000000000000000\n";
+      for (unsigned i=0;i<sizeof(regs)/sizeof(*regs);++i) {
+          memcpy(text+2,names[i],3); write_hex(text+6,(uint64_t)uc->uc_mcontext.gregs[regs[i]]);
+          ssize_t written_=write(2,text,sizeof(text)-1); (void)written_;
+      } }
     /* The thread's name (/proc/self/task/<tid>/comm; open and read are async-signal-safe). */
     { char path[]="/proc/self/task/0000000000/comm", name[40]="  name=";
       uint64_t v=tid; for (int i=25;i>=16;--i) { path[i]=(char)('0'+v%10); v/=10; }
