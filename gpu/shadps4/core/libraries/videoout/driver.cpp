@@ -69,6 +69,16 @@ constexpr u32 PixelFormatBpp(PixelFormat pixel_format) {
 }
 
 VideoOutDriver::VideoOutDriver(u32 width, u32 height) {
+    // gzport: BB_DISPLAY_RES=WxH reports another display to the game (sceVideoOutGetResolutionStatus):
+    // games that size their frame from it render at that size.
+    if (const char* res = std::getenv("BB_DISPLAY_RES")) {
+        u32 w = 0, h = 0;
+        if (std::sscanf(res, "%ux%u", &w, &h) == 2 && w >= 640 && h >= 360 && w <= 7680 && h <= 4320) {
+            width = w;
+            height = h;
+            std::printf("VideoOut: display reported as %ux%u (BB_DISPLAY_RES)\n", w, h);
+        }
+    }
     main_port.resolution.full_width = width;
     main_port.resolution.full_height = height;
     main_port.resolution.pane_width = width;
@@ -177,6 +187,9 @@ int VideoOutDriver::RegisterBuffers(VideoOutPort* port, s32 startIndex, void* co
     if (group_index >= MaxDisplayBufferGroups) {
         return ORBIS_VIDEO_OUT_ERROR_NO_EMPTY_SLOT;
     }
+    std::printf("VideoOut: %d display buffers registered, %ux%u (pitch %u), pixel format %#x\n", bufferNum,
+                attribute->width, attribute->height, attribute->pitch_in_pixel,
+                static_cast<u32>(attribute->pixel_format));
 
     if (startIndex + bufferNum > MaxDisplayBuffers || startIndex > MaxDisplayBuffers ||
         bufferNum > MaxDisplayBuffers) {

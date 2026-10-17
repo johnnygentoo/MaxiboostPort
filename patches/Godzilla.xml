@@ -5,4 +5,17 @@
     <TitleID>
         <ID>CUSA02046</ID>
     </TitleID>
+    <!-- The display setup (0x575aa0) takes its size from a mode table (0x8ee6b0: id, width,
+         height; mode 3 is 1920x1080), snaps it to the next of 1280x720..1920x1080 (0x8ee6f4) and
+         then clamps anything larger back to 1920x1080 (0x575be1). The template sets mode 3 to
+         1280x720 and turns the clamp off; scripts/patches.py writes the size it renders at into
+         the two table words. -->
+    <Metadata Title="GODZILLA" Name="Resolution Patch 1280x720 (16:9)" Author="gzport" PatchVer="1.0" AppVer="01.01" AppElf="eboot.bin">
+        <PatchList>
+            <Line Type="bytes32" Address="0x008ee6d8" Value="0x00000500"/>
+            <Line Type="bytes32" Address="0x008ee6dc" Value="0x000002D0"/>
+            <Line Type="bytes" Address="0x00575be6" Value="6690"/>
+            <Line Type="bytes" Address="0x00575bf3" Value="EB"/>
+        </PatchList>
+    </Metadata>
 </Patch>

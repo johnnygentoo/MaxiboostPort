@@ -145,6 +145,8 @@ s32 PS4_SYSV_ABI sceVideoOutRegisterBuffers(s32 handle, s32 startIndex, void* co
 
 s32 PS4_SYSV_ABI sceVideoOutSetFlipRate(s32 handle, s32 rate) {
     LOG_TRACE(Lib_VideoOut, "called");
+    // bbport: the game's frame rate (0: every vblank, 1: every second one, 2: every third).
+    std::printf("VideoOut: flip rate %d (one flip every %d vblanks)\n", rate, rate + 1);
     driver->GetPort(handle)->flip_rate = rate;
     return ORBIS_OK;
 }
