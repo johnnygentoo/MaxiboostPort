@@ -276,14 +276,17 @@ def fps_modes(have=None):
     return [mode for mode in FPS_MODES if all(name in have for name in FPS_PRESETS.get(mode[1], ()))]
 
 
+LAUNCHER_ICON = PORT_DIR / "launcher" / "godzilla.svg"
+
+
 def game_icon(game_dir):
     """The game's own icon (sce_sys/icon0.png of the player's dump, never in the repository), else
-    the launcher's."""
+    the launcher's: for the Steam shortcut."""
     if game_dir:
         icon = Path(game_dir).expanduser() / "sce_sys" / "icon0.png"
         if icon.is_file():
             return icon
-    return PORT_DIR / "launcher" / "godzilla.svg"
+    return LAUNCHER_ICON
 
 
 def dlc_addons(dlc, title_id):
@@ -655,7 +658,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         # The brand: the game's icon from the player's dump (or the launcher's) and its name.
         brand = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER, css_classes=["gz-brand"])
-        self.brand_icon = Gtk.Image(pixel_size=28)
+        self.brand_icon = Gtk.Image(pixel_size=34)
         brand.append(self.brand_icon)
         names = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
         names.append(Gtk.Label(label="GODZILLA", xalign=0, css_classes=["gz-title"]))
@@ -1270,9 +1273,9 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.show_game_icon()
 
     def show_game_icon(self):
-        """The header's and the About page's icon: the game's own from its folder, or the
-        launcher's."""
-        icon = str(game_icon(self.settings["game_dir"]))
+        """The header's and the About page's icon: the launcher's own (its cyan on navy goes with
+        the JohnnyCyan theme, as the menu entry's)."""
+        icon = str(LAUNCHER_ICON)
         self.brand_icon.set_from_file(icon)
         if hasattr(self, "about_icon"):
             self.about_icon.set_from_file(icon)
