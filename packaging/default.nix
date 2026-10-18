@@ -21,7 +21,8 @@ let
   # DLSS (a build with DLSS_SDK_ROOT): the bridge, NVIDIA's runtime library and its license, as
   # NVIDIA's RTX SDK license allows in an application. Without them the launcher lets the player
   # choose NVIDIA's library (the bridge is still needed).
-  dlssFiles = [ "out/libbbport_dlss.so" "out/NVIDIA-DLSS-LICENSE.txt" "out/gpu/libbbnet.so" ];
+  dlssFiles = [ "out/libbbport_dlss.so" "out/NVIDIA-DLSS-LICENSE.txt" "out/gpu/libbbnet.so"
+               "out/gpu/gvnet-server" ];
   isNgx = rel: lib.hasPrefix "out/libnvidia-ngx-dlss.so." rel;
   src = builtins.path {
     name = "bbport-src";
@@ -191,6 +192,10 @@ pkgs.stdenv.mkDerivation {
     # The online module (gpu/bbnet), when the build has it.
     if [ -f out/gpu/libbbnet.so ]; then
       install -Dm755 out/gpu/libbbnet.so $d/bin/gpu/libbbnet.so
+    fi
+    # Its matching server for two players on one PC (run.sh BB_COOP: bin/gvnet-server).
+    if [ -f out/gpu/gvnet-server ]; then
+      install -m755 out/gpu/gvnet-server $d/bin/gvnet-server
     fi
     if [ -f out/libbbport_dlss.so ]; then
       install -m755 out/libbbport_dlss.so $d/bin/libbbport_dlss.so

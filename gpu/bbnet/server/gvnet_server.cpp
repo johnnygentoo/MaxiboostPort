@@ -176,7 +176,7 @@ std::map<std::pair<std::string, uint64_t>, Room> g_rooms;  // (title, room id)
 std::map<std::string, std::pair<std::string, uint16_t>> g_udp; // npid -> observed UDP endpoint
 std::map<std::pair<std::string, std::string>, std::vector<BinSlot>> g_user_info;
 std::map<std::string, uint64_t> g_user_ids;
-uint64_t g_next_room = 1, g_next_user = 1;
+uint64_t g_next_room = 1;
 
 // ---- packets ----
 
@@ -402,7 +402,18 @@ Error CmdLogin(Client& c, const std::string& in, std::string& out) {
     c.npid = req.npid();
     c.title = req.title_id();
     auto id = g_user_ids.find(c.npid);
-    if (id == g_user_ids.end()) id = g_user_ids.emplace(c.npid, 0x1000 + g_next_user++).first;
+    if (id == g_user_ids.end()) {
+        // The same account id for a name every time (title user storage and saves keyed by it
+        // stay with the player whatever the order they sign in): FNV-1a of the name.
+        uint64_t h = 1469598103934665603ull;
+        for (unsigned char ch : c.npid) h = (h ^ ch) * 1099511628211ull;
+        uint64_t uid = 0x100000000ull + (h & 0x7fffffff);
+        for (bool taken = true; taken;) {
+            taken = false;
+            for (const auto& [name, other] : g_user_ids) if (other == uid) { taken = true; ++uid; }
+        }
+        id = g_user_ids.emplace(c.npid, uid).first;
+    }
     c.user_id = id->second;
     c.authed = true;
     shadnet::LoginReply rep;

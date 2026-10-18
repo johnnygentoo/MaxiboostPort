@@ -250,6 +250,37 @@ static int is_preferred(SDL_JoystickID id, const char *want) {
     const char *name=SDL_GetGamepadNameForID(id);
     return !strcasecmp(guid,want) || (name && strcasestr(name,want));
 }
+/* BB_GAMEPAD_SLOT=n (couch versus, run.sh BB_COOP: one game per player): this game takes the
+ * n-th gamepad and no other, so two games never read the same one. Both games order the gamepads
+ * alike: the launcher's choice (BB_GAMEPAD) first, then by device path (two pads of one model have
+ * the same name and GUID, never the same path). Until the n-th is connected the game has none
+ * (looked for again every second). */
+static int gamepad_slot(void) {
+    static int slot=-1;
+    if (slot<0) { const char *v=getenv("BB_GAMEPAD_SLOT"); slot=v && *v ? atoi(v) : 0; if (slot<0) slot=0; }
+    return slot;
+}
+typedef struct { SDL_JoystickID id; int preferred; const char *path; } SlotPad;
+static int slot_order(const void *a, const void *b) {
+    const SlotPad *x=a, *y=b;
+    if (x->preferred!=y->preferred) return y->preferred-x->preferred;
+    const int c=strcmp(x->path,y->path);
+    return c ? c : (x->id>y->id)-(x->id<y->id);
+}
+static SDL_JoystickID slot_gamepad(int slot, const char *want) {
+    int count=0;
+    SDL_JoystickID *ids=SDL_GetGamepads(&count), pick=0;
+    SlotPad pads[16]; int n=0;
+    for (int i=0;ids && i<count && n<16;++i) {
+        const char *path=SDL_GetGamepadPathForID(ids[i]);
+        pads[n++]=(SlotPad){ids[i], want && is_preferred(ids[i],want), path ? path : ""};
+    }
+    qsort(pads,(size_t)n,sizeof *pads,slot_order);
+    if (slot<=n) pick=pads[slot-1].id;
+    SDL_free(ids);
+    return pick;
+}
+static const uint8_t slot_colors[4][3]={{0,0,64},{64,0,0},{0,64,0},{64,0,32}};
 /* The chosen gamepad, else the first while it is not connected (checked again every second, it
  * is taken as soon as it connects); called under lock. */
 static SDL_Gamepad *current_gamepad(void) {
@@ -259,6 +290,20 @@ static SDL_Gamepad *current_gamepad(void) {
     if (gamepad && !SDL_GamepadConnected(gamepad)) { SDL_CloseGamepad(gamepad); gamepad=NULL; }
     const char *want=preferred_gamepad();
     const uint64_t now=now_us();
+    if (gamepad_slot()) {
+        if (!gamepad && now-last_scan>1000000) {
+            last_scan=now;
+            const SDL_JoystickID id=slot_gamepad(gamepad_slot(),want);
+            if (id && (gamepad=SDL_OpenGamepad(id))) {
+                cal_reset();
+                ++connected_count;
+                const uint8_t *c=slot_colors[(gamepad_slot()-1)%4];
+                SDL_SetGamepadLED(gamepad,c[0],c[1],c[2]);
+                printf("Runtime: gamepad %d connected: %s\n",gamepad_slot(),SDL_GetGamepadName(gamepad));
+            }
+        }
+        return gamepad;
+    }
     if (!gamepad || (want && !on_preferred && now-last_scan>1000000)) {
         last_scan=now;
         int count=0, pick=-1;

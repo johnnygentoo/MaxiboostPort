@@ -77,6 +77,10 @@ if [[ $game != "$(realpath "$original_game")" ]]; then
     trap '"$PYTHON" -c '\''import shutil,sys; shutil.rmtree(sys.argv[1])'\'' "$mod_game"' EXIT
 fi
 "$PYTHON" scripts/prepare.py "$game" --out "$out"
+# Couch versus (BB_COOP=1, launcher: "Two players"): two games, one per player and controller,
+# play each other through Player Match on a server on this PC (GUNDAM VERSUS has no local
+# multiplayer: its versus modes are online only). See the end of this script.
+if [[ ${BB_COOP:-0} == 1 ]]; then export BB_ONLINE=1; fi
 # Online play (BB_ONLINE=1) also links the game's own libSceNpToolkit2.prx: GUNDAM VERSUS leaves
 # PSN to it (sign-in state, callbacks, sessions); offline the runtime answers for it.
 modules=(libc.prx libSceFios2.prx)
@@ -248,47 +252,25 @@ else
     bash build.sh
     probe=${BB_PROBE:-out/bb-probe}  # BB_PROBE: a wrapper (gdb) around it
 fi
-# Online play (BB_ONLINE=1, launcher: Online; the online module gpu/bbnet): the game's own server
-# goes to the community server, summon signs to the shadNet WebAPI (scripts/online.py).
-if [[ ${BB_ONLINE:-0} == 1 && -f scripts/online.py ]]; then
-    export BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-srv.shadps4.net:31313}
-    # HTTPS needs CA certificates: OpenSSL from Nix looks only in its own store path (the
-    # packaged wrapper brings a bundle; from source the system's is taken).
-    if [[ ! -r ${SSL_CERT_FILE:-} ]]; then
-        for bundle in "${NIX_SSL_CERT_FILE:-}" /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/cert.pem /etc/ssl/ca-bundle.pem; do
-            [[ -n $bundle && -r $bundle ]] && { export SSL_CERT_FILE=$bundle; break; }
-        done
-    fi
+# Online play (BB_ONLINE=1; the online module gpu/bbnet): GUNDAM VERSUS' PSN matching goes to a
+# shadNet server, gvnet-server (gpu/bbnet/server): BB_SHADNET_SERVER host:port, default one on
+# this PC, started for this launch when none listens there. BB_SHADNET_NPID: the player's name.
+if [[ ${BB_ONLINE:-0} == 1 ]]; then
+    export BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-127.0.0.1:31313}
+    export BB_SHADNET_NPID=${BB_SHADNET_NPID:-${USER:-Player}}
+    export BB_SHADNET_PASSWORD=${BB_SHADNET_PASSWORD:-local} BB_UPNP=${BB_UPNP:-0}
     [[ -n ${BB_SHADNET_WEBAPI:-} ]] || export BB_SHADNET_WEBAPI=http://${BB_SHADNET_SERVER%:*}:31315
-    if [[ ${BB_BRIDGE:-0} == 1 ]]; then
-        # The Hunter's Dream (launcher: Online): bbbridge on this PC is the shadNet server
-        # (scripts/online.py). One already listening (a test, another launch) is used as it is;
-        # else bbbridge-cli runs for this launch and a watcher stops it once the game ($$, after the
-        # exec below) has ended.
-        bridge_cli=${BB_BRIDGE_CLI:-out/bbbridge/bbbridge-cli}
-        { read -r bridge_config; read -r SHADPS4_HTTP_HOST_OVERRIDES_JSON; } < <("$PYTHON" scripts/online.py bridge --user "${BB_USER_DIR:-$data/user}")
-        export SHADPS4_HTTP_HOST_OVERRIDES_JSON
-        bridge_up() { (exec 9<>/dev/tcp/127.0.0.1/31313) 2>/dev/null; }
-        if bridge_up; then
-            echo "Co-op: The Hunter's Dream as ${BB_SHADNET_NPID:-?}, through the bbbridge already running"
-        elif [[ ! -x $bridge_cli ]]; then
-            echo "STOP: The Hunter's Dream needs bbbridge-cli ($bridge_cli), not in this build" >&2; exit 1
-        else
-            bridge_log=${bridge_config%/*}/bbbridge.log
-            "$bridge_cli" --config "$bridge_config" --log "$bridge_log" </dev/null >/dev/null 2>&1 &
-            bridge_pid=$!
-            for _ in $(seq 100); do
-                bridge_up && break
-                kill -0 "$bridge_pid" 2>/dev/null || { echo "STOP: bbbridge stopped at start:" >&2; tail -5 "$bridge_log" >&2; exit 1; }
-                sleep 0.1
-            done
-            game_pid=$$
-            ( while kill -0 "$game_pid" 2>/dev/null; do sleep 2; done; kill -TERM "$bridge_pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
-            echo "Co-op: The Hunter's Dream as ${BB_SHADNET_NPID:-?}, through bbbridge (log: $bridge_log)"
-        fi
-    else
-        SHADPS4_HTTP_HOST_OVERRIDES_JSON=$("$PYTHON" scripts/online.py overrides --user "${BB_USER_DIR:-$data/user}") || true
-        export SHADPS4_HTTP_HOST_OVERRIDES_JSON
+    server_host=${BB_SHADNET_SERVER%:*} server_port=${BB_SHADNET_SERVER##*:}
+    server_up() { (exec 9<>"/dev/tcp/$server_host/$server_port") 2>/dev/null; }
+    if [[ $server_host == 127.0.0.1 || $server_host == localhost ]] && ! server_up; then
+        if [[ -n ${BB_PREBUILT:-} ]]; then gvnet=bin/gvnet-server; else gvnet=out/gpu/gvnet-server; fi
+        if [[ ! -x $gvnet ]]; then echo "STOP: online play needs $gvnet (the online module is not in this build)" >&2; exit 1; fi
+        "$gvnet" --bind 127.0.0.1 --port "$server_port" </dev/null > >(while IFS= read -r line; do printf '%s\n' "$line"; done) 2>&1 &
+        server_pid=$!
+        for _ in $(seq 50); do server_up && break; sleep 0.1; done
+        game_pid=$$
+        ( while kill -0 "$game_pid" 2>/dev/null; do sleep 2; done; kill -TERM "$server_pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
+        echo "Online: gvnet-server on 127.0.0.1:$server_port for this launch"
     fi
 fi
 # Trophies (scripts/trophies.py): the dump's list and icons in the user directory, for the
@@ -305,6 +287,53 @@ if [[ ${BB_DISCORD:-0} == 1 && -n ${BB_DISCORD_CLIENT_ID:-} ]]; then
     "$PYTHON" scripts/discord_presence.py --pid $$ </dev/null &
 fi
 probe_args=("$out/boot-linked.bin" --content-profile "$out/content.bin" --patches "$out/patches.bin" --app0 "$game" --user "${BB_USER_DIR:-$data/user}" --timeout "${BB_TIMEOUT:-0}" "$@")
+# Couch versus: player 1 plays from the usual saves, player 2 from $data/user-p2 (BB_COOP_USER2),
+# a copy of player 1's saves the first time. Each game takes its own gamepad (BB_GAMEPAD_SLOT: the
+# launcher's choice first, then the others; a missing one leaves the keyboard of a focused window)
+# and keeps reading it without the focus. Layout (BB_COOP_LAYOUT): split, the two windows side by
+# side on one monitor (BB_DISPLAY); displays, each game full screen on its own monitor
+# (BB_DISPLAY and BB_COOP_DISPLAY2, default 1 and 2). Player 2's sound is off unless
+# BB_COOP_AUDIO2=1 (the same music twice otherwise). Names: BB_COOP_NAME1/2. Closing either game
+# ends both.
+if [[ ${BB_COOP:-0} == 1 ]]; then
+    user1=${BB_USER_DIR:-$data/user} user2=${BB_COOP_USER2:-$data/user-p2}
+    if [[ ! -d $user2/savedata && -d $user1/savedata ]]; then
+        mkdir -p "$user2" && cp -a "$user1/savedata" "$user2/"
+        echo "Couch versus: player 2's saves start as a copy of player 1's ($user2)"
+    fi
+    mkdir -p "$user2"
+    layout=${BB_COOP_LAYOUT:-split}
+    common=(BB_PLAYERS=1 BB_PAD_BACKGROUND=1)
+    one=("${common[@]}" BB_GAMEPAD_SLOT=1 SHADPS4_P2P_PORT=${BB_COOP_PORT1:-3658} BB_SHADNET_NPID=${BB_COOP_NAME1:-Player1})
+    two=("${common[@]}" BB_GAMEPAD_SLOT=2 SHADPS4_P2P_PORT=${BB_COOP_PORT2:-3659} BB_SHADNET_NPID=${BB_COOP_NAME2:-Player2}
+         BB_USER_DIR=$user2 BB_GPU_USER_DIR=$user2)
+    if [[ $layout == displays ]]; then
+        one+=(BB_DISPLAY=${BB_DISPLAY:-1} BB_FULLSCREEN=1); two+=(BB_DISPLAY=${BB_COOP_DISPLAY2:-2} BB_FULLSCREEN=1)
+    else
+        one+=(BB_WINDOW_SPLIT=left BB_FULLSCREEN=0); two+=(BB_WINDOW_SPLIT=right BB_FULLSCREEN=0)
+    fi
+    [[ ${BB_COOP_AUDIO2:-0} == 1 ]] || two+=(BB_AUDIO=none)
+    # Player 2's own copies of the files a test or the log names (frame log, pad file, dumps).
+    [[ -n ${BB_FRAME_LOG:-} ]] && two+=(BB_FRAME_LOG=${BB_FRAME_LOG%.frames.csv}.p2.frames.csv)
+    [[ -n ${BB_READBACK_LOG:-} ]] && two+=(BB_READBACK_LOG=${BB_READBACK_LOG%.readbacks.csv}.p2.readbacks.csv)
+    [[ -n ${BB_PAD_FILE:-} ]] && two+=(BB_PAD_FILE=${BB_COOP_PAD_FILE2:-$BB_PAD_FILE.p2})
+    [[ -n ${BB_PRESENT_DUMP_TRIGGER:-} ]] && two+=(BB_PRESENT_DUMP_TRIGGER=$BB_PRESENT_DUMP_TRIGGER.p2)
+    [[ -n ${BB_DUMP_DIR:-} ]] && two+=(BB_DUMP_DIR=$BB_DUMP_DIR/p2)
+    [[ -n ${BB_PEEK_FILE:-} ]] && two+=(BB_PEEK_FILE=$BB_PEEK_FILE.p2)
+    args2=("$out/boot-linked.bin" --content-profile "$out/content.bin" --patches "$out/patches.bin" --app0 "$game" --user "$user2" --timeout "${BB_TIMEOUT:-0}" "$@")
+    echo "Couch versus: ${BB_COOP_NAME1:-Player1} (gamepad 1) and ${BB_COOP_NAME2:-Player2} (gamepad 2), layout $layout"
+    echo "  In both games: PLAY > PLAYER MATCH. One creates a room (Room type: 1 on 1), the other finds it with Search for Room (same Room type)."
+    env "${one[@]}" "$probe" "${probe_args[@]}" &
+    pid1=$!
+    env "${two[@]}" "$probe" "${args2[@]}" > >(while IFS= read -r line; do printf '[P2] %s\n' "$line"; done) 2>&1 &
+    pid2=$!
+    trap 'kill -TERM "$pid1" "$pid2" 2>/dev/null || true' TERM INT
+    status=0
+    wait -n "$pid1" "$pid2" || status=$?
+    kill -TERM "$pid1" "$pid2" 2>/dev/null || true
+    wait "$pid1" "$pid2" 2>/dev/null || true
+    exit "$status"
+fi
 if [[ -n ${mod_game:-} ]]; then
     "$probe" "${probe_args[@]}" &
     mod_pid=$!

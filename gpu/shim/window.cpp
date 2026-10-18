@@ -1,4 +1,5 @@
 // bbport: SDL3 window for the Vulkan swapchain (X11 or Wayland).
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -56,6 +57,11 @@ SDL_DisplayID ChooseDisplay() {
 
 WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}, height{height_} {
     // Gamepads are sampled by runtime_pad.c; their events are pumped here with the window's.
+    // BB_PAD_BACKGROUND=1 (couch versus: two game windows, one focused): the gamepad also drives
+    // this game while another window has the focus (SDL drops its input otherwise).
+    if (const char* bg = std::getenv("BB_PAD_BACKGROUND"); bg && bg[0] == '1') {
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+    }
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         UNREACHABLE_MSG("Failed to initialize SDL video: {}", SDL_GetError());
     }
@@ -66,6 +72,23 @@ WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED_DISPLAY(display));
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width_);
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height_);
+    // BB_WINDOW_SPLIT=left|right (couch versus on one monitor): the window takes that half of the
+    // display, 16:9, centred vertically. Tiling Wayland compositors place windows themselves.
+    if (const char* split = std::getenv("BB_WINDOW_SPLIT"); split && *split) {
+        SDL_Rect area{};
+        if (SDL_GetDisplayUsableBounds(display, &area) && area.w > 0 && area.h > 0) {
+            const int w = std::min(area.w / 2, area.h * 16 / 9);
+            const int h = w * 9 / 16;
+            const bool right = !std::strcmp(split, "right");
+            SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER,
+                                  area.x + (right ? area.w / 2 : area.w / 2 - w));
+            SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, area.y + (area.h - h) / 2);
+            SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, w);
+            SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, h);
+            width = w;
+            height = h;
+        }
+    }
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_VULKAN_BOOLEAN, true);
     const char* fullscreen = std::getenv("BB_FULLSCREEN");

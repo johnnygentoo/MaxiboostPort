@@ -175,6 +175,13 @@ DEFAULTS = {
     "gpu_profile": False,
     "vk_validation": False,
     "extra_env": "",
+    # Couch versus (run.sh BB_COOP): two games, one per player and gamepad.
+    "coop": False,
+    "coop_layout": "split",
+    "coop_display2": "",
+    "coop_audio2": False,
+    "coop_name1": "Player1",
+    "coop_name2": "Player2",
     # The PS4's trophy key (shadPS4's TrophyKey): the trophies' names (scripts/trophies.py).
     "trophy_key": "",
 }
@@ -423,11 +430,34 @@ def game_environment(s):
         env["BB_VK_VALIDATION"] = "1"
     if s.get("trophy_key", "").strip():
         env["BB_TROPHY_KEY"] = s["trophy_key"].strip()
+    if s.get("coop"):
+        env["BB_COOP"] = "1"
+        env["BB_COOP_LAYOUT"] = "displays" if s.get("coop_layout") == "displays" else "split"
+        if s.get("coop_display2"):
+            env["BB_COOP_DISPLAY2"] = s["coop_display2"]
+        if s.get("coop_audio2"):
+            env["BB_COOP_AUDIO2"] = "1"
+        for key, default, var in (("coop_name1", "Player1", "BB_COOP_NAME1"),
+                                  ("coop_name2", "Player2", "BB_COOP_NAME2")):
+            env[var] = coop_name(s.get(key, ""), default)
     for item in s["extra_env"].split():
         if "=" in item:
             key, value = item.split("=", 1)
             env[key] = value
     return env
+
+
+def coop_name(text, default):
+    """A player's name for the matching server: 3-16 letters, digits, '-' or '_' (a PSN online
+    ID's rules), else the default."""
+    name = re.sub(r"[^A-Za-z0-9_-]", "", text or "")[:16]
+    return name if len(name) >= 3 else default
+
+
+COOP_LAYOUTS = [
+    ("Рядом на одном мониторе", "split"),
+    ("Каждое окно на своём мониторе", "displays"),
+]
 
 
 def flat_button(icon, tooltip, handler):
@@ -890,6 +920,37 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.mouse_look_row.connect("notify::active", mouse_rows_sensitive)
         mouse_rows_sensitive()
         page.add(controls)
+
+        # Couch versus: GUNDAM VERSUS fights only online, so two games play each other through a
+        # matching server on this PC (run.sh BB_COOP).
+        coop = Adw.PreferencesGroup(
+            title=tr("Два игрока"),
+            description=tr("В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: "
+                           "1 on 1), другой находит её через Search for Room с тем же Room type."))
+        self.coop_row = Adw.SwitchRow(title=tr("Два игрока на одном ПК"),
+                                      subtitle=tr("Два окна игры, у каждого игрока свой геймпад"),
+                                      active=self.settings.get("coop", False))
+        self.coop_row.connect("notify::active", lambda *_: self.update_coop_rows())
+        coop.add(self.coop_row)
+        self.coop_layout_row = combo_row(tr("Окна"), None, COOP_LAYOUTS,
+                                         self.settings.get("coop_layout", "split"))
+        self.coop_layout_row.connect("notify::selected", lambda *_: self.update_coop_rows())
+        coop.add(self.coop_layout_row)
+        self.coop_display_row = Adw.ComboRow(title=tr("Монитор второго игрока"))
+        self.fill_coop_displays()
+        coop.add(self.coop_display_row)
+        self.coop_audio_row = Adw.SwitchRow(title=tr("Звук второго окна"),
+                                            subtitle=tr("Иначе музыка и звуки играют дважды"),
+                                            active=self.settings.get("coop_audio2", False))
+        coop.add(self.coop_audio_row)
+        self.coop_name_rows = []
+        for key, title in (("coop_name1", tr("Имя игрока 1")), ("coop_name2", tr("Имя игрока 2"))):
+            row = Adw.EntryRow(title=title)
+            row.set_text(self.settings.get(key, ""))
+            coop.add(row)
+            self.coop_name_rows.append(row)
+        self.update_coop_rows()
+        page.add(coop)
 
         upscaler = Adw.PreferencesGroup(
             title=tr("Апскейлер"),
@@ -1440,6 +1501,23 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.display_row.values = [value for _, value in choices]
         self.display_row.set_selected(self.display_row.values.index(current) if current in self.display_row.values else 0)
 
+    def fill_coop_displays(self):
+        """Player 2's monitor: the second one unless chosen, then the connected ones."""
+        current = self.settings.get("coop_display2", "")
+        choices = [(tr("Второй"), "")] + [(label, value) for value, label in connected_displays()]
+        if current and current not in [value for _, value in choices]:
+            choices.append((tr("{} (не подключён)").format(current), current))
+        self.coop_display_row.set_model(Gtk.StringList.new([label for label, _ in choices]))
+        self.coop_display_row.values = [value for _, value in choices]
+        self.coop_display_row.set_selected(
+            self.coop_display_row.values.index(current) if current in self.coop_display_row.values else 0)
+
+    def update_coop_rows(self):
+        on = self.coop_row.get_active()
+        for row in (self.coop_layout_row, self.coop_audio_row, *self.coop_name_rows):
+            row.set_sensitive(on)
+        self.coop_display_row.set_sensitive(on and combo_value(self.coop_layout_row) == "displays")
+
     def show_gamepad(self):
         names = getattr(self.gamepad_row, "names", None)
         selected = names[self.gamepad_row.get_selected()] if names else ""
@@ -1470,6 +1548,12 @@ class LauncherWindow(Adw.ApplicationWindow):
         s["vk_validation"] = self.validation_row.get_active()
         s["extra_env"] = self.extra_row.get_text().strip()
         s["trophy_key"] = self.trophy_key_row.get_text().strip()
+        s["coop"] = self.coop_row.get_active()
+        s["coop_layout"] = combo_value(self.coop_layout_row)
+        s["coop_display2"] = combo_value(self.coop_display_row)
+        s["coop_audio2"] = self.coop_audio_row.get_active()
+        s["coop_name1"], s["coop_name2"] = (coop_name(row.get_text(), default) for row, default
+                                            in zip(self.coop_name_rows, ("Player1", "Player2")))
         self.save_patch_profile()
         save_settings(s)
         self.ini.update({

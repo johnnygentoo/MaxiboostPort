@@ -743,6 +743,19 @@ EN = {
         'Could not save {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Current settings saved as your defaults',
+    'Рядом на одном мониторе': 'Side by side on one monitor',
+    'Каждое окно на своём мониторе': 'Each window on its own monitor',
+    'Два игрока': 'Two players',
+    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': 'In both games: PLAY → PLAYER MATCH. One creates a room (Room type: 1 on 1), the other finds it with Search for Room and the same Room type.',
+    'Два игрока на одном ПК': 'Two players on one PC',
+    'Два окна игры, у каждого игрока свой геймпад': 'Two game windows, each player with their own gamepad',
+    'Окна': 'Windows',
+    'Монитор второго игрока': "Player 2's monitor",
+    'Звук второго окна': 'Sound of the second window',
+    'Иначе музыка и звуки играют дважды': 'Otherwise music and sounds play twice',
+    'Имя игрока 1': "Player 1's name",
+    'Имя игрока 2': "Player 2's name",
+    'Второй': 'Second',
 }
 
 PT_BR = {
@@ -1540,6 +1553,19 @@ PT_BR = {
         'Não foi possível salvar {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Configurações atuais salvas como seus padrões',
+    'Рядом на одном мониторе': 'Lado a lado em um monitor',
+    'Каждое окно на своём мониторе': 'Cada janela em seu próprio monitor',
+    'Два игрока': 'Dois jogadores',
+    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': 'Nos dois jogos: PLAY → PLAYER MATCH. Um cria uma sala (Room type: 1 on 1), o outro a encontra em Search for Room com o mesmo Room type.',
+    'Два игрока на одном ПК': 'Dois jogadores no mesmo PC',
+    'Два окна игры, у каждого игрока свой геймпад': 'Duas janelas do jogo, cada jogador com seu próprio controle',
+    'Окна': 'Janelas',
+    'Монитор второго игрока': 'Monitor do jogador 2',
+    'Звук второго окна': 'Som da segunda janela',
+    'Иначе музыка и звуки играют дважды': 'Senão a música e os sons tocam duas vezes',
+    'Имя игрока 1': 'Nome do jogador 1',
+    'Имя игрока 2': 'Nome do jogador 2',
+    'Второй': 'Segundo',
 }
 
 
@@ -2247,6 +2273,19 @@ ES = {
         'No se pudo guardar {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Ajustes actuales guardados como tus valores predeterminados',
+    'Рядом на одном мониторе': 'Una junto a otra en un monitor',
+    'Каждое окно на своём мониторе': 'Cada ventana en su propio monitor',
+    'Два игрока': 'Dos jugadores',
+    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': 'En ambos juegos: PLAY → PLAYER MATCH. Uno crea una sala (Room type: 1 on 1) y el otro la encuentra con Search for Room y el mismo Room type.',
+    'Два игрока на одном ПК': 'Dos jugadores en un PC',
+    'Два окна игры, у каждого игрока свой геймпад': 'Dos ventanas del juego, cada jugador con su propio mando',
+    'Окна': 'Ventanas',
+    'Монитор второго игрока': 'Monitor del jugador 2',
+    'Звук второго окна': 'Sonido de la segunda ventana',
+    'Иначе музыка и звуки играют дважды': 'Si no, la música y los sonidos suenan dos veces',
+    'Имя игрока 1': 'Nombre del jugador 1',
+    'Имя игрока 2': 'Nombre del jugador 2',
+    'Второй': 'Segundo',
 }
 
 
@@ -2954,6 +2993,19 @@ IT = {
         'Impossibile salvare {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Impostazioni attuali salvate come tuoi predefiniti',
+    'Рядом на одном мониторе': 'Affiancate su un monitor',
+    'Каждое окно на своём мониторе': 'Ogni finestra sul proprio monitor',
+    'Два игрока': 'Due giocatori',
+    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': "In entrambi i giochi: PLAY → PLAYER MATCH. Uno crea una stanza (Room type: 1 on 1), l'altro la trova con Search for Room e lo stesso Room type.",
+    'Два игрока на одном ПК': 'Due giocatori su un PC',
+    'Два окна игры, у каждого игрока свой геймпад': 'Due finestre di gioco, ogni giocatore con il proprio controller',
+    'Окна': 'Finestre',
+    'Монитор второго игрока': 'Monitor del giocatore 2',
+    'Звук второго окна': 'Audio della seconda finestra',
+    'Иначе музыка и звуки играют дважды': 'Altrimenti musica e suoni si sentono due volte',
+    'Имя игрока 1': 'Nome del giocatore 1',
+    'Имя игрока 2': 'Nome del giocatore 2',
+    'Второй': 'Secondo',
 }
 
 
@@ -3661,6 +3713,19 @@ FR = {
         "Impossible d'enregistrer {}",
     'Текущие настройки сохранены как ваши по умолчанию':
         'Réglages actuels enregistrés comme vos valeurs par défaut',
+    'Рядом на одном мониторе': 'Côte à côte sur un écran',
+    'Каждое окно на своём мониторе': 'Chaque fenêtre sur son propre écran',
+    'Два игрока': 'Deux joueurs',
+    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': "Dans les deux jeux : PLAY → PLAYER MATCH. L'un crée un salon (Room type : 1 on 1), l'autre le trouve avec Search for Room et le même Room type.",
+    'Два игрока на одном ПК': 'Deux joueurs sur un PC',
+    'Два окна игры, у каждого игрока свой геймпад': 'Deux fenêtres de jeu, chaque joueur avec sa propre manette',
+    'Окна': 'Fenêtres',
+    'Монитор второго игрока': 'Écran du joueur 2',
+    'Звук второго окна': 'Son de la deuxième fenêtre',
+    'Иначе музыка и звуки играют дважды': 'Sinon la musique et les sons sont joués deux fois',
+    'Имя игрока 1': 'Nom du joueur 1',
+    'Имя игрока 2': 'Nom du joueur 2',
+    'Второй': 'Deuxième',
 }
 
 
@@ -4368,6 +4433,19 @@ DE = {
         '{} konnte nicht gespeichert werden',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Aktuelle Einstellungen als Ihre Standardwerte gespeichert',
+    'Рядом на одном мониторе': 'Nebeneinander auf einem Monitor',
+    'Каждое окно на своём мониторе': 'Jedes Fenster auf eigenem Monitor',
+    'Два игрока': 'Zwei Spieler',
+    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': 'In beiden Spielen: PLAY → PLAYER MATCH. Einer erstellt einen Raum (Room type: 1 on 1), der andere findet ihn mit Search for Room und demselben Room type.',
+    'Два игрока на одном ПК': 'Zwei Spieler an einem PC',
+    'Два окна игры, у каждого игрока свой геймпад': 'Zwei Spielfenster, jeder Spieler mit eigenem Controller',
+    'Окна': 'Fenster',
+    'Монитор второго игрока': 'Monitor von Spieler 2',
+    'Звук второго окна': 'Ton des zweiten Fensters',
+    'Иначе музыка и звуки играют дважды': 'Sonst laufen Musik und Klänge doppelt',
+    'Имя игрока 1': 'Name von Spieler 1',
+    'Имя игрока 2': 'Name von Spieler 2',
+    'Второй': 'Zweiter',
 }
 
 
@@ -5019,6 +5097,19 @@ ZH_CN = {
         '无法保存 {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         '当前设置已保存为您的默认设置',
+    'Рядом на одном мониторе': '在一台显示器上并排',
+    'Каждое окно на своём мониторе': '每个窗口各占一台显示器',
+    'Два игрока': '双人',
+    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': '两个游戏中都选择 PLAY → PLAYER MATCH。一方创建房间（Room type：1 on 1），另一方用 Search for Room 并选择相同的 Room type 找到它。',
+    'Два игрока на одном ПК': '同一台电脑上的双人对战',
+    'Два окна игры, у каждого игрока свой геймпад': '两个游戏窗口，每位玩家各用一个手柄',
+    'Окна': '窗口',
+    'Монитор второго игрока': '玩家 2 的显示器',
+    'Звук второго окна': '第二个窗口的声音',
+    'Иначе музыка и звуки играют дважды': '否则音乐和音效会播放两次',
+    'Имя игрока 1': '玩家 1 的名字',
+    'Имя игрока 2': '玩家 2 的名字',
+    'Второй': '第二台',
 }
 
 # Translations by language code; Russian is the key itself. Strings missing in a translation

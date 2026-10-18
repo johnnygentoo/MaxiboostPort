@@ -110,13 +110,15 @@ export OUTPUT_APPIMAGE=0
 # The online module (gpu/bbnet), when the build has it: named so that its libraries (protobuf,
 # OpenSSL, miniupnpc) come along; the runtime dlopens it at BB_NET_MODULE (below).
 net=$(ls "$root/out/gpu/libbbnet.so" 2>/dev/null || true)
+# Its matching server for two players on one PC (run.sh BB_COOP: bin/gvnet-server).
+gvnet=$(ls "$root/out/gpu/gvnet-server" 2>/dev/null || true)
 # The Hunter's Dream's bridge (bbbridge/, GPL-3.0-or-later), when the build has it: with libcurl and
 # OpenSSL, named here so that they come along.
 bridge=$(ls "$root/out/bbbridge/bbbridge-cli" 2>/dev/null || true)
 # Install from PKG (scripts/pkg_install.py): pkgextract (Unlicense), when the build has it.
 pkgextract=$(ls "$root/out/pkgextract/bin/pkgextract" 2>/dev/null || true)
 "$quick" \
-    "$root/out/bb-probe" "$root/out/bb-gpu-capabilities" ${net:+"$net"} ${bridge:+"$bridge"} ${pkgextract:+"$pkgextract"} \
+    "$root/out/bb-probe" "$root/out/bb-gpu-capabilities" ${net:+"$net"} ${gvnet:+"$gvnet"} ${bridge:+"$bridge"} ${pkgextract:+"$pkgextract"} \
     "$(command -v python3)" "$(command -v vulkaninfo)" \
     /usr/lib/libgtk-4.so* /usr/lib/libadwaita-1.so* /usr/lib/libgirepository-*.so* \
     "$pydyn"/_ssl.*.so "$pydyn"/_hashlib.*.so "$pil"/_imaging.*.so "$pil"/_imagingft.*.so

@@ -28,11 +28,12 @@ and a full play-through are not verified yet.
   the game does not render natively at them yet (its frame size is not mapped).
 - **Memory model:** "Auto" is the model of 0.3 on every GPU: with the new one each of the
   frame's compute-queue waits is a GPU round trip, and battles ran at ~30 FPS.
-- **Offline only.** GUNDAM VERSUS is an online-focused fighting game and ships PSN's toolkit
-  (libSceNpToolkit2); the port answers as a console that is not signed in to PSN.
-- **No local multiplayer in the game.** GUNDAM VERSUS has one local player; its 2v2 and 3v3
-  modes are online only. The port logs further gamepads in as users 2-4 (the groundwork for
-  playing two instances against each other), but no mode of the game takes a second local player.
+- **Two players on one PC** (launcher: **Two players**; `BB_COOP=1`): GUNDAM VERSUS has no
+  local multiplayer (its versus modes are online only), so the port runs two games, one per
+  player and gamepad, that fight each other through the game's own Player Match on a small
+  matching server started on this PC (`gvnet-server`). See [Two players](#two-players).
+- **Online** otherwise only through such a server (`BB_ONLINE=1`, `BB_SHADNET_SERVER=host:port`,
+  e.g. two PCs on a LAN); without it the port answers as a console not signed in to PSN.
 - **Upscalers (FSR 3.1/4, DLSS, TAA) are off**: they need the game's scene color, depth and
   motion, and the frame of GUNDAM VERSUS is not mapped yet.
 
@@ -100,6 +101,26 @@ install (`~/.config/bbport-launcher`, `~/.config/gzport-launcher`, `~/.local/sha
 
 Build it with `bash build.sh && bash packaging/appimage-sharun.sh`, then run
 `dist/GUNDAM-VERSUS-gvport-x86_64.AppImage`. Saves and settings go to `~/.local/share/gvport`.
+
+### Two players
+
+Turn on **Two players on one PC** in the launcher (or run `BB_COOP=1 bash run.sh`) and press
+Play: two game windows open, side by side on one monitor (**Windows**: or each full screen on its
+own monitor), and a matching server runs for as long as they do. Closing either window ends both.
+
+- **Gamepads:** player 1 takes the controller chosen in the launcher (else the first one),
+  player 2 the next one; each window keeps reading its own pad without the focus. With one
+  gamepad, player 2 plays on the keyboard while their window has the focus.
+- **Saves:** player 1 plays from the usual saves, player 2 from `user-p2/`, a copy of player 1's
+  saves made the first time.
+- **Sound:** only player 1's window plays sound unless **Sound of the second window** is on.
+- **In the games:** both go to PLAY > PLAYER MATCH. One picks **Create Room** with
+  **Room type: 1 on 1**; the other picks **Search for Room**, sets the same Room type, and
+  enters the room. Both press Ready (cross) and the battle starts. The default room type
+  ("Free teams") waits for more players than two.
+
+Tested on one PC (RX 7800 XT): two instances in a 1-on-1 Player Match, each at 60 FPS, shots
+from one land on the other. Team modes with more players, and two PCs on a LAN, are not tested.
 
 ### Saves
 
