@@ -218,6 +218,15 @@ fi
 if [[ -z ${BB_READBACKS:-} ]]; then
     export BB_READBACKS=2
 fi
+# Fences written when the GPU has done the work before them (BB_HONEST_LABELS=1; the new memory
+# model always has them). With the 0.3 model's fences, written when the command is read, the
+# effect compute queues' particle pools stayed empty (GDS: free count at its 32768 maximum, a
+# counter at -230), so ~1 frame in 10 had an effect to draw even with precise readbacks. Honest
+# fences: ~60 effect draws a frame, as on the new model. RX 7800 XT battle: still 60 FPS (16.8 ms
+# frames), +3.3 ms of CPU on the GPU command thread, 23 frames over 20 ms in a minute.
+if [[ -z ${BB_HONEST_LABELS:-} ]]; then
+    export BB_HONEST_LABELS=1
+fi
 # GCN 3-5 under RADV (Polaris, Vega and their APUs): with HiZ, depth compression showed black
 # halos and missing geometry (issues #54, #99); RADV_DEBUG=nohiz fixed it at some cost. Set
 # unless RADV_DEBUG is the user's, BB_AUTO_NOHIZ=0: off.
