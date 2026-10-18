@@ -17,7 +17,22 @@ static Level threshold() {
     }();
     return level;
 }
+// BB_GPU_LOG_CLASSES=<prefix>[,<prefix>...]: those log classes (e.g. Lib.NpMatching2) log everything
+// (trace and debug too) whatever BB_GPU_LOG says.
+static bool debug_class(std::string_view log_class) {
+    static const char* list = std::getenv("BB_GPU_LOG_CLASSES");
+    for (const char* at = list; at && *at;) {
+        const char* end = std::strchr(at, ',');
+        const size_t n = end ? size_t(end - at) : std::strlen(at);
+        if (n && log_class.substr(0, n) == std::string_view(at, n)) return true;
+        at = end ? end + 1 : nullptr;
+    }
+    return false;
+}
 bool ShouldLog(Level level) { return level >= threshold(); }
+bool ShouldLog(std::string_view log_class, Level level) {
+    return level >= threshold() || debug_class(log_class);
+}
 void Write(std::string_view log_class, Level level, const char* file, int line, const char* function,
            std::string&& message) {
     static std::mutex mutex;

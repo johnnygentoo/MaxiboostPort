@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <chrono>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <cstring>
 #include <memory>
 
@@ -11,6 +15,8 @@
 #include "core/libraries/error_codes.h"
 #include "core/libraries/libs.h"
 #include "core/libraries/network/net.h"
+#include "core/libraries/network/net_util.h"
+#include "common/singleton.h"
 #include "core/libraries/np/np_handler.h"
 #include "core/libraries/np/np_manager.h"
 #include "core/libraries/np/np_matching2/np_matching2.h"
@@ -1052,9 +1058,43 @@ int PS4_SYSV_ABI sceNpMatching2SignalingGetConnectionInfo(OrbisNpMatching2Contex
     return FillMatching2ConnectionInfo(*ctx, roomId, memberId, infoType, connInfo, false);
 }
 
-int PS4_SYSV_ABI sceNpMatching2SignalingGetLocalNetInfo(OrbisNpMatching2ContextId ctxId,
-                                                        void* info) {
-    LOG_INFO(Lib_NpMatching2, "called, ctxId = {}", ctxId);
+// bbport (gvport): this takes only the info (no context id) and was a stub: GUNDAM VERSUS read
+// its own address from the uninitialised struct and sent its connection checks there. The
+// address is the one the matching server saw (its STUN answer), else the local address used to
+// reach that server (an unconnected UDP connect sends nothing), else 127.0.0.1; no NAT.
+int PS4_SYSV_ABI sceNpMatching2SignalingGetLocalNetInfo(void* info) {
+    auto* out = static_cast<NpSignaling::OrbisNpSignalingNetInfo*>(info);
+    if (!out || out->size != sizeof(NpSignaling::OrbisNpSignalingNetInfo)) {
+        LOG_ERROR(Lib_NpMatching2, "bad net info (size {})", out ? out->size : 0);
+        return ORBIS_NP_MATCHING2_ERROR_INVALID_ARGUMENT;
+    }
+    auto* netinfo = Common::Singleton<NetUtil::NetUtilInternal>::Instance();
+    u32 addr = netinfo->GetExternalIp();
+    if (addr == 0) {
+        if (const u32 server = GetMmServerAddr(); server != 0) {
+            const int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+            sockaddr_in sa{};
+            sa.sin_family = AF_INET;
+            sa.sin_addr.s_addr = server;
+            sa.sin_port = htons(9);
+            socklen_t len = sizeof(sa);
+            if (fd >= 0 && ::connect(fd, reinterpret_cast<sockaddr*>(&sa), sizeof(sa)) == 0 &&
+                ::getsockname(fd, reinterpret_cast<sockaddr*>(&sa), &len) == 0) {
+                addr = sa.sin_addr.s_addr;
+            }
+            if (fd >= 0) {
+                ::close(fd);
+            }
+        }
+    }
+    if (addr == 0) {
+        addr = htonl(INADDR_LOOPBACK);
+    }
+    out->localAddr = addr;
+    out->mappedAddr = addr;
+    out->natStatus = 0;
+    out->_pad_14 = 0;
+    LOG_INFO(Lib_NpMatching2, "localAddr={:#x} mappedAddr={:#x}", out->localAddr, out->mappedAddr);
     return ORBIS_OK;
 }
 
