@@ -429,26 +429,34 @@ static void sample_handler(int sig, siginfo_t *info, void *context) {
     }
 }
 static void *sampler_main(void *arg) {
-    const char *name=(const char *)arg;
-    pid_t tid=0;
-    while (!tid) {
+    /* Every thread whose name starts with one of the comma-separated names, in turn. */
+    const char *names=(const char *)arg;
+    pid_t tids[64]; int count=0;
+    while (!count) {
         DIR *dir=opendir("/proc/self/task");
         struct dirent *e;
-        while (dir && (e=readdir(dir))) {
+        while (dir && (e=readdir(dir)) && count<64) {
             char path[300], comm[32]={0};
             snprintf(path,sizeof(path),"/proc/self/task/%s/comm",e->d_name);
             FILE *f=fopen(path,"r");
             if (!f) continue;
-            if (fgets(comm,sizeof(comm),f) && !strncmp(comm,name,strlen(name))) tid=(pid_t)atoi(e->d_name);
+            if (fgets(comm,sizeof(comm),f)) {
+                for (const char *at=names; at && *at;) {
+                    const char *end=strchr(at,',');
+                    const size_t n=end ? (size_t)(end-at) : strlen(at);
+                    if (n && !strncmp(comm,at,n)) { tids[count++]=(pid_t)atoi(e->d_name); break; }
+                    at=end ? end+1 : NULL;
+                }
+            }
             fclose(f);
         }
         if (dir) closedir(dir);
-        if (!tid) sleep(1);
+        if (!count) sleep(1);
     }
-    printf("Runtime: sampling thread %s (%d)\n",name,(int)tid);
-    for (;;) {
-        if (syscall(SYS_tgkill,getpid(),tid,SIGPROF)) break;
-        struct timespec t={0,500000};
+    printf("Runtime: sampling %d threads named %s\n",count,names);
+    for (unsigned i=0;;++i) {
+        if (syscall(SYS_tgkill,getpid(),tids[i%count],SIGPROF) && count==1) break; /* one gone: the others go on */
+        struct timespec t={0,500000/count+1};
         nanosleep(&t,NULL);
     }
     return NULL;
@@ -486,7 +494,10 @@ static void sample_report(void) {
     for (int i=0;i<1024;++i) { uint64_t c=atomic_exchange(&sample_counts[i],0); if (c) { rows[n].rip=sample_rips[i]; rows[n].caller=sample_callers[i]; rows[n].count=c; ++n; } }
     for (int i=1;i<n;++i) for (int j=i;j>0 && rows[j].count>rows[j-1].count;--j) { __typeof__(rows[0]) t=rows[j]; rows[j]=rows[j-1]; rows[j-1]=t; }
     printf("Thread samples (%llu):",(unsigned long long)total);
-    for (int i=0;i<n && i<16;++i) {
+    /* BB_SAMPLE_ALL=1: every sampled address, not the first 16. */
+    static int all=-1;
+    if (all<0) { const char *a=getenv("BB_SAMPLE_ALL"); all=a && a[0]=='1'; }
+    for (int i=0;i<n && (all || i<16);++i) {
         const uint64_t text_lo=0x800000000ull, text_hi=0x800000000ull+0x50d96dcull;
         if (rows[i].rip>=text_lo && rows[i].rip<text_hi) {
             printf("%s +%#lx %.1f%%",i?";":"",(unsigned long)(rows[i].rip-text_lo),100.0*rows[i].count/total);

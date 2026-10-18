@@ -1078,6 +1078,39 @@ std::pair<const Buffer*, u64> BufferCache::ObtainBuffer(VAddr device_addr, u32 s
     if (is_written && !shadows.empty()) {
         DropShadows(device_addr, size);
     }
+    // bbport (diagnostic) BB_WRITE_WATCH=lo-hi[,...] (hex): written bindings there by writer, every 5 s.
+    static const std::vector<std::pair<u64, u64>> write_watch = [] {
+        std::vector<std::pair<u64, u64>> out;
+        const char* env = std::getenv("BB_WRITE_WATCH");
+        for (const char* at = env; at && *at;) {
+            char* end = nullptr;
+            const u64 lo = std::strtoull(at, &end, 16);
+            const u64 hi = end && *end == '-' ? std::strtoull(end + 1, &end, 16) : lo + 1;
+            out.emplace_back(lo, hi);
+            at = end && *end == ',' ? end + 1 : nullptr;
+        }
+        return out;
+    }();
+    if (is_written && !write_watch.empty() &&
+        std::ranges::any_of(write_watch, [&](const auto& r) {
+            return device_addr < r.second && r.first < device_addr + size;
+        })) {
+        static std::mutex watch_mutex;
+        static std::map<std::tuple<u64, u64, u64>, u64> watch_counts;
+        static auto watch_last = std::chrono::steady_clock::now();
+        std::scoped_lock lk{watch_mutex};
+        ++watch_counts[{device_addr, size, bind_tag}];
+        if (std::chrono::steady_clock::now() - watch_last > std::chrono::seconds(5)) {
+            watch_last = std::chrono::steady_clock::now();
+            for (const auto& [k, n] : watch_counts) {
+                std::printf("Write watch: %#llx+%#llx by %llx: %llu\n",
+                            (unsigned long long)std::get<0>(k), (unsigned long long)std::get<1>(k),
+                            (unsigned long long)std::get<2>(k), (unsigned long long)n);
+            }
+            watch_counts.clear();
+            std::fflush(stdout);
+        }
+    }
     // bbport: a read-only binding of blocks that were resident and in place the last time, with
     // the residency unchanged since (most bindings in place, constants with
     // BB_CONSTANTS_IN_PLACE): the arena where it is, without the residency walk.
@@ -1199,6 +1232,69 @@ std::pair<const Buffer*, u64> BufferCache::ObtainBuffer(VAddr device_addr, u32 s
     const u64 uploaded_before = BbStats::buffer_upload_bytes.load(std::memory_order_relaxed);
     if (GuestInPlace()) {
         BbStats::bound_vram_bytes.fetch_add(size, std::memory_order_relaxed);
+    }
+    // bbport (diagnostic) BB_VERIFY_SYNC=lo-hi[,...] (hex): a read binding there that the cache holds as
+    // current in VRAM (neither CPU- nor GPU-modified) is compared with the game's memory (a
+    // readback and a wait: a few a second at most). Mismatches mean a write the cache missed.
+    static const std::vector<std::pair<u64, u64>> verify_sync = [] {
+        std::vector<std::pair<u64, u64>> out;
+        const char* env = std::getenv("BB_VERIFY_SYNC");
+        for (const char* at = env; at && *at;) {
+            char* end = nullptr;
+            const u64 lo = std::strtoull(at, &end, 16);
+            const u64 hi = end && *end == '-' ? std::strtoull(end + 1, &end, 16) : lo + 1;
+            out.emplace_back(lo, hi);
+            at = end && *end == ',' ? end + 1 : nullptr;
+        }
+        return out;
+    }();
+    if (!is_written && !verify_sync.empty() &&
+        std::ranges::any_of(verify_sync, [&](const auto& r) {
+            return device_addr < r.second && r.first < device_addr + size;
+        }) &&
+        !memory_tracker->IsRegionCpuModified(device_addr, size) &&
+        !IsRegionGpuModified(device_addr, size) &&
+        !gpu_modified_ranges.Intersects(device_addr, size)) {
+        static std::map<u64, std::chrono::steady_clock::time_point> verified_at;
+        static u64 checks = 0, mismatches = 0;
+        const auto now = std::chrono::steady_clock::now();
+        auto& at = verified_at[device_addr];
+        if (now - at > std::chrono::milliseconds(300)) {
+            at = now;
+            const auto staging = staging_pool.Request(size, VideoCore::MemoryType::HostCached);
+            const vk::BufferCopy copy{arena->Offset(device_addr), staging.offset, size};
+            runtime.CopyBuffer(arena, staging.buffer, std::span{&copy, 1});
+            scheduler.Finish();
+            staging.buffer->Invalidate(staging.offset, size);
+            std::vector<u8> guest(size);
+            Core::Memory::Instance()->ReadBacking(device_addr, guest.data(), size);
+            ++checks;
+            u64 first = ~0ull, last = 0, count = 0;
+            for (u64 i = 0; i < size; ++i) {
+                if (guest[i] != staging.mapped[i]) {
+                    first = std::min(first, i);
+                    last = i;
+                    ++count;
+                }
+            }
+            if (count != 0) {
+                ++mismatches;
+                u32 g = 0, v = 0;
+                std::memcpy(&g, guest.data() + (first & ~3ull), 4);
+                std::memcpy(&v, staging.mapped + (first & ~3ull), 4);
+                std::printf("Verify sync: %#llx+%#llx differs at +%#llx..+%#llx (%llu bytes): "
+                            "guest %#x vram %#x (%llu of %llu checks)\n",
+                            (unsigned long long)device_addr, (unsigned long long)size,
+                            (unsigned long long)first, (unsigned long long)last,
+                            (unsigned long long)count, g, v, (unsigned long long)mismatches,
+                            (unsigned long long)checks);
+                std::fflush(stdout);
+            } else if ((checks & 63) == 0) {
+                std::printf("Verify sync: %llu checks, %llu mismatches\n",
+                            (unsigned long long)checks, (unsigned long long)mismatches);
+                std::fflush(stdout);
+            }
+        }
     }
     SynchronizeMemory(arena, device_addr, size, is_written, is_texel_buffer);
     if (stats) {

@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
+#include <cstdlib>
+#include <cstdio>
+#include <chrono>
+#include <map>
 
 #include "common/assert.h"
 #include "common/logging/log.h"
@@ -69,6 +73,30 @@ struct IrqController {
         std::unique_lock lock{ctx.m_lock};
 
         LOG_TRACE(Core, "IRQ signaled: {}", magic_enum::enum_name(irq));
+        // bbport BB_SKIP_TRACE=1: interrupts per id every 5 s, with their handlers.
+        static const bool trace = [] {
+            const char* env = std::getenv("BB_SKIP_TRACE");
+            return env && *env == '1';
+        }();
+        if (trace) {
+            static std::mutex trace_mutex;
+            static std::map<u32, std::pair<u64, size_t>> counts;
+            static auto last = std::chrono::steady_clock::now();
+            std::scoped_lock tl{trace_mutex};
+            auto& c = counts[static_cast<u32>(irq)];
+            ++c.first;
+            c.second = ctx.persistent_handlers.size();
+            if (std::chrono::steady_clock::now() - last > std::chrono::seconds(5)) {
+                last = std::chrono::steady_clock::now();
+                std::printf("IRQs (5 s):");
+                for (const auto& [id, v] : counts) {
+                    std::printf(" %#x=%llu(%zu handlers)", id, (unsigned long long)v.first, v.second);
+                }
+                std::printf("\n");
+                std::fflush(stdout);
+                counts.clear();
+            }
+        }
 
         for (auto& [uid, h] : ctx.persistent_handlers) {
             h(irq);

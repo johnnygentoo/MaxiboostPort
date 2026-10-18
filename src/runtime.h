@@ -63,6 +63,8 @@ int runtime_neo_mode(void);
 /* BB_IMPORT_TRACE (runtime_trace.c): a logging thunk for a traced import, else target. */
 uintptr_t runtime_trace_wrap(const char *symbol, uintptr_t target);
 void runtime_trace_set_image(const unsigned char *image);
+/* BB_GUEST_COUNT: how often given game instructions run (runtime_count.c). */
+void runtime_count_install(unsigned char *image);
 /* Couch co-op (runtime_pad.c): users logged in (ids[4], -1 after the last) and new logins. */
 int runtime_users_logged_in(int32_t ids[4]);
 int runtime_users_next_login(void);

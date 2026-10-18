@@ -6,6 +6,7 @@
 #include <ctime>
 #include <filesystem>
 #include <format>
+#include <map>
 #include <mutex>
 
 #include "video_core/renderer_vulkan/vk_common.h"
@@ -36,6 +37,8 @@ struct Entry {
 
 // GPU thread only.
 std::vector<Entry> entries;
+// Every draw of the frame by shader pair: draws and indices, for frames that differ by a few draws.
+std::map<std::pair<u64, u64>, std::pair<u32, u64>> draw_census;
 std::vector<std::pair<Target, bool>> pending_sampled;
 std::vector<std::string> pending_buffers;
 
@@ -50,6 +53,15 @@ void AddBuffers(Entry& entry) {
     pending_buffers.clear();
 }
 bool pass_open = false;
+// BB_CAPTURE_FLIP=1: frame boundaries are flips instead of passes into a display buffer, for a game
+// that draws its UI into the display buffer over several passes (GUNDAM VERSUS: such a boundary
+// cut the recording to two passes). The recording then spans one flip interval, which may hold
+// the end of one frame and the start of the next.
+const bool flip_mode = [] {
+    const char* env = std::getenv("BB_CAPTURE_FLIP");
+    return env && *env == '1';
+}();
+std::atomic<bool> flip_boundary{false};
 std::mutex display_mutex;
 std::vector<VAddr> display_buffers;
 // bbport: read on every draw; the game registers a handful of display buffers once.
@@ -121,6 +133,13 @@ void Write(VAddr presented) {
             std::fprintf(f, "%s\n", b.c_str());
         }
     }
+    std::fprintf(f, "\ndraws by shader pair (vs ps draws indices):\n");
+    for (const auto& [pair, count] : draw_census) {
+        std::fprintf(f, "  %016llx %016llx %u %llu\n", static_cast<unsigned long long>(pair.first),
+                     static_cast<unsigned long long>(pair.second), count.first,
+                     static_cast<unsigned long long>(count.second));
+    }
+    draw_census.clear();
     std::fclose(f);
     std::printf("Frame capture: %zu passes written to %s\n", entries.size(), path.c_str());
 }
@@ -137,6 +156,9 @@ void FrameCapture::OnFlip(VAddr presented_address) {
         std::filesystem::remove(trigger, ec);
         state.store(Armed, std::memory_order_release);
         std::printf("Frame capture: armed\n");
+    }
+    if (flip_mode) {
+        flip_boundary.store(true, std::memory_order_release);
     }
 }
 
@@ -180,10 +202,29 @@ void FrameCapture::BeginPass(const VideoCore::ImageInfo* const* colors, u32 num_
                                         display_buffers.end();
         }
     }
+    // Flip mode: the first pass after a flip starts (armed) or ends (recording) the recording.
+    if (flip_mode && flip_boundary.exchange(false, std::memory_order_acq_rel)) {
+        const bool recording = state.load(std::memory_order_relaxed) == Recording;
+        if (recording) {
+            Write(last_presented.load(std::memory_order_relaxed));
+        }
+        entries.clear();
+        draw_census.clear();
+        pending_sampled.clear();
+        pending_buffers.clear();
+        pass_open = false;
+        if (recording) {
+            state.store(Idle, std::memory_order_release);
+            return;
+        }
+        if (state.load(std::memory_order_relaxed) == Armed) {
+            state.store(Recording, std::memory_order_release);
+        }
+    }
     // Frame boundaries in the command stream: the pass that writes a display buffer.
     const bool new_pass = !(pass_open && !entries.empty() && !entries.back().compute &&
                             entries.back().colors == targets);
-    if (display && new_pass) {
+    if (display && new_pass && !flip_mode) {
         if (state.load(std::memory_order_relaxed) == Recording) {
             Write(last_presented.load(std::memory_order_relaxed));
             entries.clear();
@@ -220,6 +261,9 @@ void FrameCapture::Draw(u64 vs_hash, u64 ps_hash, u32 num_indices, u32 num_insta
     auto& e = entries.back();
     ++e.draws;
     e.indices += u64(num_indices) * std::max(num_instances, 1u);
+    auto& census = draw_census[{vs_hash, ps_hash}];
+    ++census.first;
+    census.second += u64(num_indices) * std::max(num_instances, 1u);
     AddShader(e, vs_hash);
     AddShader(e, ps_hash);
     AddSampled(e);

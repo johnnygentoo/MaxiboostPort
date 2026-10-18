@@ -27,6 +27,9 @@ struct VmaAllocationInfo;
 
 namespace VideoCore {
 
+/// bbport (diagnostic) BB_WRITE_WATCH: who binds memory for writing (shader hash; 1 DMA copy, 2 DMA fill).
+inline thread_local u64 bind_tag = 0;
+
 namespace Detail {
 /// bbport: GuestInPlace() and WriteTracking() once known (every buffer binding asks): 0 not yet,
 /// 1 on, 2 off.

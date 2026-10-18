@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <set>
 #include <dlfcn.h>
 #include <map>
 #include <unordered_set>
@@ -1557,7 +1558,83 @@ bool Rasterizer::FilterDrawPasses() const {
     return !(mode == Mode::Disable && (depth_copy || stencil_copy));
 }
 
+// bbport BB_SKIP_TRACE=1: each kind of draw the renderer drops (no pipeline, resources not bound)
+// once, with its shader stages and programs, to find effects that are missing on screen.
+static void TraceSkippedDraw(const char* why, const AmdGpu::Regs& regs) {
+    static const bool on = [] {
+        const char* env = std::getenv("BB_SKIP_TRACE");
+        return env && *env == '1';
+    }();
+    if (!on) {
+        return;
+    }
+    static std::mutex mutex;
+    static std::unordered_set<u64> seen;
+    const u64 vs = regs.vs_program.address, ps = regs.ps_program.address;
+    const u64 key = vs * 31 + ps * 17 + regs.stage_enable.raw + std::hash<std::string_view>{}(why);
+    std::scoped_lock lk{mutex};
+    if (seen.size() > 4096 || !seen.insert(key).second) {
+        return;
+    }
+    std::printf("Skipped draw (%s): stages %#x vs %#llx ps %#llx es %#llx gs %#llx ls %#llx hs %#llx "
+                "prim %u gs_mode %#x onchip %u strmout %#x\n",
+                why, u32(regs.stage_enable.raw), (unsigned long long)vs << 8,
+                (unsigned long long)ps << 8, (unsigned long long)regs.es_program.address << 8,
+                (unsigned long long)regs.gs_program.address << 8,
+                (unsigned long long)regs.ls_program.address << 8,
+                (unsigned long long)regs.hs_program.address << 8, u32(regs.primitive_type),
+                u32(regs.vgt_gs_mode.mode), u32(regs.vgt_gs_mode.onchip),
+                u32(regs.vgt_strmout_config.raw));
+    std::fflush(stdout);
+}
+
+// bbport BB_DRAW_VS=<address>[,...]: draws with one of these vertex shader programs (guest
+// addresses), the first 200, with their state, to follow one effect's draws through the renderer.
+static void TraceVsDraw(const char* where, const AmdGpu::Regs& regs) {
+    static const std::vector<u64> programs = [] {
+        std::vector<u64> out;
+        const char* env = std::getenv("BB_DRAW_VS");
+        for (const char* at = env; at && *at;) {
+            char* end = nullptr;
+            out.push_back(std::strtoull(at, &end, 16));
+            at = end && *end == ',' ? end + 1 : nullptr;
+        }
+        return out;
+    }();
+    if (programs.empty()) {
+        return;
+    }
+    const u64 vs = u64(regs.vs_program.address) << 8;
+    // BB_DRAW_VS=0: every draw.
+    if (programs[0] != 0 && std::ranges::find(programs, vs) == programs.end()) {
+        return;
+    }
+    // Counts per second, by vertex shader, pixel shader and target, then one line per kind.
+    static std::mutex mutex;
+    static std::map<std::tuple<u64, u64, u64, std::string>, u32> counts;
+    static auto last = std::chrono::steady_clock::now();
+    const auto& cb = regs.color_buffers[0];
+    std::scoped_lock lk{mutex};
+    ++counts[{vs, u64(regs.ps_program.address) << 8, cb ? cb.Address() : 0,
+              std::string(where) + (regs.blend_control[0].enable ? " blend" : "") +
+                  " prim" + std::to_string(u32(regs.primitive_type)) + " st" +
+                  std::to_string(u32(regs.stage_enable.raw))}];
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last < std::chrono::seconds(1)) {
+        return;
+    }
+    last = now;
+    for (const auto& [key, n] : counts) {
+        std::printf("VS draws/s %s: vs %#llx ps %#llx cb0 %#llx: %u\n", std::get<3>(key).c_str(),
+                    (unsigned long long)std::get<0>(key), (unsigned long long)std::get<1>(key),
+                    (unsigned long long)std::get<2>(key), n);
+    }
+    counts.clear();
+    std::fflush(stdout);
+}
+
 void Rasterizer::Draw(bool is_indexed, u32 index_offset, const PreparedDraw* prepared) {
+    TraceVsDraw("enter", Regs());
     RENDERER_TRACE;
     BbStats::draws.fetch_add(1, std::memory_order_relaxed);
 
@@ -1574,6 +1651,7 @@ void Rasterizer::Draw(bool is_indexed, u32 index_offset, const PreparedDraw* pre
         FrameCapture::Poll();
         scheduler.PopPendingOperations();
         if (!FilterDraw()) {
+            TraceVsDraw("filtered", Regs());
             return;
         }
     }
@@ -1585,8 +1663,11 @@ void Rasterizer::Draw(bool is_indexed, u32 index_offset, const PreparedDraw* pre
                          prepared->reg_checksum == liverpool->gfx_reg_checksum);
     }
     if (!pipeline) {
+        TraceSkippedDraw("no pipeline", Regs());
+        TraceVsDraw("no pipeline", Regs());
         return;
     }
+    TraceVsDraw("pipeline", Regs());
     if (pipelined && FilterDrawPasses()) {
         PostDraw(pipeline, used_prepared, is_indexed, index_offset);
         return;
@@ -1652,6 +1733,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     const bool inputs_resolved = draw_inputs.resolved;
     draw_inputs.pending = false;
     if (!bound) {
+        TraceSkippedDraw("resources not bound", Regs());
         return;
     }
     const auto state = BeginRendering(pipeline);
@@ -1800,6 +1882,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
             cmdbuf.draw(num_indices, num_instances, first_vertex, first_instance);
         }
     });
+    TraceVsDraw("recorded", Regs());
     if (FrameCapture::Active()) {
         const auto* ps = pipeline->GetStages()[u32(Shader::SwStage::Fragment)];
         FrameCapture::Draw(vs_info.pgm_hash, ps ? ps->pgm_hash : 0, num_indices, num_instances);
@@ -1824,6 +1907,7 @@ void Rasterizer::DrawIndirect(bool is_indexed, VAddr arg_address, u32 offset, u3
                               u32 max_count, VAddr count_address, u16 vertex_sgpr_offset,
                               u16 instance_sgpr_offset) {
     RENDERER_TRACE;
+    TraceVsDraw("indirect", Regs());
     // bbport: like direct draws, handed to the recording thread after the pipeline selection
     // (else the GPU thread waited here for a whole frame of queued draws).
     const bool pipelined = UseDrawPipe() && FilterDrawPasses() &&
@@ -1946,6 +2030,15 @@ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_in
         }
     });
     DebugState.IncDrawCall();
+    if (FrameCapture::Active()) {
+        // bbport: the counts are in GPU memory; the capture counts the draw and names it.
+        FrameCapture::Draw(vs_crumb ? vs_crumb->pgm_hash : 0, ps_crumb ? ps_crumb->pgm_hash : 0, 0, 0);
+        char note[96];
+        std::snprintf(note, sizeof(note), "\n  indirect draw vs %08x ps %08x max %u%s",
+                      u32(vs_crumb ? vs_crumb->pgm_hash : 0), u32(ps_crumb ? ps_crumb->pgm_hash : 0),
+                      max_count, count_address ? " (count in memory)" : "");
+        FrameCapture::Note(note);
+    }
 
     ResetBindings(false);
     scheduler.KickRecording();
@@ -2043,8 +2136,32 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
     scheduler.KickRecording();
 }
 
+// bbport BB_SKIP_TRACE=1: indirect dispatches per second by outcome.
+static void CountIndirectDispatch(int outcome) {
+    static const bool on = [] {
+        const char* env = std::getenv("BB_SKIP_TRACE");
+        return env && *env == '1';
+    }();
+    if (!on) {
+        return;
+    }
+    static std::atomic<u32> counts[4];
+    static std::atomic<s64> last{0};
+    counts[outcome].fetch_add(1, std::memory_order_relaxed);
+    const s64 now = std::chrono::steady_clock::now().time_since_epoch().count();
+    s64 prev = last.load(std::memory_order_relaxed);
+    if (now - prev > 1'000'000'000 && last.compare_exchange_strong(prev, now)) {
+        std::printf("Indirect dispatches/s: %u requested, %u without pipeline, %u not bound, %u "
+                    "recorded\n",
+                    counts[0].exchange(0), counts[1].exchange(0), counts[2].exchange(0),
+                    counts[3].exchange(0));
+        std::fflush(stdout);
+    }
+}
+
 void Rasterizer::DispatchIndirect(VAddr address, u32 offset, u32 size) {
     RENDERER_TRACE;
+    CountIndirectDispatch(0);
     // bbport: handed to the recording thread like direct dispatches.
     const bool pipelined = UseDrawPipe() && !BbToggle::Disabled(BbToggle::PipelinedIndirectDraws);
     if (!pipelined) {
@@ -2052,6 +2169,7 @@ void Rasterizer::DispatchIndirect(VAddr address, u32 offset, u32 size) {
     }
     const ComputePipeline* pipeline = pipeline_cache.GetComputePipeline();
     if (!pipeline) {
+        CountIndirectDispatch(1);
         return;
     }
     if (pipelined) {
@@ -2069,8 +2187,10 @@ void Rasterizer::DispatchIndirectRecord(const ComputePipeline* pipeline, VAddr a
     const u32 offset = 0;
 
     if (!BindResources(pipeline)) {
+        CountIndirectDispatch(2);
         return;
     }
+    CountIndirectDispatch(3);
 
     const auto [buffer, base] = buffer_cache.ObtainBuffer(address + offset, size, false);
     needs_barrier |= runtime.IsBufferAccessed(buffer, base, size);
@@ -2138,6 +2258,34 @@ void Rasterizer::Finish() {
 
 void Rasterizer::OnSubmit() {
     DrainDrawPipe();
+    // bbport (diagnostic) BB_GDS_DUMP=1: per GDS dword in the effect queues' areas, the share of submits
+    // it was non-zero and its maximum, every 2 s (the host-visible GDS buffer, as last completed).
+    static const bool gds_dump = std::getenv("BB_GDS_DUMP") != nullptr;
+    if (gds_dump) {
+        static std::array<u32, 0x900 / 4> nonzero{}, maximum{};
+        static u32 samples = 0;
+        static auto last = std::chrono::steady_clock::now();
+        const auto* gds = reinterpret_cast<const u32*>(buffer_cache.GetGdsBuffer()->mapped_data.data());
+        for (u32 i = 0; i < nonzero.size(); ++i) {
+            nonzero[i] += gds[i] != 0;
+            maximum[i] = std::max(maximum[i], gds[i]);
+        }
+        ++samples;
+        if (std::chrono::steady_clock::now() - last > std::chrono::seconds(2)) {
+            last = std::chrono::steady_clock::now();
+            std::printf("GDS dump (%u samples):", samples);
+            for (u32 i = 0; i < nonzero.size(); ++i) {
+                if (maximum[i] != 0) {
+                    std::printf(" %#x:%u%%/max%u", i * 4, nonzero[i] * 100 / samples, maximum[i]);
+                }
+            }
+            std::printf("\n");
+            std::fflush(stdout);
+            nonzero.fill(0);
+            maximum.fill(0);
+            samples = 0;
+        }
+    }
     if (fault_process_pending) {
         fault_process_pending = false;
         buffer_cache.ProcessFaultBuffer();
@@ -2971,7 +3119,29 @@ void TraceShaderBinding(const Shader::Info& stage, VAddr addr, u64 size, bool wr
         }
         return out;
     }();
-    if (hashes.empty() || std::ranges::find(hashes, stage.pgm_hash) == hashes.end()) {
+    // BB_TRACE_SHADER_RANGE=lo,hi: shaders binding anything in [lo, hi) are traced (all their
+    // bindings, from the first time one of them is seen).
+    static const std::pair<u64, u64> range = [] {
+        const char* env = std::getenv("BB_TRACE_SHADER_RANGE");
+        if (!env) {
+            return std::pair<u64, u64>{0, 0};
+        }
+        char* end = nullptr;
+        const u64 lo = std::strtoull(env, &end, 16);
+        return std::pair<u64, u64>{lo, end && *end == ',' ? std::strtoull(end + 1, nullptr, 16) : 0};
+    }();
+    static std::mutex range_mutex;
+    static std::set<u64> range_hashes;
+    bool range_traced = false;
+    if (range.second != 0) {
+        std::scoped_lock lk{range_mutex};
+        if (addr < range.second && range.first < addr + size) {
+            range_hashes.insert(stage.pgm_hash);
+        }
+        range_traced = range_hashes.contains(stage.pgm_hash);
+    }
+    if (!range_traced &&
+        (hashes.empty() || std::ranges::find(hashes, stage.pgm_hash) == hashes.end())) {
         return;
     }
     const bool in_place = cache.IsInPlace(addr, size);
@@ -3154,8 +3324,10 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                     LOG_ERROR(Render, "Clamped size from {} to {} for stage {:#x}",
                               vsharp.GetSize(), size, stage.pgm_hash);
                 }
+                VideoCore::bind_tag = stage.pgm_hash;
                 const auto [buffer, offset] = buffer_cache.ObtainBuffer(
                     vsharp.base_address, size, desc.is_written, desc.is_formatted);
+                VideoCore::bind_tag = 0;
                 TraceShaderBinding(stage, vsharp.base_address, size, desc.is_written, buffer_cache);
                 const u64 offset_aligned = Common::AlignDown(offset, alignment);
                 const u64 adjust = offset - offset_aligned;
@@ -4121,6 +4293,41 @@ void Rasterizer::DepthStencilCopy(bool is_depth, bool is_stencil) {
     ScopeMarkerEnd();
 }
 
+// bbport (diagnostic) BB_DMA_WATCH=lo-hi (hex): DMA copies and fills into that range, by source and path.
+static void DmaWatch(VAddr dst, VAddr src, u32 num_bytes, int kind) {
+    static const std::pair<u64, u64> range = [] {
+        const char* env = std::getenv("BB_DMA_WATCH");
+        if (!env) {
+            return std::pair<u64, u64>{0, 0};
+        }
+        char* end = nullptr;
+        const u64 lo = std::strtoull(env, &end, 16);
+        return std::pair<u64, u64>{lo, end && *end == '-' ? std::strtoull(end + 1, nullptr, 16) : 0};
+    }();
+    if (range.second == 0 || (kind < 5 && (dst >= range.second || dst + num_bytes <= range.first))) {
+        return;
+    }
+    static std::mutex mutex;
+    static std::map<std::tuple<u64, u64, u32, int>, u64> counts;
+    static auto last = std::chrono::steady_clock::now();
+    std::scoped_lock lk{mutex};
+    ++counts[{dst, src, num_bytes, kind}];
+    if (std::chrono::steady_clock::now() - last > std::chrono::seconds(5)) {
+        last = std::chrono::steady_clock::now();
+        static const char* kinds[] = {"copy on CPU",  "copy on GPU",
+                                      "fill on CPU",  "fill on GPU",
+                                      "copy from GDS", "GDS load from guest data",
+                                      "GDS load from GPU data"};
+        for (const auto& [k, n] : counts) {
+            std::printf("DMA watch: %#llx <- %#llx, %u bytes, %s: %llu\n",
+                        (unsigned long long)std::get<0>(k), (unsigned long long)std::get<1>(k),
+                        std::get<2>(k), kinds[std::get<3>(k)], (unsigned long long)n);
+        }
+        counts.clear();
+        std::fflush(stdout);
+    }
+}
+
 void Rasterizer::FillBuffer(VAddr address, u32 num_bytes, u32 value, bool is_gds) {
     DrainDrawPipe();
     ASSERT_MSG(address % 4 == 0 && num_bytes % 4 == 0,
@@ -4137,6 +4344,7 @@ void Rasterizer::FillBuffer(VAddr address, u32 num_bytes, u32 value, bool is_gds
             BbFreeCheck::Check(address, num_bytes, &value, BbFreeCheck::DmaFill);
             u32* buffer = std::bit_cast<u32*>(address);
             std::fill(buffer, buffer + (num_bytes / sizeof(u32)), value);
+            DmaWatch(address, value, num_bytes, 2);
             BbWriteLog::Note(address, buffer, num_bytes, BbWriteLog::Dma);
             if (!VideoCore::WriteTracking()) {
                 NoteAssetWrite(address, num_bytes);
@@ -4148,8 +4356,14 @@ void Rasterizer::FillBuffer(VAddr address, u32 num_bytes, u32 value, bool is_gds
         if (is_gds) {
             return {buffer_cache.GetGdsBuffer(), address};
         }
-        return buffer_cache.ObtainBuffer(address, num_bytes, true);
+        VideoCore::bind_tag = 2;
+        const auto obtained = buffer_cache.ObtainBuffer(address, num_bytes, true);
+        VideoCore::bind_tag = 0;
+        return obtained;
     }();
+    if (!is_gds) {
+        DmaWatch(address, value, num_bytes, 3);
+    }
     runtime.FillBuffer(buffer, offset, num_bytes, value);
 }
 
@@ -4177,12 +4391,18 @@ void Rasterizer::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gds, b
             // Both buffers were not transferred to GPU yet. Can safely copy in host memory.
             BbFreeCheck::Check(dst, num_bytes, std::bit_cast<const void*>(src), BbFreeCheck::DmaCopy);
             std::memcpy(std::bit_cast<void*>(dst), std::bit_cast<void*>(src), num_bytes);
+            DmaWatch(dst, src, num_bytes, 0);
             BbWriteLog::Note(dst, std::bit_cast<const void*>(dst), num_bytes, BbWriteLog::Dma);
             if (!VideoCore::WriteTracking()) {
                 NoteAssetWrite(dst, num_bytes);
             }
             return;
         }
+    }
+    if (!dst_gds) {
+        DmaWatch(dst, src, num_bytes, src_gds ? 4 : 1);
+    } else if (!src_gds) {
+        DmaWatch(dst, src, num_bytes, buffer_cache.IsRegionGpuModified(src, num_bytes) ? 6 : 5);
     }
     texture_cache.InvalidateMemoryFromGPU(dst, num_bytes);
     const auto* gds_buffer = buffer_cache.GetGdsBuffer();
@@ -4196,7 +4416,10 @@ void Rasterizer::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gds, b
         if (dst_gds) {
             return {gds_buffer, dst};
         }
-        return buffer_cache.ObtainBuffer(dst, num_bytes, true, true);
+        VideoCore::bind_tag = 1;
+        const auto obtained = buffer_cache.ObtainBuffer(dst, num_bytes, true, true);
+        VideoCore::bind_tag = 0;
+        return obtained;
     }();
     const vk::BufferCopy copy = {
         .srcOffset = src_offset,

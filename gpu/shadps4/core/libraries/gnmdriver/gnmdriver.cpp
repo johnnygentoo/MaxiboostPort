@@ -624,6 +624,26 @@ s32 PS4_SYSV_ABI sceGnmDrawIndexAuto(u32* cmdbuf, u32 size, u32 index_count, u32
     return -1;
 }
 
+// bbport BB_SKIP_TRACE=1: indirect draw packets the game asks for, written or refused.
+static void TraceIndirectDraw(const char* name, bool written, u32 size, u32 stage, u32 vsgpr,
+                              u32 isgpr, u32 flags) {
+    static const bool on = [] {
+        const char* env = std::getenv("BB_SKIP_TRACE");
+        return env && *env == '1';
+    }();
+    if (!on) {
+        return;
+    }
+    static std::atomic<u32> calls{0};
+    const u32 n = calls.fetch_add(1, std::memory_order_relaxed);
+    if (n < 16 || n % 600 == 0 || !written) {
+        std::printf("%s #%u: %s (size %u stage %u vertex sgpr %u instance sgpr %u flags %#x)\n",
+                    name, n, written ? "written" : "REFUSED", size, stage, vsgpr, isgpr, flags);
+        std::fflush(stdout);
+    }
+}
+
+
 s32 PS4_SYSV_ABI sceGnmDrawIndexIndirect(u32* cmdbuf, u32 size, u32 data_offset, u32 shader_stage,
                                          u32 vertex_sgpr_offset, u32 instance_sgpr_offset,
                                          u32 flags) {
@@ -645,8 +665,12 @@ s32 PS4_SYSV_ABI sceGnmDrawIndexIndirect(u32* cmdbuf, u32 size, u32 data_offset,
 
         cmdbuf += 4;
         WriteTrailingNop<3>(cmdbuf);
+        TraceIndirectDraw("sceGnmDrawIndexIndirect", true, size, shader_stage, vertex_sgpr_offset,
+                          instance_sgpr_offset, flags);
         return ORBIS_OK;
     }
+    TraceIndirectDraw("sceGnmDrawIndexIndirect", false, size, shader_stage, vertex_sgpr_offset,
+                      instance_sgpr_offset, flags);
     return -1;
 }
 
@@ -759,8 +783,12 @@ s32 PS4_SYSV_ABI sceGnmDrawIndirect(u32* cmdbuf, u32 size, u32 data_offset, u32 
 
         cmdbuf += 4;
         WriteTrailingNop<3>(cmdbuf);
+        TraceIndirectDraw("sceGnmDrawIndirect", true, size, shader_stage, vertex_sgpr_offset,
+                          instance_sgpr_offset, flags);
         return ORBIS_OK;
     }
+    TraceIndirectDraw("sceGnmDrawIndirect", false, size, shader_stage, vertex_sgpr_offset,
+                      instance_sgpr_offset, flags);
     return -1;
 }
 

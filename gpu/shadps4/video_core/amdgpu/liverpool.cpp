@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <unordered_map>
+#include <map>
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -1406,6 +1408,20 @@ bool Liverpool::PredicationSkips(const PM4Header* header) {
         const bool draw = (!ready && predication.hint_no_wait) ||
                           (predication.draw_if_true ? any : !any);
         predication.skip = !draw;
+        // bbport BB_SKIP_TRACE=1: predicated draws the game's tests skip (the first 64 tests).
+        static const bool trace = EmulatorSettingsImpl::Flag("BB_SKIP_TRACE", false);
+        static u32 traced = 0;
+        if (trace && traced < 64) {
+            ++traced;
+            std::printf("Predication: %s, %zu tests (op %u at %#llx), any %d ready %d draw_if_true %d "
+                        "hint_no_wait %d\n", draw ? "draws" : "skips", predication.tests.size(),
+                        predication.tests.empty() ? 0u : predication.tests[0].op,
+                        predication.tests.empty() ? 0ull
+                                                  : (unsigned long long)predication.tests[0].address,
+                        int(any), int(ready), int(predication.draw_if_true),
+                        int(predication.hint_no_wait));
+            std::fflush(stdout);
+        }
     }
     predication.skipped += predication.skip ? 1 : 0;
     return predication.skip;
@@ -1422,6 +1438,28 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
     }
     static const bool dcb_stats = EmulatorSettingsImpl::Flag("BB_DCB_STATS", false);
     const int dcb_depth = g_dcb_depth;
+    // bbport BB_SKIP_TRACE=1: command buffers holding memory the GPU wrote (patched by shaders).
+    static const bool dcb_gpu_trace = EmulatorSettingsImpl::Flag("BB_SKIP_TRACE", false);
+    if (dcb_gpu_trace && rasterizer && !dcb.empty()) {
+        static u32 reports = 0;
+        const VAddr base = reinterpret_cast<VAddr>(dcb.data());
+        const u64 bytes = dcb.size_bytes();
+        if (reports < 40 && rasterizer->GetBufferCache().IsRegionGpuModified(base, bytes)) {
+            ++reports;
+            u64 first = ~0ull, last = 0;
+            for (u64 off = 0; off < bytes; off += 256) {
+                if (rasterizer->GetBufferCache().IsRegionGpuModified(base + off,
+                                                                     std::min<u64>(256, bytes - off))) {
+                    first = std::min(first, off);
+                    last = off;
+                }
+            }
+            std::printf("DCB %#llx (%llu bytes, depth %d) has GPU-written memory at +%#llx..+%#llx\n",
+                        (unsigned long long)base, (unsigned long long)bytes, dcb_depth,
+                        (unsigned long long)first, (unsigned long long)last + 256);
+            std::fflush(stdout);
+        }
+    }
     if (dcb_stats) {
         ScanDcb(dcb, dcb_depth);
     }
@@ -1544,6 +1582,37 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
             switch (opcode) {
             case PM4ItOpcode::Nop: {
                 const auto* nop = reinterpret_cast<const PM4CmdNop*>(header);
+                // bbport BB_SKIP_TRACE=1: NOP packets with a payload, by size and first word
+                // (placeholders the GPU may fill), counted per 600 and the first of each shown.
+                static const bool nop_trace = EmulatorSettingsImpl::Flag("BB_SKIP_TRACE", false);
+                if (nop_trace) {
+                    static std::unordered_map<u64, u32> nop_seen;
+                    const u32 words = header->type3.NumWords();
+                    const u32 first = words ? nop->data_block[0] : 0;
+                    const u64 key = (u64(words) << 32) | first;
+                    const u32 n = nop_seen[key]++;
+                    const bool gpu_written =
+                        rasterizer && rasterizer->GetBufferCache().IsRegionGpuModified(
+                                          reinterpret_cast<VAddr>(header), (words + 1) * 4);
+                    static u32 gpu_reports = 0;
+                    if (gpu_written && gpu_reports++ < 40) {
+                        std::printf("NOP in GPU-written memory: %u words at %p:", words,
+                                    (const void*)header);
+                        for (u32 i = 0; i < std::min<u32>(words, 8); ++i) {
+                            std::printf(" %08x", nop->data_block[i]);
+                        }
+                        std::printf("\n");
+                    }
+                    if (n == 0 || n % 600 == 0) {
+                        std::printf("NOP %u words, first %#x at %p (seen %u):", words, first,
+                                    (const void*)header, n);
+                        for (u32 i = 0; i < std::min<u32>(words, 8); ++i) {
+                            std::printf(" %08x", nop->data_block[i]);
+                        }
+                        std::printf("\n");
+                        std::fflush(stdout);
+                    }
+                }
                 if (nop->header.count.Value() == 0) {
                     break;
                 }
@@ -1908,6 +1977,8 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
                 auto& cs_program = GetCsRegs();
                 const auto offset = dispatch_indirect->data_offset;
                 const auto size = sizeof(PM4CmdDispatchIndirect::GroupDimensions);
+                // bbport: the packet's own dispatch initiator, as on the compute queues.
+                cs_program.dispatch_initiator = dispatch_indirect->dispatch_initiator;
                 if (DebugState.DumpingCurrentReg()) {
                     DebugState.PushRegsDumpCompute(base_addr, reinterpret_cast<uintptr_t>(header),
                                                    cs_program);
@@ -2246,6 +2317,23 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
             }
             case PM4ItOpcode::IndirectBuffer: {
                 const auto* indirect_buffer = reinterpret_cast<const PM4CmdIndirectBuffer*>(header);
+                // bbport BB_SKIP_TRACE=1: nested command buffers (address, size, first packets),
+                // each address 16 times, to find ones the GPU writes.
+                static const bool ib_trace = EmulatorSettingsImpl::Flag("BB_SKIP_TRACE", false);
+                if (ib_trace) {
+                    static std::unordered_map<VAddr, u32> ib_seen;
+                    const auto* words = indirect_buffer->Address<const u32>();
+                    const VAddr ib = reinterpret_cast<VAddr>(words);
+                    if (ib_seen[ib]++ < 16) {
+                        std::printf("IB %#llx size %u depth %d:", (unsigned long long)ib,
+                                    u32(indirect_buffer->ib_size), dcb_depth);
+                        for (u32 i = 0; i < std::min<u32>(indirect_buffer->ib_size, 8); ++i) {
+                            std::printf(" %08x", words[i]);
+                        }
+                        std::printf("\n");
+                        std::fflush(stdout);
+                    }
+                }
                 auto task = ProcessGraphics(
                     {indirect_buffer->Address<const u32>(), indirect_buffer->ib_size}, {});
                 // Tasks start suspended: the nested body (and its scan) runs on this resume.
@@ -2303,6 +2391,20 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
                         value = *reinterpret_cast<const u32*>(address);
                     }
                     skip = value == 0;
+                }
+                // bbport BB_SKIP_TRACE=1: COND_EXEC decisions, per flag address (first 64 each,
+                // then every 600th).
+                static const bool cond_trace = EmulatorSettingsImpl::Flag("BB_SKIP_TRACE", false);
+                if (cond_trace) {
+                    static std::unordered_map<VAddr, u32> seen;
+                    const VAddr flag = reinterpret_cast<VAddr>(cond_exec->Address());
+                    const u32 n = seen[flag]++;
+                    if (n < 64 || n % 600 == 0) {
+                        std::printf("CondExec %#llx = %u: %s %u dwords (seen %u)\n",
+                                    (unsigned long long)flag, *cond_exec->Address(),
+                                    skip ? "skips" : "runs", u32(cond_exec->exec_count.Value()), n);
+                        std::fflush(stdout);
+                    }
                 }
                 if (skip) {
                     if (cp_cursor) {
@@ -2417,6 +2519,21 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
             std::fflush(stdout);
         }
 
+        // bbport BB_SPLIT_TRACE=1: packets split across compute submissions (diagnostic).
+        static const bool split_trace = std::getenv("BB_SPLIT_TRACE") != nullptr;
+        if (split_trace && queue.tmp_dwords > 0) {
+            const auto* held = reinterpret_cast<const PM4Header*>(queue.tmp_packet.data());
+            static std::atomic<u64> resumed{0};
+            const u32 total = held->type3.NumWords() + 1;
+            if (total - queue.tmp_dwords > acb.size() || total > queue.tmp_packet.size() ||
+                (resumed.fetch_add(1) & 255) == 0) {
+                std::printf("Split packet q%u: opcode %#x, %u dwords, %u held, %zu in this submission%s\n",
+                            vqid, u32(held->type3.opcode.Value()), total, queue.tmp_dwords, acb.size(),
+                            total - queue.tmp_dwords > acb.size() ? " (REMAINDER MISSING)" :
+                            total > queue.tmp_packet.size() ? " (TOO LARGE)" : "");
+                std::fflush(stdout);
+            }
+        }
         // If we have a buffered packet, use it.
         if (queue.tmp_dwords > 0) [[unlikely]] {
             header = reinterpret_cast<const PM4Header*>(queue.tmp_packet.data());
@@ -2454,6 +2571,27 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
         }
 
         const PM4ItOpcode opcode = header->type3.opcode;
+        // bbport BB_SKIP_TRACE=1: packets per compute queue and opcode, every 10 s.
+        {
+            static const bool count_trace = EmulatorSettingsImpl::Flag("BB_SKIP_TRACE", false);
+            if (count_trace) {
+                static std::mutex count_mutex;
+                static std::map<std::pair<u32, u32>, u64> counts;
+                static auto last = std::chrono::steady_clock::now();
+                std::scoped_lock lk{count_mutex};
+                ++counts[{vqid, u32(opcode)}];
+                if (std::chrono::steady_clock::now() - last > std::chrono::seconds(10)) {
+                    last = std::chrono::steady_clock::now();
+                    std::printf("Compute packets (10 s):");
+                    for (const auto& [key, n] : counts) {
+                        std::printf(" q%u/%#x=%llu", key.first, key.second, (unsigned long long)n);
+                    }
+                    std::printf("\n");
+                    std::fflush(stdout);
+                    counts.clear();
+                }
+            }
+        }
 
         const auto* it_body = reinterpret_cast<const u32*>(header) + 1;
         switch (opcode) {
@@ -2483,6 +2621,29 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
                            dma_data->DstAddress<VAddr>(), dma_data->data, dma_data->NumBytes(), int(vqid));
             }
             ASSERT(dma_data->command.das == 0);
+            // bbport BB_GDS_TRACE=1: which compute queue touches which GDS bytes, every 5 s.
+            static const bool gds_trace = std::getenv("BB_GDS_TRACE") != nullptr;
+            if (gds_trace && (dma_data->src_sel == DmaDataSrc::Gds || dma_data->dst_sel == DmaDataDst::Gds)) {
+                static std::mutex gds_mutex;
+                static std::map<std::tuple<u32, int, u32, u32, u32>, u32> gds_uses;
+                static auto gds_last = std::chrono::steady_clock::now();
+                std::scoped_lock lk{gds_mutex};
+                const int kind = dma_data->dst_sel == DmaDataDst::Gds
+                                     ? (dma_data->src_sel == DmaDataSrc::Data ? 0 : 1) : 2;
+                const u32 gds_at = kind == 2 ? dma_data->src_addr_lo : dma_data->dst_addr_lo;
+                ++gds_uses[{vqid, kind, gds_at, dma_data->NumBytes(), kind == 0 ? dma_data->data : 0}];
+                if (std::chrono::steady_clock::now() - gds_last > std::chrono::seconds(5)) {
+                    gds_last = std::chrono::steady_clock::now();
+                    for (const auto& [k, n] : gds_uses) {
+                        static const char* kinds[] = {"fill", "load", "store"};
+                        std::printf("GDS q%u %s at %#x, %u bytes, value %#x: %u\n", std::get<0>(k),
+                                    kinds[std::get<1>(k)], std::get<2>(k), std::get<3>(k),
+                                    std::get<4>(k), n);
+                    }
+                    gds_uses.clear();
+                    std::fflush(stdout);
+                }
+            }
             if (dma_data->src_sel == DmaDataSrc::Data && dma_data->dst_sel == DmaDataDst::Gds) {
                 rasterizer->FillBuffer(dma_data->dst_addr_lo, dma_data->NumBytes(), dma_data->data,
                                        true);
@@ -2595,6 +2756,20 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
             auto& cs_program = GetCsRegs();
             const auto ib_address = dispatch_indirect->Address<VAddr>();
             const auto size = sizeof(PM4CmdDispatchIndirect::GroupDimensions);
+            // bbport: the packet carries its own dispatch initiator (as DISPATCH_DIRECT does);
+            // the register's value was the last direct dispatch's, or none: a queue that only
+            // dispatched indirectly skipped every dispatch.
+            static const bool trace = EmulatorSettingsImpl::Flag("BB_SKIP_TRACE", false);
+            if (trace && (cs_program.dispatch_initiator & 1) == 0 &&
+                (dispatch_indirect->dispatch_initiator & 1) != 0) {
+                static u32 rescued = 0;
+                if (rescued++ % 600 == 0) {
+                    std::printf("Compute queue %u: indirect dispatch the old initiator check skipped "
+                                "(%u so far)\n", vqid, rescued);
+                    std::fflush(stdout);
+                }
+            }
+            cs_program.dispatch_initiator = dispatch_indirect->dispatch_initiator;
             if (DebugState.DumpingCurrentReg()) {
                 DebugState.PushRegsDumpCompute(base_addr, reinterpret_cast<uintptr_t>(header),
                                                cs_program);
@@ -2696,6 +2871,27 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
         case PM4ItOpcode::ReleaseMem: {
             // BB_HONEST_LABELS: written once the GPU has finished the work before it (not a GDS store,
             // which needs the GPU copy recorded here).
+            {
+                // bbport BB_SKIP_TRACE=1: compute RELEASE_MEM labels by address (the first 8 of
+                // each, then every 300th), with the event, value and interrupt.
+                static const bool rm_trace = EmulatorSettingsImpl::Flag("BB_SKIP_TRACE", false);
+                if (rm_trace) {
+                    const auto* rm = reinterpret_cast<const PM4CmdReleaseMem*>(header);
+                    static std::mutex rm_mutex;
+                    static std::unordered_map<VAddr, u32> rm_seen;
+                    std::scoped_lock lk{rm_mutex};
+                    const u32 n = rm_seen[rm->Address<VAddr>()]++;
+                    if (n < 8 || n % 300 == 0) {
+                        std::printf("Compute q%u ReleaseMem event %#x -> %#llx = %#llx sel %u int %u "
+                                    "(seen %u)\n",
+                                    vqid, u32(rm->event_type.Value()),
+                                    (unsigned long long)rm->Address<VAddr>(),
+                                    (unsigned long long)rm->DataQWord(), u32(rm->data_sel.Value()),
+                                    u32(rm->int_sel.Value()), n);
+                        std::fflush(stdout);
+                    }
+                }
+            }
             WatchLabel("compute ReleaseMem", reinterpret_cast<const PM4CmdReleaseMem*>(header)->Address<VAddr>(),
                        reinterpret_cast<const PM4CmdReleaseMem*>(header)->DataQWord(),
                        static_cast<u32>(reinterpret_cast<const PM4CmdReleaseMem*>(header)->data_sel.Value()), int(vqid));

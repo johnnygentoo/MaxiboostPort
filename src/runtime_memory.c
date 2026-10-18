@@ -474,6 +474,20 @@ static int32_t map_direct_locked(void **out, uint64_t size, int prot, int flags,
     if (!direct_range_allocated((uint64_t)physical,size)) return INVALID;
     int32_t result=place(out,size,prot,flags,alignment,KIND_DIRECT,block_type((uint64_t)physical),(uint64_t)physical);
     if (!result) ++maps;
+    /* The same physical memory at a second address (GPU write tracking sees one address only). */
+    if (!result) {
+        const uintptr_t at=(uintptr_t)*out;
+        for (size_t i=0;i<vma_count;++i) {
+            const Vma *v=&vmas[i];
+            if (v->kind!=KIND_DIRECT || v->start==at) continue;
+            const uint64_t vphys_end=v->phys+(v->end-v->start);
+            if (v->phys<(uint64_t)physical+size && (uint64_t)physical<vphys_end)
+                printf("Runtime: alias: direct memory phys %#" PRIx64 "+%#" PRIx64 " at %#" PRIx64
+                       " (prot %#x) is also mapped at %#" PRIx64 "..%#" PRIx64 " (phys %#" PRIx64 ", prot %#x)\n",
+                       (uint64_t)physical,size,(uint64_t)at,(unsigned)prot,(uint64_t)v->start,(uint64_t)v->end,
+                       v->phys,(unsigned)v->prot);
+        }
+    }
     return result;
 }
 static ABI int32_t direct_map(void **out, uint64_t size, int prot, int flags, int64_t physical, uint64_t alignment) {
