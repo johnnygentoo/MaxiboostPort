@@ -755,6 +755,13 @@ EN = {
     'Иначе музыка и звуки играют дважды': 'Otherwise music and sounds play twice',
     'Имя игрока 1': "Player 1's name",
     'Имя игрока 2': "Player 2's name",
+    'По сети': 'Over the network',
+    'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Each PC needs its own copy of the game. One takes the players, the others connect to it by its address.',
+    'Игра по сети': 'Network play',
+    'Этот ПК принимает игроков': 'This PC takes the players',
+    'Подключиться к другому ПК': 'Join another PC',
+    'Адрес ПК, который принимает игроков': 'Address of the PC that takes the players',
+    'Адрес этого ПК: {}': "This PC's address: {}",
     'Второй': 'Second',
 }
 
@@ -1565,6 +1572,13 @@ PT_BR = {
     'Иначе музыка и звуки играют дважды': 'Senão a música e os sons tocam duas vezes',
     'Имя игрока 1': 'Nome do jogador 1',
     'Имя игрока 2': 'Nome do jogador 2',
+    'По сети': 'Pela rede',
+    'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Cada PC precisa da sua própria cópia do jogo. Um recebe os jogadores, os outros se conectam a ele pelo endereço dele.',
+    'Игра по сети': 'Jogo em rede',
+    'Этот ПК принимает игроков': 'Este PC recebe os jogadores',
+    'Подключиться к другому ПК': 'Conectar a outro PC',
+    'Адрес ПК, который принимает игроков': 'Endereço do PC que recebe os jogadores',
+    'Адрес этого ПК: {}': 'Endereço deste PC: {}',
     'Второй': 'Segundo',
 }
 
@@ -2285,6 +2299,13 @@ ES = {
     'Иначе музыка и звуки играют дважды': 'Si no, la música y los sonidos suenan dos veces',
     'Имя игрока 1': 'Nombre del jugador 1',
     'Имя игрока 2': 'Nombre del jugador 2',
+    'По сети': 'Por la red',
+    'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Cada PC necesita su propia copia del juego. Uno recibe a los jugadores y los demás se conectan a él por su dirección.',
+    'Игра по сети': 'Juego en red',
+    'Этот ПК принимает игроков': 'Este PC recibe a los jugadores',
+    'Подключиться к другому ПК': 'Conectarse a otro PC',
+    'Адрес ПК, который принимает игроков': 'Dirección del PC que recibe a los jugadores',
+    'Адрес этого ПК: {}': 'Dirección de este PC: {}',
     'Второй': 'Segundo',
 }
 
@@ -3005,6 +3026,13 @@ IT = {
     'Иначе музыка и звуки играют дважды': 'Altrimenti musica e suoni si sentono due volte',
     'Имя игрока 1': 'Nome del giocatore 1',
     'Имя игрока 2': 'Nome del giocatore 2',
+    'По сети': 'In rete',
+    'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Ogni PC ha bisogno della propria copia del gioco. Uno accoglie i giocatori, gli altri si collegano a lui tramite il suo indirizzo.',
+    'Игра по сети': 'Gioco in rete',
+    'Этот ПК принимает игроков': 'Questo PC accoglie i giocatori',
+    'Подключиться к другому ПК': 'Collegati a un altro PC',
+    'Адрес ПК, который принимает игроков': 'Indirizzo del PC che accoglie i giocatori',
+    'Адрес этого ПК: {}': 'Indirizzo di questo PC: {}',
     'Второй': 'Secondo',
 }
 
@@ -3725,6 +3753,13 @@ FR = {
     'Иначе музыка и звуки играют дважды': 'Sinon la musique et les sons sont joués deux fois',
     'Имя игрока 1': 'Nom du joueur 1',
     'Имя игрока 2': 'Nom du joueur 2',
+    'По сети': 'Par le réseau',
+    'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Chaque PC a besoin de sa propre copie du jeu. L’un accueille les joueurs, les autres s’y connectent par son adresse.',
+    'Игра по сети': 'Jeu en réseau',
+    'Этот ПК принимает игроков': 'Ce PC accueille les joueurs',
+    'Подключиться к другому ПК': 'Se connecter à un autre PC',
+    'Адрес ПК, который принимает игроков': 'Adresse du PC qui accueille les joueurs',
+    'Адрес этого ПК: {}': 'Adresse de ce PC : {}',
     'Второй': 'Deuxième',
 }
 
@@ -4445,6 +4480,13 @@ DE = {
     'Иначе музыка и звуки играют дважды': 'Sonst laufen Musik und Klänge doppelt',
     'Имя игрока 1': 'Name von Spieler 1',
     'Имя игрока 2': 'Name von Spieler 2',
+    'По сети': 'Über das Netzwerk',
+    'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Jeder PC braucht eine eigene Kopie des Spiels. Einer nimmt die Spieler auf, die anderen verbinden sich über seine Adresse mit ihm.',
+    'Игра по сети': 'Netzwerkspiel',
+    'Этот ПК принимает игроков': 'Dieser PC nimmt die Spieler auf',
+    'Подключиться к другому ПК': 'Mit einem anderen PC verbinden',
+    'Адрес ПК, который принимает игроков': 'Adresse des PCs, der die Spieler aufnimmt',
+    'Адрес этого ПК: {}': 'Adresse dieses PCs: {}',
     'Второй': 'Zweiter',
 }
 
@@ -5109,6 +5151,13 @@ ZH_CN = {
     'Иначе музыка и звуки играют дважды': '否则音乐和音效会播放两次',
     'Имя игрока 1': '玩家 1 的名字',
     'Имя игрока 2': '玩家 2 的名字',
+    'По сети': '局域网',
+    'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': '每台电脑都需要一份自己的游戏。一台接收玩家，其他电脑通过它的地址连接。',
+    'Игра по сети': '联网游戏',
+    'Этот ПК принимает игроков': '这台电脑接收玩家',
+    'Подключиться к другому ПК': '连接到另一台电脑',
+    'Адрес ПК, который принимает игроков': '接收玩家的电脑的地址',
+    'Адрес этого ПК: {}': '这台电脑的地址：{}',
     'Второй': '第二台',
 }
 

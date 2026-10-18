@@ -81,6 +81,27 @@ fi
 # play each other through Player Match on a server on this PC (GUNDAM VERSUS has no local
 # multiplayer: its versus modes are online only). See the end of this script.
 if [[ ${BB_COOP:-0} == 1 ]]; then export BB_ONLINE=1; fi
+# Play over the local network (BB_LAN, launcher: "Over the network"): host, this PC's matching server
+# takes the other PCs' games too (TCP 31313, UDP 31314; each game's own UDP 3658); join, the games
+# of this PC play through the host PC's server at BB_LAN_SERVER (its address, port 31313 unless
+# given). Each PC needs its own copy of the game.
+case ${BB_LAN:-} in
+host)
+    # The address the other PCs reach this one at: the server tells each game how the others see it.
+    lan_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+    [[ -n $lan_ip ]] || lan_ip=$(hostname -i 2>/dev/null | awk '{print $1}')
+    [[ -n $lan_ip ]] || { echo 'STOP: this PC has no network address for the other PCs to reach' >&2; exit 1; }
+    export BB_ONLINE=1 BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-$lan_ip:31313}
+    export SHADPS4_P2P_PORT=${SHADPS4_P2P_PORT:-3658}
+    echo "Network play: other PCs join this one at $lan_ip"
+    ;;
+join)
+    [[ -n ${BB_LAN_SERVER:-} ]] || { echo "STOP: network play needs the host PC's address (BB_LAN_SERVER)" >&2; exit 1; }
+    server=$BB_LAN_SERVER; [[ $server == *:* ]] || server+=:31313
+    export BB_ONLINE=1 BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-$server}
+    export SHADPS4_P2P_PORT=${SHADPS4_P2P_PORT:-3658}
+    ;;
+esac
 # Online play (BB_ONLINE=1) also links the game's own libSceNpToolkit2.prx: GUNDAM VERSUS leaves
 # PSN to it (sign-in state, callbacks, sessions); offline the runtime answers for it.
 modules=(libc.prx libSceFios2.prx)
@@ -262,15 +283,16 @@ if [[ ${BB_ONLINE:-0} == 1 ]]; then
     [[ -n ${BB_SHADNET_WEBAPI:-} ]] || export BB_SHADNET_WEBAPI=http://${BB_SHADNET_SERVER%:*}:31315
     server_host=${BB_SHADNET_SERVER%:*} server_port=${BB_SHADNET_SERVER##*:}
     server_up() { (exec 9<>"/dev/tcp/$server_host/$server_port") 2>/dev/null; }
-    if [[ $server_host == 127.0.0.1 || $server_host == localhost ]] && ! server_up; then
+    if [[ $server_host == 127.0.0.1 || $server_host == localhost || ${BB_LAN:-} == host ]] && ! server_up; then
         if [[ -n ${BB_PREBUILT:-} ]]; then gvnet=bin/gvnet-server; else gvnet=out/gpu/gvnet-server; fi
         if [[ ! -x $gvnet ]]; then echo "STOP: online play needs $gvnet (the online module is not in this build)" >&2; exit 1; fi
-        "$gvnet" --bind 127.0.0.1 --port "$server_port" </dev/null > >(while IFS= read -r line; do printf '%s\n' "$line"; done) 2>&1 &
+        bind=127.0.0.1; [[ ${BB_LAN:-} == host ]] && bind=0.0.0.0  # the other PCs' games too
+        "$gvnet" --bind "$bind" --port "$server_port" </dev/null > >(while IFS= read -r line; do printf '%s\n' "$line"; done) 2>&1 &
         server_pid=$!
         for _ in $(seq 50); do server_up && break; sleep 0.1; done
         game_pid=$$
         ( while kill -0 "$game_pid" 2>/dev/null; do sleep 2; done; kill -TERM "$server_pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
-        echo "Online: gvnet-server on 127.0.0.1:$server_port for this launch"
+        echo "Online: gvnet-server on $bind:$server_port for this launch"
     fi
 fi
 # Trophies (scripts/trophies.py): the dump's list and icons in the user directory, for the

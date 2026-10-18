@@ -16,6 +16,7 @@ import shutil
 import os
 import re
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -182,6 +183,8 @@ DEFAULTS = {
     "coop_audio2": False,
     "coop_name1": "Player1",
     "coop_name2": "Player2",
+    "lan": "off",
+    "lan_server": "",
     # The PS4's trophy key (shadPS4's TrophyKey): the trophies' names (scripts/trophies.py).
     "trophy_key": "",
 }
@@ -440,6 +443,12 @@ def game_environment(s):
         for key, default, var in (("coop_name1", "Player1", "BB_COOP_NAME1"),
                                   ("coop_name2", "Player2", "BB_COOP_NAME2")):
             env[var] = coop_name(s.get(key, ""), default)
+    if s.get("lan") in ("host", "join"):
+        env["BB_LAN"] = s["lan"]
+        if s["lan"] == "join":
+            env["BB_LAN_SERVER"] = s.get("lan_server", "").strip()
+        if not s.get("coop"):
+            env["BB_SHADNET_NPID"] = coop_name(s.get("coop_name1", ""), "Player1")
     for item in s["extra_env"].split():
         if "=" in item:
             key, value = item.split("=", 1)
@@ -458,6 +467,22 @@ COOP_LAYOUTS = [
     ("Рядом на одном мониторе", "split"),
     ("Каждое окно на своём мониторе", "displays"),
 ]
+
+LAN_MODES = [
+    ("Выключена", "off"),
+    ("Этот ПК принимает игроков", "host"),
+    ("Подключиться к другому ПК", "join"),
+]
+
+
+def lan_address():
+    """This PC's address on the local network (the route out, no packet sent), else ''."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("1.1.1.1", 9))
+            return probe.getsockname()[0]
+    except OSError:
+        return ""
 
 
 def flat_button(icon, tooltip, handler):
@@ -949,8 +974,22 @@ class LauncherWindow(Adw.ApplicationWindow):
             row.set_text(self.settings.get(key, ""))
             coop.add(row)
             self.coop_name_rows.append(row)
-        self.update_coop_rows()
         page.add(coop)
+
+        # Network play: each PC with its own copy of the game; one PC's matching server takes the
+        # others' games (run.sh BB_LAN).
+        lan = Adw.PreferencesGroup(
+            title=tr("По сети"),
+            description=tr("Каждому ПК нужна своя копия игры. Один принимает игроков, другие "
+                           "подключаются к нему по его адресу."))
+        self.lan_row = combo_row(tr("Игра по сети"), None, LAN_MODES, self.settings.get("lan", "off"))
+        self.lan_row.connect("notify::selected", lambda *_: self.update_coop_rows())
+        lan.add(self.lan_row)
+        self.lan_server_row = Adw.EntryRow(title=tr("Адрес ПК, который принимает игроков"))
+        self.lan_server_row.set_text(self.settings.get("lan_server", ""))
+        lan.add(self.lan_server_row)
+        self.update_coop_rows()
+        page.add(lan)
 
         upscaler = Adw.PreferencesGroup(
             title=tr("Апскейлер"),
@@ -1514,9 +1553,14 @@ class LauncherWindow(Adw.ApplicationWindow):
 
     def update_coop_rows(self):
         on = self.coop_row.get_active()
-        for row in (self.coop_layout_row, self.coop_audio_row, *self.coop_name_rows):
+        lan = combo_value(self.lan_row)
+        for row in (self.coop_layout_row, self.coop_audio_row, self.coop_name_rows[1]):
             row.set_sensitive(on)
+        self.coop_name_rows[0].set_sensitive(on or lan != "off")  # this PC's player online
         self.coop_display_row.set_sensitive(on and combo_value(self.coop_layout_row) == "displays")
+        self.lan_server_row.set_visible(lan == "join")
+        address = lan_address() if lan == "host" else ""
+        self.lan_row.set_subtitle(tr("Адрес этого ПК: {}").format(address) if address else "")
 
     def show_gamepad(self):
         names = getattr(self.gamepad_row, "names", None)
@@ -1552,6 +1596,8 @@ class LauncherWindow(Adw.ApplicationWindow):
         s["coop_layout"] = combo_value(self.coop_layout_row)
         s["coop_display2"] = combo_value(self.coop_display_row)
         s["coop_audio2"] = self.coop_audio_row.get_active()
+        s["lan"] = combo_value(self.lan_row)
+        s["lan_server"] = self.lan_server_row.get_text().strip()
         s["coop_name1"], s["coop_name2"] = (coop_name(row.get_text(), default) for row, default
                                             in zip(self.coop_name_rows, ("Player1", "Player2")))
         self.save_patch_profile()
