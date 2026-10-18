@@ -133,7 +133,10 @@ DRAW_PIPE = [("Авто", "", "Включён при 8 и более поток�
 # checked yet, so only English is offered by name.
 LANGUAGES = [("Как в системе", ""), ("Английский", "1")]
 LIVE_RESOLUTION = [("Авто (по видеокарте)", "auto"), ("Выключена (быстрее)", "0"), ("Включена", "1")]
-READBACKS = [("Relaxed", "", "По умолчанию"), ("Выключены", "0"), ("Precise", "2")]
+# "" leaves it to run.sh: precise for GUNDAM VERSUS (its effects are drawn from GPU-written data).
+READBACKS = [("Авто: Precise", "", "Нужно для эффектов: лучей, взрывов, огня"),
+             ("Relaxed", "1", "Эффекты (лучи, взрывы, огонь) не рисуются"),
+             ("Выключены", "0", "Эффекты (лучи, взрывы, огонь) не рисуются"), ("Precise", "2")]
 # Background pre-upload of the game's GPU memory into VRAM (BB_PREUPLOAD): auto = on with a discrete GPU.
 PREUPLOAD = [("Обычная", "", "Без лишней видеопамяти"), ("Полная", "2", "Около 3 ГБ видеопамяти сверху"),
              ("Выключена", "0")]

@@ -208,6 +208,16 @@ if [[ -z ${BB_PC_MODEL:-} ]]; then
     export BB_PC_MODEL=0
     echo "Memory model: the 0.3 one (${gpu_name:-GPU unknown}; BB_PC_MODEL=1: the new one, slower in this game)"
 fi
+# Readbacks left to the port: precise (BB_READBACKS=2: GPU-written memory is protected against CPU
+# reads too, a read copies it back). GUNDAM VERSUS draws its particle effects (beams, sabers,
+# explosions, fire) from a list its compute shaders build: each frame the CPU copies that list and
+# the GDS counters back (CFunctionTaskRenderEffect, guest+0x5fe291 and +0x5fe2ea) and issues one draw
+# per entry. Relaxed readbacks (1) only copy back on CPU writes: the CPU read the list's initial
+# contents, an empty list, and no effect was ever drawn. Precise costs ~1.4 ms of CPU a frame and
+# ~450 page readbacks a second in a battle on an RX 7800 XT, still 60 FPS.
+if [[ -z ${BB_READBACKS:-} ]]; then
+    export BB_READBACKS=2
+fi
 # GCN 3-5 under RADV (Polaris, Vega and their APUs): with HiZ, depth compression showed black
 # halos and missing geometry (issues #54, #99); RADV_DEBUG=nohiz fixed it at some cost. Set
 # unless RADV_DEBUG is the user's, BB_AUTO_NOHIZ=0: off.
