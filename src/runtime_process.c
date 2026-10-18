@@ -4,7 +4,7 @@
  *   - modules the game loads at run time from its own sce_module folder were linked into the
  *     image beforehand (scripts/link_modules.py) or are served by the runtime (libSceNpToolkit2),
  *     so loading one only hands out a handle; system modules are not there;
- *   - no unwind tables are offered (C++ exceptions would need them: logged when asked);
+ *   - the linked modules' unwind tables for libc's unwinder (C++ exceptions);
  *   - local time from the host's time zone. */
 #define _GNU_SOURCE
 #include "runtime.h"
@@ -12,7 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/uio.h>
 #include <time.h>
+#include <unistd.h>
 
 #define KERNEL_ENOENT ((int32_t)0x80020002)
 #define KERNEL_ESRCH ((int32_t)0x80020003)
@@ -57,23 +59,87 @@ static ABI int32_t dlsym(int32_t handle, const char *symbol, void **address) {
     return KERNEL_ESRCH;
 }
 
-/* Module information by address: libc's unwinder (C++ exceptions) and crash reports ask. */
+/* Module information by address: libc's unwinder (C++ exceptions: the game's libSceNpToolkit2
+ * throws and catches its own) and crash reports ask. scripts/link_modules.py writes where each
+ * linked module's code and unwind tables are (unwind.txt beside the boot image). */
+typedef struct { uint64_t start, size, eh_frame_hdr, eh_frame, eh_frame_size; char name[64]; } UnwindModule;
+static UnwindModule unwind_modules[16];
+static int unwind_count;
+void runtime_process_load_unwind(const char *path, const unsigned char *image) {
+    FILE *f=fopen(path,"r");
+    if (!f) return;
+    UnwindModule m;
+    unsigned long long a,b,c,d,e;
+    while (unwind_count<16 && fscanf(f,"%llx %llx %llx %llx %llx %63s",&a,&b,&c,&d,&e,m.name)==6) {
+        const uint64_t base=(uint64_t)(uintptr_t)image;
+        m.start=base+a; m.size=b; m.eh_frame_hdr=base+c; m.eh_frame=base+d; m.eh_frame_size=e;
+        unwind_modules[unwind_count++]=m;
+    }
+    fclose(f);
+}
+static const UnwindModule *unwind_module_at(uint64_t address) {
+    for (int i=0;i<unwind_count;++i)
+        if (address>=unwind_modules[i].start && address-unwind_modules[i].start<unwind_modules[i].size) return &unwind_modules[i];
+    return NULL;
+}
+/* The guest frames above the caller (frame pointers; PS4 code keeps them), each as module+offset:
+ * where a guest thread stopped (a debug exception: an uncaught C++ exception ends in one). */
+void runtime_guest_backtrace(FILE *out) {
+    uintptr_t rbp=(uintptr_t)__builtin_frame_address(0);
+    for (int depth=0; depth<40 && rbp; ++depth) {
+        uintptr_t frame[2];
+        struct iovec local={frame,sizeof(frame)}, remote={(void *)rbp,sizeof(frame)};
+        if (process_vm_readv(getpid(),&local,1,&remote,1,0)!=(ssize_t)sizeof(frame) || frame[0]<=rbp) break;
+        const UnwindModule *m=unwind_module_at(frame[1]);
+        if (m) fprintf(out,"  #%d %s+%#llx\n",depth,m->name,(unsigned long long)(frame[1]-m->start));
+        else fprintf(out,"  #%d %#llx\n",depth,(unsigned long long)frame[1]);
+        rbp=frame[0];
+    }
+}
 static void unwind_asked(const char *what, uint64_t address) {
     static _Atomic int told;
     if (atomic_fetch_add(&told,1)<8)
-        printf("Runtime: %s(%#llx): no module information (C++ exception or backtrace)\n",what,(unsigned long long)address);
+        printf("Runtime: %s(%#llx): not in a linked module\n",what,(unsigned long long)address);
 }
-static ABI int32_t module_info_from_addr(uint64_t address, int32_t flags, void *info) {
-    (void)flags;
+/* OrbisKernelModuleInfoEx (shadPS4 module.h): st_size, name[256], id, tls fields, init/fini,
+ * two reserved words, eh_frame_hdr, eh_frame, their sizes, 4 segments (address, size, prot),
+ * segment count. */
+typedef struct { uint64_t address; uint32_t size; int32_t prot; } SegmentInfo;
+typedef struct {
+    uint64_t st_size; char name[256]; int32_t id; uint32_t tls_index; uint64_t tls_init_addr;
+    uint32_t tls_init_size, tls_size, tls_offset, tls_align; uint64_t init_proc, fini_proc, reserved1, reserved2;
+    uint64_t eh_frame_hdr_addr, eh_frame_addr; uint32_t eh_frame_hdr_size, eh_frame_size;
+    SegmentInfo segments[4]; uint32_t segment_count;
+} ModuleInfoEx;
+static ABI int32_t module_info_from_addr(uint64_t address, int32_t flags, ModuleInfoEx *info) {
     if (!info) return KERNEL_EFAULT;
-    unwind_asked("sceKernelGetModuleInfoFromAddr",address);
-    return KERNEL_ESRCH;
+    if (flags>=3) return KERNEL_EINVAL;
+    const UnwindModule *m=unwind_module_at(address);
+    if (!m) { unwind_asked("sceKernelGetModuleInfoFromAddr",address); return KERNEL_ESRCH; }
+    memset(info,0,sizeof(*info));
+    info->st_size=sizeof(*info);
+    snprintf(info->name,sizeof(info->name),"%s",m->name);
+    info->id=(int32_t)(m-unwind_modules);
+    info->eh_frame_hdr_addr=m->eh_frame_hdr; info->eh_frame_addr=m->eh_frame;
+    info->eh_frame_size=(uint32_t)m->eh_frame_size;
+    info->segments[0]=(SegmentInfo){m->start,(uint32_t)m->size,5};
+    info->segment_count=1;
+    return 0;
 }
-static ABI int32_t module_info_for_unwind(uint64_t address, int32_t flags, void *info) {
-    (void)flags;
+/* OrbisModuleInfoForUnwind: st_size, name[256], eh_frame_hdr, eh_frame, eh_frame size, the first
+ * segment's address and size. */
+typedef struct { uint64_t st_size; char name[256]; uint64_t eh_frame_hdr, eh_frame, eh_frame_size, seg0, seg0_size; } UnwindInfo;
+static ABI int32_t module_info_for_unwind(uint64_t address, int32_t flags, UnwindInfo *info) {
     if (!info) return KERNEL_EFAULT;
-    unwind_asked("sceKernelGetModuleInfoForUnwind",address);
-    return KERNEL_ESRCH;
+    if (flags>=3 || info->st_size<sizeof(*info)) return KERNEL_EINVAL;
+    const UnwindModule *m=unwind_module_at(address);
+    if (!m) { unwind_asked("sceKernelGetModuleInfoForUnwind",address); return KERNEL_ESRCH; }
+    memset(info,0,sizeof(*info));
+    info->st_size=sizeof(*info);
+    snprintf(info->name,sizeof(info->name),"%s",m->name);
+    info->eh_frame_hdr=m->eh_frame_hdr; info->eh_frame=m->eh_frame; info->eh_frame_size=m->eh_frame_size;
+    info->seg0=m->start; info->seg0_size=m->size;
+    return 0;
 }
 static ABI int32_t module_segment_info(uint64_t address, void *info) {
     (void)info;

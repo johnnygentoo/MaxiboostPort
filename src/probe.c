@@ -547,6 +547,14 @@ int main(int argc, char **argv) {
         }
     }
     image = allocate(round_page(size));
+    runtime_trace_set_image(image);
+    { /* link_modules.py's unwind.txt beside the boot image: the modules' unwind tables */
+        char unwind[4096];
+        snprintf(unwind,sizeof(unwind),"%s",argv[1]);
+        char *slash=strrchr(unwind,'/');
+        snprintf(slash ? slash+1 : unwind,sizeof(unwind)-(size_t)(slash ? slash+1-unwind : 0),"unwind.txt");
+        runtime_process_load_unwind(unwind,image);
+    }
     if (fread(image, 1, size, f) != size || fgetc(f) != EOF) fail("incorrect memory image size");
     fclose(f);
     if (!cpu_only) {
@@ -582,6 +590,8 @@ int main(int argc, char **argv) {
                         : (uintptr_t)image + relocs[i].value;
         if (relocs[i].kind) {
             uintptr_t resolved = runtime_resolve(names[relocs[i].value], relocs[i].kind == 2);
+            if (resolved && relocs[i].kind == 1) /* BB_IMPORT_TRACE: a logging thunk in between */
+                resolved = runtime_trace_wrap(runtime_symbol(names[relocs[i].value]), resolved);
             if (resolved) value = resolved + relocs[i].addend;
             else if (native_libc && bindings[relocs[i].value]) {
                 uint64_t address=bindings[relocs[i].value];

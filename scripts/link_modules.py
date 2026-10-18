@@ -93,6 +93,23 @@ def patch_fs_loads(image, ph, base):
     return patched
 
 
+def unwind_entry(image, ph, base, name):
+    """(code start, code size, eh_frame_hdr, eh_frame, eh_frame size, name) of a module in the
+    image, for the runtime's sceKernelGetModuleInfoForUnwind (C++ exceptions); None without one."""
+    hdr = next((p for p in ph if p['type'] == 0x6474e550), None)
+    code = next((p for p in ph if p['type'] == 1), None)
+    if not hdr or not code:
+        return None
+    at = base + hdr['vaddr']
+    version, ptr_enc = image[at], image[at + 1]
+    if version != 1 or ptr_enc not in (0x1b, 0x03):  # pcrel|sdata4, or udata4
+        return None
+    value = struct.unpack_from('<i' if ptr_enc == 0x1b else '<I', image, at + 4)[0]
+    eh_frame = at + 4 + value if ptr_enc == 0x1b else base + value
+    end = at if eh_frame < at else base + code['vaddr'] + code['memsz']  # up to the header or the segment's end
+    return (base + code['vaddr'], code['memsz'], at, eh_frame, max(0, end - eh_frame), name)
+
+
 def link(game, out, module_names=DEFAULT_MODULES):
     main = module(game / 'eboot.bin')
     raw = (out / 'boot.bin').read_bytes()
@@ -131,8 +148,10 @@ def link(game, out, module_names=DEFAULT_MODULES):
     base = (size + 65535) & ~65535
     fs_patched = patch_fs_loads(image, main['ph'], 0)
     tls_module = 2
+    module_phs = []
     for filename in module_names:
         m = module(game / 'sce_module' / filename)
+        module_phs.append(m['ph'])
         loads = [p for p in m['ph'] if p['type'] in (1, 0x61000010)]
         modsize = max(p['vaddr'] + p['memsz'] for p in loads)
         if base + modsize > 512 * 1024 * 1024:
@@ -223,6 +242,12 @@ def link(game, out, module_names=DEFAULT_MODULES):
                      or main_tls['vaddr'] + main_tls['filesz'] > size):
         raise ValueError('unsupported eboot TLS layout')
     procparam = next(p for p in main['ph'] if p['type'] == 0x61000001)
+    # Where each module's unwind tables are (out/unwind.txt, read by the runtime).
+    unwind = [unwind_entry(image, main['ph'], 0, 'eboot.bin')]
+    for t, ph in zip(table, module_phs):
+        unwind.append(unwind_entry(image, ph, t['base'], t['file']))
+    (out / 'unwind.txt').write_text(''.join(
+        f'{a:#x} {b:#x} {c:#x} {d:#x} {e:#x} {n}\n' for a, b, c, d, e, n in filter(None, unwind)))
     with (out / 'boot-linked.bin').open('wb') as f:
         f.write(struct.pack('<8s6Q', b'BBPROBE5', len(image), entry, len(segments), len(relocs), len(names), flags))
         f.write(struct.pack('<Q', procparam['vaddr']))

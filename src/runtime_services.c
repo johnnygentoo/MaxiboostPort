@@ -653,7 +653,9 @@ static ABI int32_t json_to_string(const void *self,void *string) { (void)self; (
 static ABI void *json_init_rtti(void *self,void *alloc,void *user,uint64_t size) { (void)alloc; (void)user; (void)size; return self; }
 
 /* ---- Other dialogs' results: the user cancelled (did not sign in, invite or browse). ---- */
-static ABI int32_t signin_result(int32_t *result) { if (result) result[0]=1; return 0; }
+/* Online (BB_ONLINE=1) the user is signed in already: the dialog ends at once with OK, as a PS4's
+ * does; offline the user does not sign in (cancelled). */
+static ABI int32_t signin_result(int32_t *result) { if (result) result[0]=runtime_net_enabled() ? 0 : 1; return 0; }
 static ABI int32_t browser_close(void) { return dialog_close(10); }
 static ABI int32_t profile_close(void) { return dialog_close(3); }
 
@@ -703,7 +705,39 @@ static ABI int32_t discmap_7c98(const char *path,int64_t offset,int64_t size,int
     return 0;
 }
 
+/* ---- What GUNDAM VERSUS' own libSceNpToolkit2.prx asks besides (online play links it): no PS
+ * Store icon, no custom-data or Facebook dialogs (cancelled), no in-game messages or bandwidth
+ * test (not supported), trophy icons and lists not offered, user events by polling only. ---- */
+#define NP_NOT_SUPPORTED ((int32_t)0x80550603)
+static ABI int32_t not_supported(void) { return NP_NOT_SUPPORTED; }
+static ABI int32_t custom_data_result(int32_t *result) { if (result) result[0]=1; return 0; } /* cancelled */
+static ABI int32_t custom_data_status(void) { return 3; } /* finished */
+static ABI int32_t user_event_callback(void *cb,void *arg) { (void)cb; (void)arg; return 0; }
+static ABI int32_t word_filter_request(int32_t ctx) { (void)ctx; return new_id(); }
+static ABI int32_t trophy_none(void) { return (int32_t)0x80551600 | 0x16; } /* no icon/list here */
+
 static const RuntimeExport exports[]={
+    {"sceNpCommerceShowPsStoreIcon",ok_void}, {"sceNpCommerceHidePsStoreIcon",ok_void},
+    {"sceGameCustomDataDialogInitialize",ok_void}, {"sceGameCustomDataDialogOpenA",ok_void},
+    {"sceGameCustomDataDialogUpdateStatus",custom_data_status}, {"sceGameCustomDataDialogGetResultA",custom_data_result},
+    {"sceGameCustomDataDialogTerminate",ok_void},
+    {"sceNpInGameMessageInitialize",not_supported}, {"sceNpInGameMessageTerminate",ok_void},
+    {"sceNpInGameMessageCreateHandle",not_supported}, {"sceNpInGameMessageDeleteHandle",ok_void},
+    {"sceNpInGameMessagePrepareA",not_supported}, {"sceNpInGameMessageSendDataA",not_supported},
+    {"sceNpBandwidthTestInitStart",not_supported}, {"sceNpBandwidthTestGetStatus",not_supported},
+    {"sceNpBandwidthTestAbort",ok_void}, {"sceNpBandwidthTestShutdown",not_supported},
+    {"sceUserServiceRegisterEventCallback",user_event_callback}, {"sceUserServiceUnregisterEventCallback",ok_void},
+    {"sceNpSnsFacebookCreateRequest",not_supported}, {"sceNpSnsFacebookDeleteRequest",ok_void},
+    {"sceNpSnsFacebookGetAccessToken",not_supported},
+    {"sceNpSnsFacebookDialogInitialize",ok_void}, {"sceNpSnsFacebookDialogOpen",ok_void},
+    {"sceNpSnsFacebookDialogUpdateStatus",custom_data_status}, {"sceNpSnsFacebookDialogGetResult",custom_data_result},
+    {"sceNpSnsFacebookDialogTerminate",ok_void},
+    {"sceNpTrophyAbortHandle",ok_void}, {"sceNpTrophyCaptureScreenshot",ok_void},
+    {"sceNpTrophyGetGameIcon",trophy_none}, {"sceNpTrophyGetGroupIcon",trophy_none},
+    {"sceNpTrophyGetGroupInfo",trophy_none}, {"sceNpTrophyGetTrophyIcon",trophy_none},
+    {"sceNpTrophyShowTrophyList",trophy_none},
+    {"sceNpWordFilterCreateRequest",word_filter_request}, {"sceNpWordFilterAbortRequest",ok_void},
+    {"sceNpWordFilterSanitizeComment",np_signed_out},
     {"sceNpCheckNpAvailabilityA",np_user_signed_out}, {"sceNpGetAccountCountryA",np_user_signed_out},
     {"sceNpGetAccountIdA",np_user_signed_out}, {"sceNpGetParentalControlInfoA",np_signed_out},
     {"sceNpRegisterNpReachabilityStateCallback",np_reachability_register},
@@ -994,6 +1028,12 @@ static const RuntimeExport exports[]={
     {"sceUserServiceGetUserColor",user_color},
 };
 uintptr_t runtime_services_resolve(const char *name) {
+    /* Online play links the game's own libSceNpToolkit2.prx (run.sh): its functions are the
+     * game's, the offline answers below only stand in for it offline. */
+    if (runtime_net_enabled()) {
+        const char *symbol=runtime_symbol(name);
+        if (symbol && (!strncmp(symbol,"_ZN3sce7Toolkit",15) || !strncmp(symbol,"sceNpToolkit2_",14))) return 0;
+    }
     const uintptr_t online=runtime_net_resolve(name); /* BB_ONLINE=1: the online module first */
     return online ? online : RUNTIME_LOOKUP(exports,name);
 }

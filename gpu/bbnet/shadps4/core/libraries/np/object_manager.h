@@ -26,10 +26,18 @@ struct ObjectManager {
     s32 CreateObject(Args&&... args) {
         std::scoped_lock lk{mutex};
 
-        if (auto slot = std::ranges::find(objects, nullptr); slot != objects.end()) {
-            *slot = new T{args...};
-
-            return std::ranges::distance(objects.begin(), slot) + 1;
+        // bbport: round-robin from the slot after the last one handed out, so an id just freed
+        // is not handed out again at once. GUNDAM VERSUS deletes a finished TUS request a second
+        // time after creating the next one; with the freed id reused, that deleted the new
+        // request, which it then polled for ever ("LOGGING IN"). On a PS4 ids are not reused
+        // at once either.
+        for (size_t i = 0; i < N; ++i) {
+            const size_t at = (next + i) % N;
+            if (!objects[at]) {
+                objects[at] = new T{args...};
+                next = (at + 1) % N;
+                return static_cast<s32>(at + 1);
+            }
         }
 
         return MAX_OBJECTS_ERROR;
@@ -55,4 +63,5 @@ struct ObjectManager {
 private:
     std::mutex mutex;
     std::array<T*, N> objects = {nullptr};
+    size_t next = 0;
 };

@@ -2,6 +2,7 @@
 #define BB_RUNTIME_H
 #include <time.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stddef.h>
 #include <string.h>
 #ifndef _WIN32
@@ -59,10 +60,15 @@ uintptr_t runtime_fiber_resolve(const char *name);
 uintptr_t runtime_process_resolve(const char *name);
 uintptr_t runtime_usbd_resolve(const char *name);
 int runtime_neo_mode(void);
+/* BB_IMPORT_TRACE (runtime_trace.c): a logging thunk for a traced import, else target. */
+uintptr_t runtime_trace_wrap(const char *symbol, uintptr_t target);
+void runtime_trace_set_image(const unsigned char *image);
 /* Couch co-op (runtime_pad.c): users logged in (ids[4], -1 after the last) and new logins. */
 int runtime_users_logged_in(int32_t ids[4]);
 int runtime_users_next_login(void);
 uintptr_t runtime_process_resolve_data(const char *name);
+void runtime_process_load_unwind(const char *path, const unsigned char *image);
+void runtime_guest_backtrace(FILE *out);
 void runtime_fiber_report(void);
 uintptr_t runtime_ngs2_resolve(const char *name);
 uintptr_t runtime_font_resolve(const char *name);

@@ -900,7 +900,37 @@ static s32 UnregisterStateCallbackAById(s32 callback_id) {
     return ORBIS_OK;
 }
 
+// bbport: a reachability callback registered after the user signed in learns the current state
+// at the next check, as on a PS4 (GUNDAM VERSUS registers it after its toolkit starts and waits
+// for "reachable" before it goes online; the sign-in had been delivered to nobody).
+static bool g_np_reachability_announce = false;
+
+static void AnnounceNpReachability() {
+    NpReachabilityStateCallback callback{};
+    std::vector<Libraries::UserService::OrbisUserServiceUserId> users;
+    {
+        std::scoped_lock lk{g_np_state_callbacks_mutex};
+        if (!g_np_reachability_announce || NpReachabilityCb.func == nullptr) {
+            return;
+        }
+        g_np_reachability_announce = false;
+        callback = NpReachabilityCb;
+        for (Libraries::UserService::OrbisUserServiceUserId user = 1; user <= 16; ++user) {
+            if (g_shadnet_enabled && Libraries::Np::NpHandler::GetInstance().IsPsnSignedIn(user) &&
+                g_np_reachability_last[user] != OrbisNpReachabilityState::Reachable) {
+                g_np_reachability_last[user] = OrbisNpReachabilityState::Reachable;
+                users.push_back(user);
+            }
+        }
+    }
+    for (const auto user : users) {
+        LOG_INFO(Lib_NpManager, "user {} is reachable (announced to the new callback)", user);
+        callback.func(user, OrbisNpReachabilityState::Reachable, callback.userdata);
+    }
+}
+
 static void DispatchPendingNpStateCallbacks() {
+    AnnounceNpReachability();
     std::deque<PendingNpStateEvent> pending_events;
     LegacyNpStateCallback legacy_callback{};
     NpStateCallbackForNpToolkit toolkit_callback{};
@@ -1031,6 +1061,7 @@ s32 PS4_SYSV_ABI sceNpRegisterNpReachabilityStateCallback(OrbisNpReachabilitySta
     NpReachabilityCb.userdata = userdata;
     // Reset the per-user cache so the next state transition reports fresh.
     g_np_reachability_last.clear();
+    g_np_reachability_announce = true;
     return ORBIS_OK;
 }
 

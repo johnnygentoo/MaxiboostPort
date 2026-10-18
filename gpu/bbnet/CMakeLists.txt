@@ -36,3 +36,10 @@ target_link_libraries(bbnet PRIVATE bbgpu nlohmann_json::nlohmann_json protobuf:
     OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB "${MINIUPNPC_LIBRARY}" Vulkan::Headers fmt::fmt
     Boost::headers magic_enum::magic_enum)
 target_include_directories(bbnet PRIVATE "${MINIUPNPC_INCLUDE}")
+
+# gvnet-server (server/gvnet_server.cpp): a small shadNet server for playing instances of the game
+# with each other on one computer or a LAN (matchmaking rooms and the players' addresses).
+add_executable(gvnet-server server/gvnet_server.cpp "${SHADNET_PROTO_OUT}/shadnet.pb.cc")
+target_include_directories(gvnet-server PRIVATE "${SHADNET_PROTO_OUT}")
+target_link_libraries(gvnet-server PRIVATE protobuf::libprotobuf)
+set_target_properties(gvnet-server PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")

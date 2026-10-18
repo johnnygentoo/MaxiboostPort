@@ -173,11 +173,13 @@ static ABI __attribute__((noreturn)) void hard_exit(int status) {
 }
 static ABI __attribute__((noreturn)) void raise_exception(uint32_t code,uint64_t argument) {
     fprintf(stderr,"STOP: guest raised debug exception code=0x%x argument=0x%llx\n",code,(unsigned long long)argument);
+    runtime_guest_backtrace(stderr);
     runtime_report();
     exit(23);
 }
 static ABI int32_t print_backtrace(void) {
-    fputs("Runtime: guest requested a backtrace (not available)\n",stderr);
+    fputs("Runtime: guest requested a backtrace:\n",stderr);
+    runtime_guest_backtrace(stderr);
     return 0;
 }
 typedef struct { uint32_t bits[4]; } GuestSigset;

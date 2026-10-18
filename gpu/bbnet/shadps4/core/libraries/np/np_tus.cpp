@@ -1,8 +1,12 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <future>
+#include <mutex>
 
 #include "common/logging/log.h"
 #include "core/libraries/error_codes.h"
@@ -84,6 +88,53 @@ s32 GetRequest(int requestId, NpTusRequest** out) {
 
     return ORBIS_OK;
 }
+
+// bbport (gvport): title user storage kept on this computer. The online module had no TUS
+// behind it (requests "succeeded" with nothing filled in, and GUNDAM VERSUS waited for ever while
+// logging in). Each account's slots are files in BB_TUS_DIR (shared by the instances playing
+// together on one computer) or <user>/tus: <account>_<slot>.dat (data and its info) and .var
+// (a variable). A slot never written answers USER_STORAGE_DATA_NOT_FOUND, as PSN does.
+namespace LocalTus {
+#pragma pack(push, 1)
+struct VariableA {
+    OrbisNpOnlineId owner;
+    u8 reserved1[16];
+    s32 has_data;
+    u64 last_changed;
+    u8 pad[4];
+    OrbisNpOnlineId author;
+    u8 reserved2[16];
+    s64 variable;
+    s64 old_variable;
+    OrbisNpAccountId owner_account;
+    OrbisNpAccountId author_account;
+};
+#pragma pack(pop)
+static_assert(sizeof(VariableA) == 0x78);
+struct DataHeader {
+    u64 last_changed;
+    s64 author;
+    u64 info_size;
+    u8 info[384];
+};
+std::mutex mutex;
+
+std::filesystem::path Dir() {
+    const char* tus = std::getenv("BB_TUS_DIR");
+    if (tus && *tus) return tus;
+    const char* user = std::getenv("BB_GPU_USER_DIR");
+    return std::filesystem::path(user && *user ? user : "user") / "tus";
+}
+std::filesystem::path Path(s64 account, s32 slot, const char* ext) {
+    return Dir() / (std::to_string(account) + "_" + std::to_string(slot) + ext);
+}
+u64 NowTick() {
+    const auto us = std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::system_clock::now().time_since_epoch())
+                        .count();
+    return static_cast<u64>(us) + 62135596800000000ull; // ticks: microseconds since 0001-01-01
+}
+} // namespace LocalTus
 
 s32 PS4_SYSV_ABI sceNpTusAddAndGetVariable() {
     LOG_ERROR(Lib_NpTus, "(STUBBED) called");
@@ -679,7 +730,28 @@ s32 PS4_SYSV_ABI sceNpTusGetDataAAsync(int reqId, OrbisNpAccountId accountId,
         return ret;
     }
 
-    req->Start([=]() { return 0; });
+    // The result is the size received, or USER_STORAGE_DATA_NOT_FOUND.
+    req->Start([=]() -> int {
+        std::lock_guard lock(LocalTus::mutex);
+        std::ifstream f(LocalTus::Path(accountId, slotId, ".dat"), std::ios::binary);
+        LocalTus::DataHeader h{};
+        if (!f || !f.read(reinterpret_cast<char*>(&h), sizeof(h))) {
+            return ORBIS_NP_COMMUNITY_SERVER_ERROR_USER_STORAGE_DATA_NOT_FOUND;
+        }
+        std::vector<char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        std::memset(dataStatus, 0, sizeof(*dataStatus));
+        dataStatus->set = 1;
+        dataStatus->lastChanged.tick = h.last_changed;
+        dataStatus->data = data;
+        dataStatus->dataSize = bytes.size();
+        dataStatus->info.size = std::min<u64>(h.info_size, sizeof(h.info));
+        std::memcpy(dataStatus->info.data, h.info, dataStatus->info.size);
+        dataStatus->owner = accountId;
+        dataStatus->lastChangedAuthorId = h.author;
+        const u64 n = std::min<u64>(bytes.size(), data ? dataSize : 0);
+        if (n) std::memcpy(data, bytes.data(), n);
+        return static_cast<int>(n);
+    });
 
     return ORBIS_OK;
 }
@@ -864,8 +936,42 @@ s32 PS4_SYSV_ABI sceNpTusGetMultiSlotVariableA() {
     return ORBIS_OK;
 }
 
-s32 PS4_SYSV_ABI sceNpTusGetMultiSlotVariableAAsync() {
-    LOG_ERROR(Lib_NpTus, "(STUBBED) called");
+s32 PS4_SYSV_ABI sceNpTusGetMultiSlotVariableAAsync(int reqId, OrbisNpAccountId accountId,
+                                                    const s32* slotIds, void* variables,
+                                                    u64 variablesSize, int arrayLen, void* option) {
+    if (!slotIds || !variables) {
+        return ORBIS_NP_COMMUNITY_ERROR_INSUFFICIENT_ARGUMENT;
+    }
+    if (arrayLen < 1 || option ||
+        variablesSize != static_cast<u64>(arrayLen) * sizeof(LocalTus::VariableA)) {
+        return ORBIS_NP_COMMUNITY_ERROR_INVALID_ARGUMENT;
+    }
+    NpTusRequest* req = nullptr;
+    if (auto ret = GetRequest(reqId, &req); ret < 0) {
+        return ret;
+    }
+    std::vector<s32> slots(slotIds, slotIds + arrayLen);
+    auto* out = static_cast<LocalTus::VariableA*>(variables);
+    req->Start([=]() -> int {
+        std::lock_guard lock(LocalTus::mutex);
+        for (int i = 0; i < arrayLen; ++i) {
+            LocalTus::VariableA& v = out[i];
+            std::memset(&v, 0, sizeof(v));
+            v.owner_account = accountId;
+            std::ifstream f(LocalTus::Path(accountId, slots[i], ".var"), std::ios::binary);
+            s64 value = 0;
+            u64 changed = 0;
+            if (f && f.read(reinterpret_cast<char*>(&value), 8) &&
+                f.read(reinterpret_cast<char*>(&changed), 8)) {
+                v.has_data = 1;
+                v.variable = value;
+                v.old_variable = value;
+                v.last_changed = changed;
+                v.author_account = accountId;
+            }
+        }
+        return 0;
+    });
     return ORBIS_OK;
 }
 
@@ -1018,7 +1124,35 @@ s32 PS4_SYSV_ABI sceNpTusSetDataAAsync(int reqId, OrbisNpAccountId accountId,
         return ret;
     }
 
-    req->Start([=]() { return 0; });
+    // One call with all of the data (sendSize == totalSize) writes the slot; a part of a larger
+    // upload is appended to what the earlier parts wrote.
+    std::vector<char> bytes(static_cast<const char*>(data), static_cast<const char*>(data) + sendSize);
+    LocalTus::DataHeader h{};
+    h.last_changed = LocalTus::NowTick();
+    h.author = lastChangedAuthor ? *lastChangedAuthor : accountId;
+    if (info) {
+        h.info_size = std::min<u64>(info->size, sizeof(h.info));
+        std::memcpy(h.info, info->data, h.info_size);
+    }
+    req->Start([=]() -> int {
+        std::lock_guard lock(LocalTus::mutex);
+        std::error_code ec;
+        std::filesystem::create_directories(LocalTus::Dir(), ec);
+        const auto path = LocalTus::Path(accountId, slotId, ".dat");
+        std::vector<char> old;
+        if (sendSize < totalSize) {
+            std::ifstream f(path, std::ios::binary);
+            LocalTus::DataHeader prev{};
+            if (f && f.read(reinterpret_cast<char*>(&prev), sizeof(prev)))
+                old.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+            if (old.size() >= totalSize) old.clear(); // an earlier, finished upload: start over
+        }
+        std::ofstream f(path, std::ios::binary | std::ios::trunc);
+        f.write(reinterpret_cast<const char*>(&h), sizeof(h));
+        f.write(old.data(), static_cast<std::streamsize>(old.size()));
+        f.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+        return f ? 0 : ORBIS_NP_COMMUNITY_SERVER_ERROR_INTERNAL_SERVER_ERROR;
+    });
 
     return ORBIS_OK;
 }
@@ -1060,8 +1194,33 @@ s32 PS4_SYSV_ABI sceNpTusSetMultiSlotVariableA() {
     return ORBIS_OK;
 }
 
-s32 PS4_SYSV_ABI sceNpTusSetMultiSlotVariableAAsync() {
-    LOG_ERROR(Lib_NpTus, "(STUBBED) called");
+s32 PS4_SYSV_ABI sceNpTusSetMultiSlotVariableAAsync(int reqId, OrbisNpAccountId accountId,
+                                                    const s32* slotIds, const s64* variables,
+                                                    int arrayLen, void* option) {
+    if (!slotIds || !variables) {
+        return ORBIS_NP_COMMUNITY_ERROR_INSUFFICIENT_ARGUMENT;
+    }
+    if (arrayLen < 1 || option) {
+        return ORBIS_NP_COMMUNITY_ERROR_INVALID_ARGUMENT;
+    }
+    NpTusRequest* req = nullptr;
+    if (auto ret = GetRequest(reqId, &req); ret < 0) {
+        return ret;
+    }
+    std::vector<s32> slots(slotIds, slotIds + arrayLen);
+    std::vector<s64> values(variables, variables + arrayLen);
+    req->Start([=]() -> int {
+        std::lock_guard lock(LocalTus::mutex);
+        std::error_code ec;
+        std::filesystem::create_directories(LocalTus::Dir(), ec);
+        const u64 now = LocalTus::NowTick();
+        for (int i = 0; i < arrayLen; ++i) {
+            std::ofstream f(LocalTus::Path(accountId, slots[i], ".var"), std::ios::binary | std::ios::trunc);
+            f.write(reinterpret_cast<const char*>(&values[i]), 8);
+            f.write(reinterpret_cast<const char*>(&now), 8);
+        }
+        return 0;
+    });
     return ORBIS_OK;
 }
 

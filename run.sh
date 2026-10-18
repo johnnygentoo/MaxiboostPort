@@ -77,7 +77,11 @@ if [[ $game != "$(realpath "$original_game")" ]]; then
     trap '"$PYTHON" -c '\''import shutil,sys; shutil.rmtree(sys.argv[1])'\'' "$mod_game"' EXIT
 fi
 "$PYTHON" scripts/prepare.py "$game" --out "$out"
-"$PYTHON" scripts/link_modules.py "$game" --out "$out"
+# Online play (BB_ONLINE=1) also links the game's own libSceNpToolkit2.prx: GUNDAM VERSUS leaves
+# PSN to it (sign-in state, callbacks, sessions); offline the runtime answers for it.
+modules=(libc.prx libSceFios2.prx)
+if [[ ${BB_ONLINE:-0} == 1 && -f $game/sce_module/libSceNpToolkit2.prx ]]; then modules+=(libSceNpToolkit2.prx); fi
+"$PYTHON" scripts/link_modules.py "$game" --out "$out" --modules "${modules[@]}"
 # BB_DLC_DIR (the launcher's DLC folder): the dumped add-ons of this title, one folder each (e.g.
 # SPEXPANSIONDLC03). The runtime reports <user>/addcont/<title id>/<label> as installed (shadPS4's
 # layout), so the folder is linked there; a real folder already in its place is left alone.
