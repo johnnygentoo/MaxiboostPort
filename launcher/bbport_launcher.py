@@ -2356,10 +2356,13 @@ class LauncherApp(Adw.Application):
                                                   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def do_activate(self):
-        # The launcher's own icons (launcher/icons: GitHub's mark), symbolic like the theme's.
+        # The launcher's own icons (launcher/icons: GitHub's mark), symbolic like the theme's, and its
+        # application icon (io.github.gvport.Launcher.svg, the same as gundam.svg) for the window
+        # when the menu entry is not installed (launcher/install-desktop.sh).
         display = Gdk.Display.get_default()
         if display:
             Gtk.IconTheme.get_for_display(display).add_search_path(str(PORT_DIR / "launcher" / "icons"))
+        Gtk.Window.set_default_icon_name(self.get_application_id())
         window = self.get_active_window() or LauncherWindow(self)
         window.present()
 

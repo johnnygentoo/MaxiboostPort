@@ -204,6 +204,18 @@ pkgs.stdenv.mkDerivation {
       done
       [ -f out/NVIDIA-DLSS-LICENSE.txt ] && install -m644 out/NVIDIA-DLSS-LICENSE.txt $d/NVIDIA-DLSS-LICENSE.txt
     fi
+    # The application menu entry and its icon (launcher/gundam.svg, PNGs of it for menus and docks
+    # that do not draw SVG), named as the launcher's application id.
+    id=io.github.gvport.Launcher
+    sed -e "s|@LAUNCHER@|$out/bin/bbport|" -e "s|@ICON@|$id|" -e '/^Path=/d' \
+      launcher/$id.desktop.in > $id.desktop
+    install -Dm644 $id.desktop $out/share/applications/$id.desktop
+    install -Dm644 launcher/gundam.svg $out/share/icons/hicolor/scalable/apps/$id.svg
+    for size in 48 64 128 256 512; do
+      mkdir -p $out/share/icons/hicolor/''${size}x''${size}/apps
+      ${pkgs.librsvg}/bin/rsvg-convert -w $size -h $size launcher/gundam.svg \
+        -o $out/share/icons/hicolor/''${size}x''${size}/apps/$id.png
+    done
     runHook postInstall
   '';
   postFixup = ''
