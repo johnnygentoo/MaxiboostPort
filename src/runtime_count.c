@@ -50,6 +50,33 @@ static int reg_by_name(const char *name, int *low) {
         if (!strcmp(names[i].n, wide)) return names[i].r;
     return -1;
 }
+/* BB_GUEST_TRANSITIONS=<offset>:<key reg>:<value reg>: at that site, each time the value register
+ * holds something else than at the key's last hit, a line "Guest transition +<site>: <key>
+ * <old> -> <new>" (the first 4096; 256 keys). With a state machine's dispatcher (key: the object,
+ * value: its state function) it lists every state change in order. The site must be counted. */
+static uint64_t trans_offset; static int trans_key = -1, trans_value = -1;
+#define MAX_TRANS_KEYS 256
+static _Atomic uint64_t trans_keys[MAX_TRANS_KEYS], trans_values[MAX_TRANS_KEYS];
+static _Atomic int trans_printed;
+static void note_transition(const ucontext_t *uc) {
+    const uint64_t key = (uint64_t)uc->uc_mcontext.gregs[trans_key];
+    const uint64_t value = (uint64_t)uc->uc_mcontext.gregs[trans_value];
+    for (int i = 0; i < MAX_TRANS_KEYS; ++i) {
+        const int k = (int)((key * 0x9e3779b97f4a7c15ull >> 56) + (uint64_t)i) % MAX_TRANS_KEYS;
+        uint64_t seen = atomic_load(&trans_keys[k]);
+        if (seen == 0 && !atomic_compare_exchange_strong(&trans_keys[k], &seen, key) && seen != key) continue;
+        if (seen != 0 && seen != key) continue;
+        const uint64_t old = atomic_exchange(&trans_values[k], value);
+        if (old != value && atomic_fetch_add(&trans_printed, 1) < 4096) {
+            const uint64_t base = (uint64_t)(uintptr_t)image_base;
+            char line[160];
+            snprintf(line, sizeof(line), "Guest transition +%#" PRIx64 ": %#" PRIx64 " +%#" PRIx64 " -> +%#" PRIx64 "\n",
+                     trans_offset, key, old ? old - base : 0, value - base);
+            ssize_t w = write(1, line, strlen(line)); (void)w;
+        }
+        return;
+    }
+}
 static int site_count;
 static struct sigaction previous;
 /* The site each thread is stepping over, by thread id: no thread-local storage in the handler
@@ -117,6 +144,7 @@ static void on_trap_body(int sig, siginfo_t *info, void *context) {
                 atomic_fetch_add(&list_hist[n == 0 ? 0 : n == 1 ? 1 : n <= 4 ? 2 : n <= 16 ? 3 : n <= 64 ? 4 : 5], 1);
                 memcpy(list_last, e, sizeof(list_last));
             }
+            if (trans_key >= 0 && trans_value >= 0 && sites[i].offset == trans_offset) note_transition(uc);
             if (delay_us && sites[i].offset == delay_offset) {
                 struct timespec t = {(time_t)(delay_us / 1000000), (long)(delay_us % 1000000) * 1000};
                 nanosleep(&t, NULL);
@@ -240,6 +268,19 @@ void runtime_count_install(unsigned char *image) {
         const int index = end && *end == ':' ? reg_by_name(end + 1, &low) : -1;
         if (which) { list_offset = offset; list_index = index; }
         else { reg_offset = offset; reg_index = index; reg_low = low; }
+    }
+    const char *transitions = getenv("BB_GUEST_TRANSITIONS");
+    if (transitions && *transitions) {
+        char *end = NULL; int low = 0;
+        trans_offset = strtoull(transitions, &end, 16);
+        if (end && *end == ':') {
+            char key[8] = {0}; const char *colon = strchr(end + 1, ':');
+            if (colon && colon - end - 1 < (long)sizeof(key)) {
+                memcpy(key, end + 1, (size_t)(colon - end - 1));
+                trans_key = reg_by_name(key, &low);
+                trans_value = reg_by_name(colon + 1, &low);
+            }
+        }
     }
     const char *delay = getenv("BB_GUEST_DELAY");
     if (delay && *delay) {
