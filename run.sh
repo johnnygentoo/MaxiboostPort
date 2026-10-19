@@ -299,8 +299,11 @@ if [[ ${BB_ONLINE:-0} == 1 ]]; then
     export BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-127.0.0.1:31313}
     export BB_SHADNET_NPID=${BB_SHADNET_NPID:-${USER:-Player}}
     export BB_SHADNET_PASSWORD=${BB_SHADNET_PASSWORD:-local} BB_UPNP=${BB_UPNP:-0}
-    [[ -n ${BB_SHADNET_WEBAPI:-} ]] || export BB_SHADNET_WEBAPI=http://${BB_SHADNET_SERVER%:*}:31315
     server_host=${BB_SHADNET_SERVER%:*} server_port=${BB_SHADNET_SERVER##*:}
+    # The WebAPI two ports above the server's (31315 for 31313), as shadNet servers have it. gvnet-server
+    # has none: the game's sessions then fail harmlessly. A WebAPI of another game's server answering
+    # there (GODZILLA's shadNet on the same PC) made "Failed to create room".
+    [[ -n ${BB_SHADNET_WEBAPI:-} ]] || export BB_SHADNET_WEBAPI=http://$server_host:$((server_port + 2))
     server_up() { (exec 9<>"/dev/tcp/$server_host/$server_port") 2>/dev/null; }
     if [[ $server_host == 127.0.0.1 || $server_host == localhost || ${BB_LAN:-} == host ]] && ! server_up; then
         if [[ -n ${BB_PREBUILT:-} ]]; then gvnet=bin/gvnet-server; else gvnet=out/gpu/gvnet-server; fi

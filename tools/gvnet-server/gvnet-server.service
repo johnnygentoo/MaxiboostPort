@@ -1,0 +1,17 @@
+# GUNDAM VERSUS' matching server for the PCs of a LAN, as a systemd user service:
+#   cp tools/gvnet-server/gvnet-server.service ~/.config/systemd/user/
+#   (ExecStart: where the gvnet-server binary is; the port: other PCs join at <this PC>:31323)
+#   systemctl --user daemon-reload && systemctl --user enable --now gvnet-server
+#   loginctl enable-linger      # runs without anyone logged in
+# Port 31323 (TCP, and UDP 31324) leaves 31313-31315 to a shadNet server of another game.
+[Unit]
+Description=GUNDAM VERSUS (gvport) matching server for LAN play
+After=network-online.target
+
+[Service]
+ExecStart=%h/gvnet-server/gvnet-server --bind 0.0.0.0 --port 31323
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

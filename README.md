@@ -120,7 +120,24 @@ own monitor), and a matching server runs for as long as they do. Closing either 
   ("Free teams") waits for more players than two.
 
 Tested on one PC (RX 7800 XT): two instances in a 1-on-1 Player Match, each at 60 FPS, shots
-from one land on the other. Team modes with more players, and two PCs on a LAN, are not tested.
+from one land on the other. Team modes with more players are not tested.
+
+### Over the network
+
+Each PC needs its own copy of the game and of the port. One matching server serves them all:
+
+- **One of the players' PCs:** in the launcher, **Over the network: host** on that PC (its address
+  is shown), **join** with that address on the others.
+- **An always-on PC** (a home server, no GPU or game needed): build the server alone with
+  `bash tools/gvnet-server/build.sh` (it needs g++ and protobuf), copy
+  `tools/gvnet-server/out/gvnet-server` to `~/gvnet-server/` there and run it as a user service
+  (`tools/gvnet-server/gvnet-server.service`, how to install it is in the file). It listens on
+  port 31323 (TCP, and UDP 31324), so a GODZILLA shadNet server can run on the same PC. Every PC
+  then plays with **join** and the address `<server>:31323`.
+
+The games then meet in PLAY > PLAYER MATCH as with two players on one PC. Each game's own P2P
+port is UDP 3658. Tested (2026-10-18) with two games on one PC joining a server on another PC
+over the LAN: room found, joined, 1-on-1 battle started.
 
 ### Saves
 
