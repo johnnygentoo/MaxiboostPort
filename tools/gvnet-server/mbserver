@@ -1,0 +1,49 @@
+#!/bin/sh
+# mbserver: start and stop MAXIBOOST ON's LAN matching server (gvnet-server, the matching server
+# from GUNDAM VERSUS' port) by hand, like GODZILLA's gzserver. The PCs' launchers join it at
+# <this PC>:31323 ("Over the network: join").
+#   mbserver toggle | start | stop | restart | status | log [lines] | follow
+# Expects the binary at ~/mbnet-server/gvnet-server (tools/gvnet-server/build.sh builds it); its
+# output goes to ~/mbnet-server/mbnet.log. MBNET_PORT changes the port (TCP; UDP is the next one).
+# Only the server started from ~/mbnet-server is seen or stopped: a GUNDAM VERSUS port's own
+# (~/gvnet-server) is left alone; it uses the same port by default, so one of them needs MBNET_PORT
+# to run both.
+dir=$HOME/mbnet-server
+port=${MBNET_PORT:-31323}
+log=$dir/mbnet.log
+pids() {
+    exe=$(readlink -f "$dir/gvnet-server" 2>/dev/null)
+    for pid in $(pgrep -x gvnet-server); do
+        [ "$(readlink "/proc/$pid/exe" 2>/dev/null)" = "$exe" ] && echo "$pid"
+    done
+}
+running() { [ -n "$(pids)" ]; }
+case ${1:-status} in
+toggle)
+    # On if off, off if on.
+    if running; then "$0" stop; else "$0" start; fi ;;
+start)
+    if running; then echo "mbserver: already running (pid $(pids))"; exit 0; fi
+    if [ ! -x "$dir/gvnet-server" ]; then echo "mbserver: no $dir/gvnet-server (tools/gvnet-server/build.sh)" >&2; exit 1; fi
+    # Detached from this shell: it keeps running after you log out of ssh.
+    cd "$dir" && setsid nohup ./gvnet-server --bind 0.0.0.0 --port "$port" >> "$log" 2>&1 < /dev/null &
+    sleep 1
+    if running; then echo "mbserver: started (pid $(pids)), players join at $(hostname -i 2>/dev/null | awk '{print $1}'):$port"
+    else echo "mbserver: did not start, see: mbserver log" >&2; exit 1; fi ;;
+stop)
+    if running; then kill $(pids); sleep 1; echo "mbserver: stopped"; else echo "mbserver: not running"; fi ;;
+restart)
+    "$0" stop; "$0" start ;;
+status)
+    if running; then
+        echo "mbserver: running (pid $(pids)) on port $port"
+        echo "  signed in: $(ss -tn state established "( sport = :$port )" | tail -n +2 | wc -l)"
+    else echo "mbserver: stopped"; fi ;;
+log)
+    # The last lines: sign-ins, rooms created, joined, closed.
+    tail -n "${2:-40}" "$log" ;;
+follow)
+    tail -f "$log" ;;
+*)
+    echo "usage: mbserver toggle | start | stop | restart | status | log [lines] | follow" >&2; exit 2 ;;
+esac

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # build.sh [PROTOBUF_BUILD]: builds gvnet-server alone (gpu/bbnet/server), for a PC that only hosts
-# the matching server: no GPU library, no game. Needs g++ and protobuf: the system's (protoc and
+# MAXIBOOST ON's matching server (tools/gvnet-server/mbserver starts it): no GPU library, no game. Needs g++ and protobuf: the system's (protoc and
 # pkg-config's protobuf), or PROTOBUF_BUILD, a CMake build of protobuf with abseil fetched (such as
 # shadnet-p2p's build directory: externals/protobuf/protoc-*, libprotobuf.a, _deps/absl-build),
 # linked statically. Writes tools/gvnet-server/out/gvnet-server.
