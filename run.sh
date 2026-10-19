@@ -178,16 +178,17 @@ gpu_vendor= gpu_name=
 if [[ -z ${BB_PC_MODEL:-} || ( ${BB_AUTO_NOHIZ:-1} != 0 && -z ${RADV_DEBUG:-} ) ]]; then
     IFS=$'\t' read -r gpu_vendor gpu_name < <("$caps" --device 2> /dev/null) || true
 fi
-# Memory model left to the port: the 0.3 one on every GPU. GUNDAM VERSUS' compute queues wait
-# (WAIT_REG_MEM) for fences of the frame's earlier work; the new model writes those once the GPU
-# has really finished it, so each wait is a GPU round trip: a battle ran at ~30 FPS on an
-# RX 7800 XT with it, 60 with the 0.3 model (which renders it the same).
+# Memory model left to the port: the 0.3 one on every GPU. MAXIBOOST ON with the new one
+# (BB_PC_MODEL=1, RX 7800 XT) never presented a frame: no picture minutes after start. With the
+# 0.3 model a battle holds 60 FPS. (GUNDAM VERSUS, the same engine, ran at ~30 FPS with the new
+# one: its compute queues' fence waits became GPU round trips.)
 if [[ -z ${BB_PC_MODEL:-} ]]; then
     export BB_PC_MODEL=0
-    echo "Memory model: the 0.3 one (${gpu_name:-GPU unknown}; BB_PC_MODEL=1: the new one, slower in this game)"
+    echo "Memory model: the 0.3 one (${gpu_name:-GPU unknown}; BB_PC_MODEL=1: the new one, which does not run this game)"
 fi
 # Readbacks left to the port: precise (BB_READBACKS=2: GPU-written memory is protected against CPU
-# reads too, a read copies it back). GUNDAM VERSUS draws its particle effects (beams, sabers,
+# reads too, a read copies it back). MAXIBOOST ON's engine (GUNDAM VERSUS', where this was found)
+# draws its particle effects (beams, sabers,
 # explosions, fire) from a list its compute shaders build: each frame the CPU copies that list and
 # the GDS counters back (CFunctionTaskRenderEffect, guest+0x5fe291 and +0x5fe2ea) and issues one draw
 # per entry. Relaxed readbacks (1) only copy back on CPU writes: the CPU read the list's initial
@@ -221,9 +222,11 @@ if [[ ${BB_AS_0_3:-0} == 1 ]]; then
     export BB_GUEST_IN_PLACE=0 BB_HOST_COPY_WAITS=all BB_PRODUCER_CHECK=1
 fi
 export BB_GUEST_IN_PLACE=${BB_GUEST_IN_PLACE:-${BB_PC_MODEL:-0}}
-# PS4 Pro mode (sceKernelIsNeoMode): GUNDAM VERSUS is "PS4 Pro Enhanced" (param.sfo); on a Pro it
-# renders its scene at 1920x1080 instead of the base PS4's 1440x1080 stretched to the screen.
-# Holds 60 FPS on an RX 7800 XT. BB_NEO=0: the base PS4.
+# PS4 Pro mode (sceKernelIsNeoMode). GUNDAM VERSUS renders its scene at 1920x1080 on a Pro instead
+# of the base PS4's 1440x1080.
+# Holds 60 FPS on an RX 7800 XT. BB_NEO=0: the base PS4. MAXIBOOST ON renders 1920x1080 either
+# way (same targets and shadow maps measured with BB_NEO=0); Pro mode is kept, as the game's
+# own better setting.
 export BB_NEO=${BB_NEO:-1}
 # MangoHud (launcher switch: MANGOHUD=1) must be drawn once. Two overlays on top of each other
 # showed doubled, offset text: the Steam Deck's performance overlay (mangoapp, game mode) plus the
