@@ -20,7 +20,7 @@ s32 PS4_SYSV_ABI sceNpSignalingTerminate();
 
 s32 PS4_SYSV_ABI sceNpSignalingCreateContext(const void* npId, void* callback, void* callbackArg,
                                              OrbisNpSignalingContextId* outContextId);
-s32 PS4_SYSV_ABI sceNpSignalingCreateContextA(s32 userId, void* callback, void* callbackArg,
+s32 PS4_SYSV_ABI sceNpSignalingCreateContextA(u64 userId, void* callback, void* callbackArg,
                                               OrbisNpSignalingContextId* outContextId);
 s32 PS4_SYSV_ABI sceNpSignalingDeleteContext(OrbisNpSignalingContextId ctxId);
 

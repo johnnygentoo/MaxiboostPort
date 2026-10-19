@@ -121,6 +121,27 @@ static void on_trap_body(int sig, siginfo_t *info, void *context) {
                 struct timespec t = {(time_t)(delay_us / 1000000), (long)(delay_us % 1000000) * 1000};
                 nanosleep(&t, NULL);
             }
+            /* BB_GUEST_BACKTRACE=1: at a site that is a function's first instruction, the chain of
+             * callers (the game keeps frame pointers: rbp is still the caller's), the first 8 hits. */
+            static int backtrace = -1;
+            if (backtrace < 0) { const char *v = getenv("BB_GUEST_BACKTRACE"); backtrace = v && *v == '1'; }
+            if (backtrace) {
+                static _Atomic int printed;
+                if (atomic_fetch_add(&printed, 1) < 8) {
+                    char line[512]; int n = snprintf(line, sizeof(line), "Guest backtrace +%#" PRIx64 ":", sites[i].offset);
+                    const uint64_t base = (uint64_t)(uintptr_t)image_base;
+                    uint64_t r = *(const uint64_t *)(uintptr_t)uc->uc_mcontext.gregs[REG_RSP];
+                    const uint64_t *frame = (const uint64_t *)(uintptr_t)uc->uc_mcontext.gregs[REG_RBP];
+                    for (int d = 0; d < 14 && n < (int)sizeof(line) - 24; ++d) {
+                        n += snprintf(line + n, sizeof(line) - (size_t)n, " +%#" PRIx64, r - base);
+                        if (!frame || (uintptr_t)frame & 7 || !runtime_memory_is_mapped((uintptr_t)frame, 16)) break;
+                        r = frame[1]; frame = (const uint64_t *)(uintptr_t)frame[0];
+                        if (r < base || r >= base + 0x5000000) break;
+                    }
+                    snprintf(line + n, sizeof(line) - (size_t)n, "\n");
+                    ssize_t w = write(1, line, strlen(line)); (void)w;
+                }
+            }
             const uint64_t ret = *(const uint64_t *)(uintptr_t)uc->uc_mcontext.gregs[REG_RSP];
             for (int k = 0; k < MAX_CALLERS; ++k) {
                 uint64_t seen = atomic_load(&sites[i].callers[k]);

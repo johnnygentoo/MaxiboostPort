@@ -185,8 +185,23 @@ s32 PS4_SYSV_ABI sceNpSignalingCreateContext(const void* npId, void* callback, v
     return ORBIS_OK;
 }
 
-s32 PS4_SYSV_ABI sceNpSignalingCreateContextA(s32 userId, void* callback, void* callbackArg,
+// The A variant names the user by its account id: MAXIBOOST ON passes the low 32 bits of the one
+// sceNpGetAccountIdA gave it (guest+0x34496e: mov edi,[account]). A value that is no user of ours
+// is matched against the signed-in users' account ids, whole or their low half.
+s32 PS4_SYSV_ABI sceNpSignalingCreateContextA(u64 account, void* callback, void* callbackArg,
                                               OrbisNpSignalingContextId* outContextId) {
+    s32 userId = static_cast<s32>(account);
+    if (!Libraries::Np::NpHandler::GetInstance().IsPsnSignedIn(userId)) {
+        // The users the runtime logs in (1-4): the one whose account id this is.
+        for (s32 user = 1; user <= 16; ++user) {
+            const u64 id =
+                static_cast<u64>(Libraries::Np::NpHandler::GetInstance().GetAccountId(user));
+            if (id != 0 && (id == account || static_cast<u32>(id) == static_cast<u32>(account))) {
+                userId = user;
+                break;
+            }
+        }
+    }
     {
         SignalingMutexGuard lock;
         if (!g_initialized) {

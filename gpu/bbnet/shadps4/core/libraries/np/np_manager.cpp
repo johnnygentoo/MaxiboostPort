@@ -604,9 +604,10 @@ s32 PS4_SYSV_ABI sceNpGetNpId(Libraries::UserService::OrbisUserServiceUserId use
     }
     if (!g_shadnet_enabled || !Libraries::Np::NpHandler::GetInstance().IsPsnSignedIn(user_id)) {
         LOG_WARNING(Lib_NpManager,
-                    "sceNpGetNpId: SIGNED_OUT (user_id={} shadnet_enabled={} signed_in={})",
+                    "sceNpGetNpId: SIGNED_OUT (user_id={} shadnet_enabled={} signed_in={}) from {}",
                     user_id, g_shadnet_enabled,
-                    Libraries::Np::NpHandler::GetInstance().IsPsnSignedIn(user_id));
+                    Libraries::Np::NpHandler::GetInstance().IsPsnSignedIn(user_id),
+                    __builtin_return_address(0));
         return ORBIS_NP_ERROR_SIGNED_OUT;
     }
     *np_id = Libraries::Np::NpHandler::GetInstance().GetNpId(user_id);
