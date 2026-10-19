@@ -1707,9 +1707,56 @@ void Rasterizer::Draw(bool is_indexed, u32 index_offset, const PreparedDraw* pre
     DrawRecord(pipeline, used_prepared, is_indexed, index_offset);
 }
 
+// bbport BB_SKIP_PS_FILE=<file> (diagnostics): draws whose pixel shader hash is listed in the file
+// (hexadecimal, any separators) are skipped; the file is read again once a frame when it changed,
+// so draws can be switched off in a running game to see what each one draws.
+static bool SkippedByShaderFile(const GraphicsPipeline* pipeline) {
+    static const char* path = std::getenv("BB_SKIP_PS_FILE");
+    if (!path) {
+        return false;
+    }
+    static std::vector<u64> hashes;
+    static u32 checked_frame = ~0u;
+    static std::filesystem::file_time_type stamp{};
+    const u32 frame = BbStats::frame_number.load(std::memory_order_relaxed);
+    if (frame != checked_frame) {
+        checked_frame = frame;
+        std::error_code ec;
+        const auto now = std::filesystem::last_write_time(path, ec);
+        if (ec) {
+            hashes.clear();
+        } else if (now != stamp) {
+            stamp = now;
+            hashes.clear();
+            if (FILE* f = std::fopen(path, "r")) {
+                char word[64];
+                while (std::fscanf(f, "%63s", word) == 1) {
+                    hashes.push_back(std::strtoull(word, nullptr, 16));
+                }
+                std::fclose(f);
+            }
+            std::printf("Skip file: %zu pixel shaders skipped\n", hashes.size());
+        }
+    }
+    const auto* ps = pipeline->GetStages()[u32(Shader::SwStage::Fragment)];
+    if (ps) {
+        // Every pixel shader drawn, once, for building the list.
+        static std::set<u64> seen;
+        if (seen.insert(ps->pgm_hash).second) {
+            std::printf("Skip file: pixel shader %016llx drawn (vs %016llx)\n",
+                        (unsigned long long)ps->pgm_hash,
+                        (unsigned long long)pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash);
+        }
+    }
+    return ps && std::ranges::find(hashes, ps->pgm_hash) != hashes.end();
+}
+
 void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw* used_prepared,
                             bool is_indexed, u32 index_offset) {
     BB_SECTION(DrawRecord);
+    if (SkippedByShaderFile(pipeline)) {
+        return;
+    }
     buffer_cache.NewPacket();
     if (DrawPipe::OnStageB()) {
         FrameCapture::Poll();
@@ -1960,6 +2007,9 @@ void Rasterizer::DrawIndirect(bool is_indexed, VAddr arg_address, u32 offset, u3
 
 void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_indexed,
                                     const IndirectDraw& indirect) {
+    if (SkippedByShaderFile(pipeline)) {
+        return;
+    }
     buffer_cache.NewPacket();
     if (DrawPipe::OnStageB()) {
         FrameCapture::Poll();
@@ -3471,6 +3521,36 @@ void Rasterizer::BindTextures(const Shader::Info& stage, const PreparedStage* pr
 
         const auto data_fmt = tsharp.GetDataFmt();
         const auto num_fmt = tsharp.GetNumberFmt();
+        // bbport BB_TRACE_TEXTURES=<hash>[,...]: each texture those shaders bind (once per
+        // address and format): its data and number format, component swizzle and tiling.
+        static const std::vector<u64> traced_textures = [] {
+            std::vector<u64> out;
+            const char* env = std::getenv("BB_TRACE_TEXTURES");
+            for (const char* at = env; at && *at;) {
+                char* end = nullptr;
+                out.push_back(std::strtoull(at, &end, 16));
+                at = end && *end == ',' ? end + 1 : nullptr;
+            }
+            return out;
+        }();
+        if (!traced_textures.empty() &&
+            (traced_textures[0] == 0 || std::ranges::find(traced_textures, stage.pgm_hash) !=
+                                            traced_textures.end())) {
+            static std::mutex trace_mutex;
+            static std::set<std::tuple<u64, u64, u32, u32>> seen;
+            std::scoped_lock lk{trace_mutex};
+            if (seen.size() < 4000 &&
+                seen.insert({stage.pgm_hash, tsharp.Address(), u32(data_fmt), u32(num_fmt)}).second) {
+                std::printf("Texture trace: shader %016llx slot %u at %#llx %ux%u data fmt %u num "
+                            "fmt %u dst_sel %u%u%u%u tiling %u type %u\n",
+                            (unsigned long long)stage.pgm_hash, image_index,
+                            (unsigned long long)tsharp.Address(), u32(tsharp.width + 1),
+                            u32(tsharp.height + 1), u32(data_fmt), u32(num_fmt),
+                            u32(tsharp.dst_sel_x), u32(tsharp.dst_sel_y), u32(tsharp.dst_sel_z),
+                            u32(tsharp.dst_sel_w), u32(tsharp.tiling_index), u32(tsharp.type));
+                std::fflush(stdout);
+            }
+        }
         if (tsharp.Address() == 0 || data_fmt == AmdGpu::DataFormat::FormatInvalid) {
             image_bindings.emplace_back(VideoCore::ImageId{}, &image_desc_storage.emplace_back());
             image_binding_entries.push_back(nullptr);

@@ -57,10 +57,14 @@ bool pass_open = false;
 // that draws its UI into the display buffer over several passes (GUNDAM VERSUS: such a boundary
 // cut the recording to two passes). The recording then spans one flip interval, which may hold
 // the end of one frame and the start of the next.
-const bool flip_mode = [] {
+// BB_CAPTURE_FLIP=N (2-9): the recording spans N flip intervals (MAXIBOOST ON's GPU work for one
+// frame runs across a flip on the GPU thread: one interval held part of its passes).
+const int flip_span = [] {
     const char* env = std::getenv("BB_CAPTURE_FLIP");
-    return env && *env == '1';
+    return env && *env >= '1' && *env <= '9' ? *env - '0' : 0;
 }();
+const bool flip_mode = flip_span > 0;
+int flips_recorded = 0;
 std::atomic<bool> flip_boundary{false};
 std::mutex display_mutex;
 std::vector<VAddr> display_buffers;
@@ -203,8 +207,10 @@ void FrameCapture::BeginPass(const VideoCore::ImageInfo* const* colors, u32 num_
         }
     }
     // Flip mode: the first pass after a flip starts (armed) or ends (recording) the recording.
-    if (flip_mode && flip_boundary.exchange(false, std::memory_order_acq_rel)) {
+    if (flip_mode && flip_boundary.exchange(false, std::memory_order_acq_rel) &&
+        !(state.load(std::memory_order_relaxed) == Recording && ++flips_recorded < flip_span)) {
         const bool recording = state.load(std::memory_order_relaxed) == Recording;
+        flips_recorded = 0;
         if (recording) {
             Write(last_presented.load(std::memory_order_relaxed));
         }

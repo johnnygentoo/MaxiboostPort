@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <set>
+#include <tuple>
+#include <mutex>
+#include <cstdio>
 #include <cstdio>
 #include <algorithm>
 #include <utility>
@@ -461,6 +465,25 @@ void GraphicsPipeline::GetVertexInputs(
         const auto step_rate = attrib.GetStepRate();
         const auto buffer = given ? sharps[index] : attrib.GetSharp(vs_info);
         ++index;
+        // bbport BB_TRACE_VERTEX=1: each vertex shader's attributes (once): format and swizzle.
+        static const bool trace_vertex = std::getenv("BB_TRACE_VERTEX") != nullptr;
+        if (trace_vertex) {
+            static std::mutex trace_mutex;
+            static std::set<std::tuple<u64, u32, u32, u32, u32>> seen;
+            const u32 sel = buffer.dst_sel_x | buffer.dst_sel_y << 3 | buffer.dst_sel_z << 6 |
+                            buffer.dst_sel_w << 9;
+            std::scoped_lock lk{trace_mutex};
+            if (seen.size() < 4000 && seen.insert({vs_info.pgm_hash, attrib.semantic,
+                                                   u32(buffer.data_format),
+                                                   u32(buffer.num_format), sel}).second) {
+                std::printf("Vertex trace: vs %016llx attr %u data fmt %u num fmt %u dst_sel "
+                            "%u%u%u%u stride %u\n",
+                            (unsigned long long)vs_info.pgm_hash, attrib.semantic,
+                            u32(buffer.data_format), u32(buffer.num_format),
+                            u32(buffer.dst_sel_x), u32(buffer.dst_sel_y), u32(buffer.dst_sel_z),
+                            u32(buffer.dst_sel_w), u32(buffer.GetStride()));
+            }
+        }
         attributes.push_back(Attribute{
             .location = attrib.semantic,
             .binding = attrib.semantic,

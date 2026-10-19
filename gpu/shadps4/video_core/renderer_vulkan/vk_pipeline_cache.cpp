@@ -10,6 +10,8 @@
 #include <deque>
 #include <functional>
 #include <mutex>
+#include <set>
+#include <tuple>
 #include <ranges>
 #include <string>
 #include <thread>
@@ -874,6 +876,25 @@ bool PipelineCache::RefreshGraphicsKey(PipelineSelection& sel) {
     // Compile and bind shader stages
     if (!RefreshGraphicsStages(sel)) {
         return false;
+    }
+    // bbport BB_TRACE_CB_SWAP=1: each pixel shader, color target and component order (once).
+    static const bool trace_swap = std::getenv("BB_TRACE_CB_SWAP") != nullptr;
+    if (trace_swap) {
+        static std::mutex trace_mutex;
+        static std::set<std::tuple<u64, u64, u32, s32>> seen;
+        const u64 ps = key.stage_hashes[static_cast<u32>(SwStage::Fragment)];
+        std::scoped_lock lk{trace_mutex};
+        for (s32 cb = 0; cb < AmdGpu::NUM_COLOR_BUFFERS; ++cb) {
+            const auto& col_buf = regs.color_buffers[cb];
+            if (!col_buf || !regs.color_target_mask.GetMask(cb) || seen.size() >= 4000 ||
+                !seen.insert({ps, col_buf.Address(), u32(col_buf.info.comp_swap), cb}).second) {
+                continue;
+            }
+            std::printf("CB swap: ps %016llx mrt %d target %#llx fmt %u num %u swap %u\n",
+                        (unsigned long long)ps, cb, (unsigned long long)col_buf.Address(),
+                        u32(col_buf.GetDataFmt()), u32(col_buf.GetNumberFmt()),
+                        u32(col_buf.info.comp_swap));
+        }
     }
     if (motion_possible) {
         const auto* vs = sel.infos[static_cast<u32>(Shader::SwStage::Vertex)];

@@ -6,6 +6,7 @@
  *   x ADDR [LEN]       up to 256 bytes in hex
  *   m ADDR             the guest mutex handle at ADDR: its host mutex's lock word, count and owner
  *                      thread (with the thread's name)
+ *   f ADDR LEN PATH    LEN bytes (up to 64 MiB) written to the file PATH (textures, buffers)
  * Addresses are hexadecimal; a read of unmapped memory says so instead of faulting. */
 #define _GNU_SOURCE
 #include "runtime.h"
@@ -66,6 +67,16 @@ static void answer(char *line) {
             for (size_t j=i;j<i+16 && j<size;++j) printf(" %02x",bytes[j]);
             printf("\n");
         }
+    } else if (!strcmp(op,"f")) {
+        char *n=strtok_r(NULL," \t\n",&save), *path=strtok_r(NULL," \t\n",&save);
+        size_t size=n ? strtoull(n,NULL,0) : 0;
+        if (!path || !size || size>(64u<<20)) { printf("Peek: f needs ADDR LEN PATH\n"); return; }
+        unsigned char *bytes=malloc(size);
+        FILE *out=bytes ? fopen(path,"wb") : NULL;
+        if (!out) { free(bytes); printf("Peek: f %s: cannot write\n",path); return; }
+        if (!peek(address,bytes,size)) printf("Peek: f %#" PRIx64 ": unmapped\n",address);
+        else { fwrite(bytes,1,size,out); printf("Peek: f %#" PRIx64 ": %zu bytes to %s\n",address,size,path); }
+        fclose(out); free(bytes);
     } else if (!strcmp(op,"m")) {
         uint64_t handle;
         int words[3];
