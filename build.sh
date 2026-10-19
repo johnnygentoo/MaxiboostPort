@@ -120,4 +120,7 @@ if [[ ${1:-} == --test ]]; then
     out/online-test
     "$CC" -std=c11 -D_GNU_SOURCE -O2 -g -Wall -Wextra -Werror -I. -Isrc tests/test_content.c src/runtime_content.c -o out/content-test
     out/content-test
+    # runtime_lookup (src/runtime.c) is not called by the test.
+    "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -I. -Isrc tests/test_json.c -Wl,--unresolved-symbols=ignore-all -o out/json-test
+    out/json-test
 fi

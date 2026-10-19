@@ -633,23 +633,8 @@ static ABI int32_t tk_init(const void *params) {
     return 0;
 }
 
-/* ---- libSceJson2: the initializer runs; parsing fails (nothing comes from the network), the
- * values the game builds stay empty (null, "", []). ---- */
-static _Alignas(16) unsigned char json_null[64];
+/* ---- libSceJson2: the initializer runs (runtime_json.c is the library). ---- */
 static ABI int32_t json_ok(void *self) { (void)self; return 0; }
-static ABI int32_t json_parse(void *value,const char *text,uint64_t size) { (void)value; (void)text; (void)size; return (int32_t)0x80920001; }
-static ABI void *json_value_init(void *self) { memset(self,0,16); return self; }
-static ABI void *json_value_copy(void *self,const void *other) { memmove(self,other,16); return self; }
-static ABI void json_value_clear(void *self) { memset(self,0,16); }
-static ABI int32_t json_value_type(const void *self) { int32_t t; memcpy(&t,self,4); return t; }
-static ABI void *json_static_null(const void *self) { (void)self; return json_null; }
-static ABI uint64_t json_zero(const void *self) { (void)self; return 0; }
-static ABI const char *json_c_str(const void *self) { (void)self; return ""; }
-static ABI void *json_ptr_init(void *self) { memset(self,0,8); return self; }
-static ABI void *json_ptr_copy(void *self,const void *other) { (void)other; memset(self,0,8); return self; }
-static ABI void *json_iterator(void *out,const void *self) { (void)self; memset(out,0,8); return out; }
-static ABI int32_t json_iterator_differ(const void *a,const void *b) { (void)a; (void)b; return 0; }
-static ABI int32_t json_to_string(const void *self,void *string) { (void)self; (void)string; return 0; }
 static ABI void *json_init_rtti(void *self,void *alloc,void *user,uint64_t size) { (void)alloc; (void)user; (void)size; return self; }
 
 /* ---- Other dialogs' results: the user cancelled (did not sign in, invite or browse). ---- */
@@ -735,9 +720,6 @@ static ABI int32_t http_uri_parse(HttpUriElement *out,const char *uri,void *pool
 static ABI void *tk_assign(void *self,const void *other) { (void)other; return self; }
 static ABI int32_t tk_server_error(const void *response) { (void)response; return 0; }
 /* sce::Json values the game reads back: null and 0 (nothing parses offline). */
-static ABI void *json_string_from(void *self,const char *text) { (void)text; memset(self,0,8); return self; }
-static ABI void *json_get_value(const void *self,const void *key) { (void)self; (void)key; return json_null; }
-static ABI int64_t json_get_integer(const void *self) { (void)self; return 0; }
 
 static const RuntimeExport exports[]={
     {"sceUsbStorageInit",ok_void}, {"sceUsbStorageTerm",ok_void}, {"sceUsbStorageGetDeviceList",usb_device_list},
@@ -752,9 +734,6 @@ static const RuntimeExport exports[]={
     {"sceNpWebApiCreateContextA",np_signed_out}, {"sceNpWebApiSendRequest2",np_signed_out},
     {"sceNpWebApiSetMaxConnection",ok_void},
     {"sceNpInGameMessageGetMemoryPoolStatistics",not_supported},
-    {"_ZN3sce4Json6StringC1EPKc",json_string_from}, /* sce::Json::String::String(char const*) */
-    {"_ZNK3sce4Json5Value8getValueERKNS0_6StringE",json_get_value}, /* sce::Json::Value::getValue(sce::Json::String const&) const */
-    {"_ZNK3sce4Json5Value10getIntegerEv",json_get_integer}, /* sce::Json::Value::getInteger() const */
     {"_ZN3sce7Toolkit2NP2V24Core4termERKNS3_7Request10TermParamsE",tk_ok},
     {"_ZN3sce7Toolkit2NP2V24Core7Request10TermParamsC1Ev",tk_this},
     {"_ZN3sce7Toolkit2NP2V24Core7Request10TermParamsD1Ev",tk_destroy},
@@ -825,30 +804,6 @@ static const RuntimeExport exports[]={
     {"scePlayGoGetInstallSpeed",playgo_get_speed}, {"scePlayGoClose",playgo_close},
     {"scePlayGoTerminate",playgo_terminate},
     {"sceLibcHeapGetTraceInfo",heap_trace_info}, {"sceDiscMap_7C980FFB0AA27E7A",discmap_7c98},
-    {"_ZN3sce4Json5ArrayD1Ev",tk_destroy}, /* sce::Json::Array::~Array() */
-    {"_ZN3sce4Json6StringC1Ev",json_ptr_init}, /* sce::Json::String::String() */
-    {"_ZN3sce4Json5ValueD1Ev",tk_destroy}, /* sce::Json::Value::~Value() */
-    {"_ZN3sce4Json5Value5clearEv",json_value_clear}, /* sce::Json::Value::clear() */
-    {"_ZNK3sce4Json5Array4sizeEv",json_zero}, /* sce::Json::Array::size() const */
-    {"_ZNK3sce4Json6String5c_strEv",json_c_str}, /* sce::Json::String::c_str() const */
-    {"_ZNK3sce4Json5Value9getStringEv",json_static_null}, /* sce::Json::Value::getString() const */
-    {"_ZN3sce4Json5Array8iteratorppEv",tk_this}, /* sce::Json::Array::iterator::operator++() */
-    {"_ZN3sce4Json6StringD1Ev",tk_destroy}, /* sce::Json::String::~String() */
-    {"_ZNK3sce4Json6String6lengthEv",json_zero}, /* sce::Json::String::length() const */
-    {"_ZNK3sce4Json5Value11getUIntegerEv",json_zero}, /* sce::Json::Value::getUInteger() const */
-    {"_ZNK3sce4Json5Array3endEv",json_iterator}, /* sce::Json::Array::end() const */
-    {"_ZN3sce4Json5ArrayC1ERKS1_",json_ptr_copy}, /* sce::Json::Array::Array(sce::Json::Array const&) */
-    {"_ZNK3sce4Json5Value8getArrayEv",json_static_null}, /* sce::Json::Value::getArray() const */
-    {"_ZNK3sce4Json5Array5beginEv",json_iterator}, /* sce::Json::Array::begin() const */
-    {"_ZNK3sce4Json5Array8iteratorneERKS2_",json_iterator_differ}, /* sce::Json::Array::iterator::operator!=(sce::Json::Array::iterator const&) const */
-    {"_ZN3sce4Json5ValueC1Ev",json_value_init}, /* sce::Json::Value::Value() */
-    {"_ZNK3sce4Json5Array8iteratordeEv",json_static_null}, /* sce::Json::Array::iterator::operator*() const */
-    {"_ZN3sce4Json5Array8iteratorD1Ev",tk_destroy}, /* sce::Json::Array::iterator::~iterator() */
-    {"_ZN3sce4Json5ValueC1ERKS1_",json_value_copy}, /* sce::Json::Value::Value(sce::Json::Value const&) */
-    {"_ZN3sce4Json5ValueaSERKS1_",json_value_copy}, /* sce::Json::Value::operator=(sce::Json::Value const&) */
-    {"_ZNK3sce4Json5Value7getTypeEv",json_value_type}, /* sce::Json::Value::getType() const */
-    {"_ZNK3sce4Json5ValueixEPKc",json_static_null}, /* sce::Json::Value::operator[](char const*) const */
-    {"_ZNK3sce4Json5Value8toStringERNS0_6StringE",json_to_string}, /* sce::Json::Value::toString(sce::Json::String&) const */
     {"_ZN3sce7Toolkit2NP2V24Core10OnlineUserD1Ev",tk_destroy}, /* sce::Toolkit::NP::V2::Core::OnlineUser::~OnlineUser() */
     {"_ZN3sce7Toolkit2NP2V24Core10OnlineUserC1Ev",tk_this}, /* sce::Toolkit::NP::V2::Core::OnlineUser::OnlineUser() */
     {"_ZN3sce7Toolkit2NP2V24Core11addCallbackERKNS3_7Request11AddCallbackE",tk_ok}, /* sce::Toolkit::NP::V2::Core::addCallback(sce::Toolkit::NP::V2::Core::Request::AddCallback c */
@@ -910,7 +865,6 @@ static const RuntimeExport exports[]={
     {"_ZN3sce4Json11InitializerC1Ev",tk_this}, /* sce::Json::Initializer::Initializer() */
     {"_ZN3sce4Json11InitializerD1Ev",tk_destroy}, /* sce::Json::Initializer::~Initializer() */
     {"_ZN3sce4Json17InitParameterRttiC1EPNS0_14AllocParamRttiEPvm",json_init_rtti}, /* sce::Json::InitParameterRtti::InitParameterRtti(sce::Json::AllocParamRtti*, void*, unsigne */
-    {"_ZN3sce4Json6Parser5parseERNS0_5ValueEPKcm",json_parse}, /* sce::Json::Parser::parse(sce::Json::Value&, char const*, unsigned long) */
     {"sceNpToolkit2_7zsee5IHLis",tk_request},
     {"sceNpToolkit2_cmvr0mOCX2Q",tk_request},
     {"sceNpToolkit2_o8e-sH1eU5s",tk_request},

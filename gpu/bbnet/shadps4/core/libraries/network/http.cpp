@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <iterator>
 #include <cstdio>
 #include <cctype>
 #include <chrono>
@@ -466,6 +467,82 @@ struct SendRequestPlan {
     // case we bypass TLS verification because we can't load the game's CAs.
     bool ctx_has_loaded_certs = false;
 };
+
+// mbport: the publisher's game service, answered here. MAXIBOOST ON asks
+// https://cosmos.channel.or.jp/<title>/api/sys/get_env at its title screen for its configuration
+// (maintenance, the add-on schedule, phases, ...; the parser is guest+0xecf10) and goes on only
+// with an answer; that service is not ours to reach. BB_GAME_ENV names the JSON file answered
+// (run.sh: data/maxiboost_env.json), encoded as the game decodes it: a 4-byte header whose byte
+// sum mod 10 is the number of padding words after it (0 here), two words whose XOR seeds an
+// xorshift128 (0 here: the state is the game's constants), then the text XOR each output word.
+static std::vector<u8> EncodeGameEnv(const std::string& text) {
+    std::vector<u8> out(12, 0);
+    std::string padded = text;
+    while (padded.size() % 4) {
+        padded.push_back(' ');
+    }
+    u32 x = 0x1cd9e3f0, y = 0x8187ab18, z = 0xd0cf11e0, w = 0x2fd; // seed 0
+    for (size_t i = 0; i < padded.size(); i += 4) {
+        const u32 t = x ^ (x << 11);
+        x = y;
+        y = z;
+        z = w;
+        w = w ^ (w >> 19) ^ t ^ (t >> 8);
+        u32 word;
+        std::memcpy(&word, padded.data() + i, 4);
+        word ^= w;
+        const auto* bytes = reinterpret_cast<const u8*>(&word);
+        out.insert(out.end(), bytes, bytes + 4);
+    }
+    return out;
+}
+
+static bool LocalGameServiceResponse(const SendRequestPlan& plan, HttpResponse& res,
+                                     u32& event_bits) {
+    static const std::string host = [] {
+        const char* env = std::getenv("BB_GAME_SERVICE_HOST");
+        return std::string(env ? env : "cosmos.channel.or.jp");
+    }();
+    if (host.empty() || plan.host != host) {
+        return false;
+    }
+    SynthesizeTransportFailureResponse(res);
+    const std::string_view path = plan.path;
+    const std::string_view get_env = "/api/sys/get_env";
+    std::string text;
+    if (path.size() >= get_env.size() && path.substr(path.size() - get_env.size()) == get_env) {
+        const char* file = std::getenv("BB_GAME_ENV");
+        std::ifstream in(file ? file : "", std::ios::binary);
+        if (in) {
+            text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        }
+        if (text.empty()) {
+            std::printf("Http: %s%s: no configuration to answer (BB_GAME_ENV)\n", plan.host.c_str(),
+                        plan.path.c_str());
+            res.status_code = 404;
+        } else {
+            res.status_code = 200;
+            res.body = EncodeGameEnv(text);
+            std::printf("Http: %s%s answered here (%s)\n", plan.host.c_str(), plan.path.c_str(),
+                        file);
+        }
+    } else {
+        // Anything else (play statistics) is accepted and dropped.
+        static std::atomic<u32> told{0};
+        if (told.fetch_add(1, std::memory_order_relaxed) < 16) {
+            std::printf("Http: %s%s (%zu bytes) accepted here, not sent\n", plan.host.c_str(),
+                        plan.path.c_str(), plan.body.size());
+        }
+        res.status_code = 200;
+    }
+    res.content_length = res.body.size();
+    res.content_length_result = 0;
+    res.read_cursor = 0;
+    res.all_headers_blob = "Content-Length: " + std::to_string(res.body.size()) + "\r\n";
+    event_bits = ORBIS_HTTP_NB_EVENT_IN | ORBIS_HTTP_NB_EVENT_OUT | ORBIS_HTTP_NB_EVENT_RESOLVED;
+    return true;
+}
+
 
 // Extract the path-and-query portion from a full URL
 static std::string ExtractPathFromUrl(const std::string& url) {
@@ -1793,6 +1870,10 @@ int PS4_SYSV_ABI sceHttpSendRequest(int reqId, const void* postData, u64 size) {
         const std::string server_host = server.substr(0, server.rfind(':'));
         allowed_host = internet || plan.host == server_host || plan.host == "127.0.0.1" ||
                        plan.host == "localhost";
+        static const char* service = std::getenv("BB_GAME_SERVICE_HOST");
+        if (plan.host == (service ? service : "cosmos.channel.or.jp")) {
+            allowed_host = true; // answered here (LocalGameServiceResponse), never sent
+        }
         if (!allowed_host) {
             static std::atomic<u32> told{0};
             if (told.fetch_add(1, std::memory_order_relaxed) < 16) {
@@ -1813,7 +1894,9 @@ int PS4_SYSV_ABI sceHttpSendRequest(int reqId, const void* postData, u64 size) {
         s32 worker_errno = 0;
         u32 success_event_bits = 0; // 0 = no event (offline path uses failure bits)
 
-        if (!online) {
+        if (online && LocalGameServiceResponse(plan, local_res, success_event_bits)) {
+            worker_errno = 0;
+        } else if (!online) {
             SynthesizeTransportFailureResponse(local_res);
             worker_errno = ORBIS_HTTP_ERROR_RESOLVER_ENODNS;
         } else {
