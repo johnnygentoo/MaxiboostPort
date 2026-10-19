@@ -49,6 +49,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 PORT_DIR = Path(__file__).resolve().parent.parent  # native_probe (or the package's copy)
 sys.path.insert(0, str(PORT_DIR / 'scripts'))
 from prepare import sfo  # noqa: E402
+from dlc import addons  # noqa: E402
 import game_check  # noqa: E402
 import save_import  # noqa: E402
 from patches import APP_VERSION as PATCH_APP_VERSION, BUILTIN_XML, FPS_PRESETS  # noqa: E402
@@ -295,19 +296,9 @@ def game_icon(game_dir):
 
 
 def dlc_addons(dlc, title_id):
-    """Entitlement labels of this title's add-ons in a DLC folder: subfolders named by the label
-    (as the runtime reports them, from <user>/addcont/<title id>/<label>) with a param.sfo of
-    CATEGORY ac and this title's CONTENT_ID."""
-    found = []
-    for folder in sorted(Path(dlc).iterdir()) if Path(dlc).is_dir() else []:
-        try:
-            info = sfo((folder / "sce_sys/param.sfo").read_bytes())
-        except (OSError, ValueError, IndexError):
-            continue
-        content = str(info.get("CONTENT_ID", ""))
-        if info.get("CATEGORY") == "ac" and content[7:16] == title_id and content[20:] == folder.name:
-            found.append(folder.name)
-    return found
+    """Entitlement labels of this title's add-ons in a DLC folder: dumped add-on folders or their
+    .pkg files (scripts/dlc.py, as run.sh reports them to the game)."""
+    return list(addons(dlc, title_id))
 
 
 # DLSS (vk_dlss.cpp): the bridge (libbbport_dlss.so) and NVIDIA's runtime library

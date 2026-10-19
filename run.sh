@@ -107,17 +107,14 @@ esac
 modules=(libc.prx libSceFios2.prx)
 if [[ ${BB_ONLINE:-0} == 1 && -f $game/sce_module/libSceNpToolkit2.prx ]]; then modules+=(libSceNpToolkit2.prx); fi
 "$PYTHON" scripts/link_modules.py "$game" --out "$out" --modules "${modules[@]}"
-# BB_DLC_DIR (the launcher's DLC folder): the dumped add-ons of this title, one folder each (e.g.
-# SPEXPANSIONDLC03). The runtime reports <user>/addcont/<title id>/<label> as installed (shadPS4's
-# layout), so the folder is linked there; a real folder already in its place is left alone.
+# BB_DLC_DIR (the launcher's DLC folder): this title's add-ons, dumped (one folder each, named by its
+# entitlement label, e.g. SPEXPANSIONDLC03) or as their .pkg files (GUNDAM VERSUS' are unlock keys:
+# the mobile suits are in the game already). The runtime reports <user>/addcont/<title id>/<label>
+# as installed (shadPS4's layout); scripts/dlc.py makes those entries, a real folder of your own in
+# their place is left alone.
 if [[ -n ${BB_DLC_DIR:-} && -d $BB_DLC_DIR ]]; then
-    title=$("$PYTHON" -c 'import sys; sys.path.insert(0, "scripts"); from prepare import sfo
-print(sfo(open(sys.argv[1] + "/sce_sys/param.sfo", "rb").read()).get("TITLE_ID", ""))' "$game" 2>/dev/null) || title=
-    addcont=${BB_USER_DIR:-$data/user}/addcont
-    if [[ $title =~ ^[A-Z]{4}[0-9]{5}$ && ( ! -e $addcont/$title || -L $addcont/$title ) ]]; then
-        mkdir -p "$addcont"
-        ln -sfn "$(realpath "$BB_DLC_DIR")" "$addcont/$title"
-    fi
+    "$PYTHON" scripts/dlc.py link --dlc "$BB_DLC_DIR" --game "$game" --user "${BB_USER_DIR:-$data/user}" ||
+        echo "DLC: the add-ons in $BB_DLC_DIR were not set up" >&2
 fi
 # BB_REGION=eu|na (the launcher's Region): the game's region for this launch, whatever the dump's
 # param.sfo says; it picks the regional text (Spanish from Spain or Latin American).
