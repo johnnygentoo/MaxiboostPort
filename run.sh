@@ -80,8 +80,8 @@ fi
 # Two players on one PC: MAXIBOOST ON has its own local versus (Free Battle: a player slot set
 # to 2P, the screen split in two); each further gamepad is another PS4 user (runtime_pad.c).
 # Play over the local network (BB_LAN, launcher: "Over the network"): host, this PC's matching server
-# takes the other PCs' games too (TCP 31313, UDP 31314; each game's own UDP 3658); join, the games
-# of this PC play through the host PC's server at BB_LAN_SERVER (its address, port 31313 unless
+# takes the other PCs' games too (TCP 31333, UDP 31334; each game's own UDP 3658); join, the games
+# of this PC play through the host PC's server at BB_LAN_SERVER (its address, port 31333 unless
 # given). Each PC needs its own copy of the game.
 case ${BB_LAN:-} in
 host)
@@ -89,13 +89,13 @@ host)
     lan_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
     [[ -n $lan_ip ]] || lan_ip=$(hostname -i 2>/dev/null | awk '{print $1}')
     [[ -n $lan_ip ]] || { echo 'STOP: this PC has no network address for the other PCs to reach' >&2; exit 1; }
-    export BB_ONLINE=1 BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-$lan_ip:31313}
+    export BB_ONLINE=1 BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-$lan_ip:31333}
     export SHADPS4_P2P_PORT=${SHADPS4_P2P_PORT:-3658}
     echo "Network play: other PCs join this one at $lan_ip"
     ;;
 join)
     [[ -n ${BB_LAN_SERVER:-} ]] || { echo "STOP: network play needs the host PC's address (BB_LAN_SERVER)" >&2; exit 1; }
-    server=$BB_LAN_SERVER; [[ $server == *:* ]] || server+=:31313
+    server=$BB_LAN_SERVER; [[ $server == *:* ]] || server+=:31333
     export BB_ONLINE=1 BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-$server}
     export SHADPS4_P2P_PORT=${SHADPS4_P2P_PORT:-3658}
     ;;
@@ -277,11 +277,11 @@ fi
 # shadNet server, gvnet-server (gpu/bbnet/server): BB_SHADNET_SERVER host:port, default one on
 # this PC, started for this launch when none listens there. BB_SHADNET_NPID: the player's name.
 if [[ ${BB_ONLINE:-0} == 1 ]]; then
-    export BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-127.0.0.1:31313}
+    export BB_SHADNET_SERVER=${BB_SHADNET_SERVER:-127.0.0.1:31333}
     export BB_SHADNET_NPID=${BB_SHADNET_NPID:-${USER:-Player}}
     export BB_SHADNET_PASSWORD=${BB_SHADNET_PASSWORD:-local} BB_UPNP=${BB_UPNP:-0}
     server_host=${BB_SHADNET_SERVER%:*} server_port=${BB_SHADNET_SERVER##*:}
-    # The WebAPI two ports above the server's (31315 for 31313), as shadNet servers have it. gvnet-server
+    # The WebAPI two ports above the server's (31335 for 31333), as shadNet servers have it. gvnet-server
     # has none: the game's sessions then fail harmlessly. A WebAPI of another game's server answering
     # there (GODZILLA's shadNet on the same PC) made "Failed to create room".
     [[ -n ${BB_SHADNET_WEBAPI:-} ]] || export BB_SHADNET_WEBAPI=http://$server_host:$((server_port + 2))

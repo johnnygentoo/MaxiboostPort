@@ -124,9 +124,9 @@ of the game and of the port, and one matching server serves them all.
   `tools/gvnet-server/out/gvnet-server` to `~/mbnet-server/` there and start it by hand with
   `tools/gvnet-server/mbserver toggle | start | stop | status | log`, or run it as a user service
   (`tools/gvnet-server/mbnet-server.service`, how to install it is in the file). It listens on
-  port 31323 (TCP, and UDP 31324), so a GODZILLA shadNet server can run on the same PC (a GUNDAM
-  VERSUS port's server uses 31323 too: give one of them another port). Every PC then plays with
-  **join** and the address `<server>:31323`.
+  port 31333 (TCP, and UDP 31334), so a GODZILLA shadNet server (31313-31315) and a GUNDAM VERSUS
+  port's server (31323-31324) can run on the same PC. Every PC then plays with **join** and the
+  address `<server>:31333`.
 
 ### Saves
 

@@ -512,8 +512,8 @@ EN = {
         "shadNet server's UDP (summons)",
     'UPnP открывает порт только на роутере; брандмауэр этого компьютера всё равно блокирует кооператив. Откройте порт: {}':
         "UPnP opens the port on the router only; this computer's firewall still blocks co-op. Open the port: {}",
-    'Адрес WebAPI (пусто: порт 31315 сервера)':
-        "WebAPI address (empty: the server's port 31315)",
+    'Адрес WebAPI (пусто: порт 31335 сервера)':
+        "WebAPI address (empty: the server's port 31335)",
     'Адрес сервера (host:port)':
         'Server address (host:port)',
     'Бесшовный кооператив (экспериментально)':
@@ -1325,8 +1325,8 @@ PT_BR = {
         'UDP do servidor shadNet (invocações)',
     'UPnP открывает порт только на роутере; брандмауэр этого компьютера всё равно блокирует кооператив. Откройте порт: {}':
         'O UPnP só abre a porta no roteador; o firewall deste computador ainda bloqueia o cooperativo. Abra a porta: {}',
-    'Адрес WebAPI (пусто: порт 31315 сервера)':
-        'Endereço do WebAPI (vazio: a porta 31315 do servidor)',
+    'Адрес WebAPI (пусто: порт 31335 сервера)':
+        'Endereço do WebAPI (vazio: a porta 31335 do servidor)',
     'Адрес сервера (host:port)':
         'Endereço do servidor (host:porta)',
     'Бесшовный кооператив (экспериментально)':
@@ -2048,8 +2048,8 @@ ES = {
         'UDP del servidor shadNet (invocaciones)',
     'UPnP открывает порт только на роутере; брандмауэр этого компьютера всё равно блокирует кооператив. Откройте порт: {}':
         'El UPnP solo abre el puerto en el router; el cortafuegos de este equipo sigue bloqueando el cooperativo. Abre el puerto: {}',
-    'Адрес WebAPI (пусто: порт 31315 сервера)':
-        'Dirección del WebAPI (vacía: el puerto 31315 del servidor)',
+    'Адрес WebAPI (пусто: порт 31335 сервера)':
+        'Dirección del WebAPI (vacía: el puerto 31335 del servidor)',
     'Адрес сервера (host:port)':
         'Dirección del servidor (host:puerto)',
     'Бесшовный кооператив (экспериментально)':
@@ -2771,8 +2771,8 @@ IT = {
         'UDP del server shadNet (evocazioni)',
     'UPnP открывает порт только на роутере; брандмауэр этого компьютера всё равно блокирует кооператив. Откройте порт: {}':
         'UPnP apre la porta solo sul router; il firewall di questo computer blocca comunque la cooperativa. Apri la porta: {}',
-    'Адрес WebAPI (пусто: порт 31315 сервера)':
-        'Indirizzo WebAPI (vuoto: la porta 31315 del server)',
+    'Адрес WebAPI (пусто: порт 31335 сервера)':
+        'Indirizzo WebAPI (vuoto: la porta 31335 del server)',
     'Адрес сервера (host:port)':
         'Indirizzo del server (host:porta)',
     'Бесшовный кооператив (экспериментально)':
@@ -3494,8 +3494,8 @@ FR = {
         'UDP du serveur shadNet (invocations)',
     'UPnP открывает порт только на роутере; брандмауэр этого компьютера всё равно блокирует кооператив. Откройте порт: {}':
         'UPnP n’ouvre le port que sur le routeur ; le pare-feu de cet ordinateur bloque quand même la coopération. Ouvrez le port : {}',
-    'Адрес WebAPI (пусто: порт 31315 сервера)':
-        'Adresse WebAPI (vide : le port 31315 du serveur)',
+    'Адрес WebAPI (пусто: порт 31335 сервера)':
+        'Adresse WebAPI (vide : le port 31335 du serveur)',
     'Адрес сервера (host:port)':
         'Adresse du serveur (hôte:port)',
     'Бесшовный кооператив (экспериментально)':
@@ -4217,8 +4217,8 @@ DE = {
         'UDP des shadNet-Servers (Beschwörungen)',
     'UPnP открывает порт только на роутере; брандмауэр этого компьютера всё равно блокирует кооператив. Откройте порт: {}':
         'UPnP öffnet den Port nur am Router; die Firewall dieses Computers blockiert den Koop trotzdem. Öffne den Port: {}',
-    'Адрес WebAPI (пусто: порт 31315 сервера)':
-        'WebAPI-Adresse (leer: Port 31315 des Servers)',
+    'Адрес WebAPI (пусто: порт 31335 сервера)':
+        'WebAPI-Adresse (leer: Port 31335 des Servers)',
     'Адрес сервера (host:port)':
         'Serveradresse (Host:Port)',
     'Бесшовный кооператив (экспериментально)':
@@ -4847,7 +4847,7 @@ ZH_CN = {
     "UPnP открывает порт только на роутере; брандмауэр этого компьютера всё равно блокирует кооператив. Откройте порт: {}": "UPnP 只会在路由器上开放端口，本机防火墙仍会阻止联机合作。请开放端口：{}",
     "«Играет в Bloodborne» в профиле Discord, онлайн или офлайн": "无论在线或离线，都在你的 Discord 个人资料上显示“正在玩 Bloodborne”",
     "Автоматически (по контроллеру)": "自动（按手柄）",
-    "Адрес WebAPI (пусто: порт 31315 сервера)": "WebAPI 地址（留空：使用服务器的 31315 端口）",
+    "Адрес WebAPI (пусто: порт 31335 сервера)": "WebAPI 地址（留空：使用服务器的 31335 端口）",
     "Адрес сервера (host:port)": "服务器地址（主机:端口）",
     "Бесшовный кооператив (экспериментально)": "无缝联机合作（实验性）",
     "В дампе игры нет трофеев (sce_sys/trophy)": "游戏转储中没有奖杯（sce_sys/trophy）",

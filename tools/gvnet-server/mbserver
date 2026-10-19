@@ -1,15 +1,15 @@
 #!/bin/sh
 # mbserver: start and stop MAXIBOOST ON's LAN matching server (gvnet-server, the matching server
 # from GUNDAM VERSUS' port) by hand, like GODZILLA's gzserver. The PCs' launchers join it at
-# <this PC>:31323 ("Over the network: join").
+# <this PC>:31333 ("Over the network: join").
 #   mbserver toggle | start | stop | restart | status | log [lines] | follow
 # Expects the binary at ~/mbnet-server/gvnet-server (tools/gvnet-server/build.sh builds it); its
 # output goes to ~/mbnet-server/mbnet.log. MBNET_PORT changes the port (TCP; UDP is the next one).
 # Only the server started from ~/mbnet-server is seen or stopped: a GUNDAM VERSUS port's own
-# (~/gvnet-server) is left alone; it uses the same port by default, so one of them needs MBNET_PORT
-# to run both.
+# (~/gvnet-server, port 31323) and GODZILLA's shadNet (31313-31315) are left alone: this one uses
+# 31333 (UDP 31334).
 dir=$HOME/mbnet-server
-port=${MBNET_PORT:-31323}
+port=${MBNET_PORT:-31333}
 log=$dir/mbnet.log
 pids() {
     exe=$(readlink -f "$dir/gvnet-server" 2>/dev/null)
