@@ -59,6 +59,10 @@ struct UpscalerHooks {
     /// end at the flip (draws into the display buffer are most of its HUD), the upscaler's output
     /// is what that pass reads, and nothing of the display is redirected.
     bool scene_scaled_into_display = false;
+    /// Only a pass whose depth is (about) the render size is a scene pass (MAXIBOOST ON: its
+    /// bloom chain draws into small targets with depths of their own, and the last scene pass
+    /// names the scene depth).
+    bool scene_depth_at_render_size = false;
 };
 
 struct Profile {

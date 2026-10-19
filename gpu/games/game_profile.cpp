@@ -14,10 +14,11 @@ namespace Game {
 extern const Profile BloodborneProfile;
 extern const Profile GodzillaProfile;
 extern const Profile GundamProfile;
+extern const Profile MaxiboostProfile;
 
 namespace {
-constexpr std::array<const Profile*, 3> Profiles = {&BloodborneProfile, &GodzillaProfile,
-                                                    &GundamProfile};
+constexpr std::array<const Profile*, 4> Profiles = {&BloodborneProfile, &GodzillaProfile,
+                                                    &GundamProfile, &MaxiboostProfile};
 std::atomic<const Profile*> active{nullptr};
 } // namespace
 

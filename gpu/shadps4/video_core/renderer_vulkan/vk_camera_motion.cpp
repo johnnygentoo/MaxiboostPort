@@ -391,9 +391,14 @@ void CameraMotion::OnGBufferPass(VideoCore::ImageId depth, float x_sign, float y
     gbuffer_z_scale = z_scale;
     gbuffer_z_offset = z_offset;
     if (depth != depth_id) {
-        // Another depth target: another G-buffer pass, with its own camera.
+        // Another depth target: another G-buffer pass, with its own camera. mbport: a game whose
+        // later scene passes (effects over a copy of the scene depth) bind no camera keeps the
+        // frame's camera from the earlier one (Game::UpscalerHooks::scene_depth_at_render_size).
+        const Game::UpscalerHooks* hooks = Game::Upscaler();
         depth_id = depth;
-        pass_has_camera = false;
+        if (!(hooks && hooks->scene_depth_at_render_size)) {
+            pass_has_camera = false;
+        }
         ++frame_gbuffer_passes;
     }
     gbuffer_x_sign = x_sign;

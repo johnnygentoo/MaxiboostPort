@@ -207,7 +207,7 @@ target_link_libraries(camera-motion-test PRIVATE bbgpu)
 add_dependencies(camera-motion-test host_shaders)
 
 # Game profile cameras parsed from captured constant blocks (no GPU library needed).
-add_executable(game-camera-test EXCLUDE_FROM_ALL ../tests/test_game_cameras.cpp games/gundam.cpp)
+add_executable(game-camera-test EXCLUDE_FROM_ALL ../tests/test_game_cameras.cpp games/gundam.cpp games/maxiboost.cpp)
 target_include_directories(game-camera-test PRIVATE games)
 target_compile_options(game-camera-test PRIVATE -UNDEBUG)
 

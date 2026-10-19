@@ -10,6 +10,7 @@
 #include "bbport_timeline.h"
 #include "bbport_sections.h"
 #include "game_profile.h"
+#include "bbport_settings.h"
 #include "bbport_ce_stats.h"
 #include "bbport_toggles.h"
 #include "bbport_write_log.h"
@@ -697,6 +698,18 @@ void Rasterizer::PrepareRenderState(const GraphicsPipeline* pipeline) {
     gbuffer_draw = camera_motion->Enabled() &&
                    u32(std::popcount(key.mrt_mask)) >= CameraMotion::ScenePassTargets() &&
                    db_desc.first;
+    if (gbuffer_draw) {
+        const Game::UpscalerHooks* hooks = Game::Upscaler();
+        if (hooks && hooks->scene_depth_at_render_size) {
+            const auto& depth = texture_cache.GetImage(db_desc.first);
+            const u32 render_width = u32(std::max(BbSettings::Get().active_render_width.load(), 256));
+            // About the render size, and not the display pass (its depth is the output's).
+            gbuffer_draw = depth.info.size.width * 10 >= render_width * 9 &&
+                           depth.info.size.width * 10 <= render_width * 11 &&
+                           !(regs.color_buffers[0] &&
+                             FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address()));
+        }
+    }
     if (gbuffer_draw) {
         const auto& vp = regs.viewports[0];
         camera_motion->OnGBufferPass(db_desc.first, vp.xscale < 0.0f ? -1.0f : 1.0f,

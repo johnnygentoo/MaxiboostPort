@@ -1520,6 +1520,16 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
         // gvport: the first draw into the display buffer is the game's pass scaling the finished
         // scene (ldr_target, the scene size) into it; the HUD follows there at the display size.
         // The upscaled scene (ui_image, the output size) is what that pass reads instead.
+        static const bool debug_display = std::getenv("BB_UPSCALER_DEBUG") != nullptr;
+        if (debug_display && color && !ui_phase && !done_this_frame) {
+            static int told = 0;
+            if (told++ < 8) {
+                std::printf("Upscaler: draw into %#llx: display %d ldr %d scaled %d ready %d active %d failed %d\n",
+                            (unsigned long long)texture_cache.GetImage(color).info.guest_address,
+                            int(FrameCapture::IsDisplayBuffer(texture_cache.GetImage(color).info.guest_address)),
+                            int(bool(ldr_target)), int(Scaled()), int(camera_motion.Ready()), int(Active()), int(failed));
+            }
+        }
         if (!ui_phase && !done_this_frame && color && ldr_target && Scaled() &&
             FrameCapture::IsDisplayBuffer(texture_cache.GetImage(color).info.guest_address)) {
             if (camera_motion.Ready() && Active() && !failed) {
@@ -1828,10 +1838,17 @@ void TemporalUpscaler::RunScaled(bool hud_depth) {
     const u32 iw = color.info.size.width, ih = color.info.size.height;
     const auto [w, h] = SceneSize(iw, ih);
     const u32 ow = target_width, oh = target_height;
+    static const bool debug = std::getenv("BB_UPSCALER_DEBUG") != nullptr;
     if (depth.info.size.width != iw || depth.info.size.height != ih || w > ow || h > oh) {
+        static int told = 0;
+        if (debug && told++ < 8) {
+            std::printf("Upscaler: skipped: scene %ux%u (render %ux%u), depth %ux%u, output %ux%u\n",
+                        iw, ih, w, h, depth.info.size.width, depth.info.size.height, ow, oh);
+        }
         return;
     }
     if (!EnsureResources(w, h, ow, oh, false)) {
+        std::printf("Upscaler: resources for %ux%u -> %ux%u failed\n", w, h, ow, oh);
         failed = true;
         return;
     }

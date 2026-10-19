@@ -2,7 +2,7 @@
 // Game profile cameras (gpu/games): a scene camera block captured from the game parses into the
 // motion shaders' convention. GUNDAM VERSUS: the 272-byte block of a Free Battle frame (frame
 // capture, 1920x1080), camera at (467.473, 20.4028, -293.757).
-//   cmake target game-camera-test, or: g++ -std=c++20 -Igpu/games tests/test_game_cameras.cpp gpu/games/gundam.cpp
+//   cmake target game-camera-test, or: g++ -std=c++20 -Igpu/games tests/test_game_cameras.cpp gpu/games/gundam.cpp gpu/games/maxiboost.cpp
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -13,6 +13,7 @@
 
 namespace Game {
 extern const Profile GundamProfile;
+extern const Profile MaxiboostProfile;
 }
 
 namespace {
@@ -69,10 +70,37 @@ void TestGundam() {
     data[64] = 0.0f;
     assert(!hooks->camera(data, camera));
 }
+// MAXIBOOST ON: the view-projection of a Free Battle frame's terrain (frame capture, 1920x1080)
+// and its view matrix from the 544-byte scene block ([68]..[83], row vectors).
+void TestMaxiboost() {
+    const float vp[16] = {-0.670502f, 0.598049f, 0.846835f, 0.846751f, 0, 2.41291f, -0.271213f,
+                          -0.271185f, 1.24049f, 0.323254f, 0.457727f, 0.457681f, 156.585f,
+                          134.742f, 375.277f, 379.239f};
+    const float view[16] = {-0.475499f, 0.238566f, -0.846751f, 0, 0, 0.962527f, 0.271185f, 0,
+                            0.879716f, 0.128948f, -0.457681f, 0, 111.045f, 53.7498f, -379.239f, 1};
+    const Game::UpscalerHooks* hooks = Game::MaxiboostProfile.upscaler;
+    assert(hooks && hooks->camera && hooks->camera_constants_size == sizeof(vp));
+    Game::SceneCamera camera;
+    assert(hooks->camera(vp, camera));
+    assert(Near(camera.proj_y / camera.proj_x, 16.0f / 9.0f, 1e-3f));
+    // The derived view is the game's (column-vector rows, z negated).
+    for (int r = 0; r < 3; ++r) {
+        const float sign = r == 2 ? -1.0f : 1.0f;
+        for (int c = 0; c < 4; ++c) {
+            assert(Near(camera.view[r * 4 + c], sign * view[c * 4 + r], 2e-3f));
+        }
+    }
+    assert(camera.near_plane > 0.0f && camera.far_plane > camera.near_plane);
+    // A shadow pass's orthographic matrix is no scene camera.
+    float ortho[16] = {0.01f, 0, 0, 0, 0, 0.01f, 0, 0, 0, 0, 0.001f, 0, 1, 2, 0.5f, 1};
+    assert(!hooks->camera(ortho, camera));
+}
 } // namespace
 
 int main() {
     TestGundam();
+    TestMaxiboost();
+    std::printf("PASS: MAXIBOOST ON scene camera\n");
     std::printf("PASS: GUNDAM VERSUS scene camera\n");
     return 0;
 }

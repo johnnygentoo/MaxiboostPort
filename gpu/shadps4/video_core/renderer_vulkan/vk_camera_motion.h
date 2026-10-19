@@ -5,7 +5,10 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 #include "common/types.h"
@@ -85,6 +88,19 @@ public:
     void OnConstantBuffer(const float* data, u64 size) {
         const Game::UpscalerHooks* hooks = Game::Upscaler();
         if (hooks && hooks->camera) {
+            // bbport BB_CAMERA_SIZES=1: the sizes of the constant buffers scene passes bind (once
+            // each), to find a game's camera block.
+            static const bool log_sizes = std::getenv("BB_CAMERA_SIZES") != nullptr;
+            if (log_sizes) {
+                static std::array<u64, 64> seen{};
+                static u32 count = 0;
+                if (count < seen.size() && std::find(seen.begin(), seen.begin() + count, size) ==
+                                               seen.begin() + count) {
+                    seen[count++] = size;
+                    std::printf("Camera motion: scene pass binds a %llu-byte constant buffer\n",
+                                static_cast<unsigned long long>(size));
+                }
+            }
             Game::SceneCamera camera;
             if (size == hooks->camera_constants_size && hooks->camera(data, camera)) {
                 OnSceneCamera(camera);

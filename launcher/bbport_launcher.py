@@ -109,9 +109,9 @@ UI_LANGUAGES = [("Как в системе", ""), ("Русский", "ru"), ("En
                 ("Español", "es"), ("Italiano", "it"), ("Français", "fr"), ("Deutsch", "de"),
                 ("简体中文", "zh_CN")]
 # The temporal upscalers need the game's scene color, depth and motion, which the GPU library learns
-# from the game profile (gpu/games/gundam.cpp maps GUNDAM VERSUS' camera, G-buffer pass and the pass
-# scaling the scene into the display buffer). MAXIBOOST ON's frame is not mapped yet: off until it is.
-UPSCALERS_AVAILABLE = False
+# from the game profile (gpu/games/maxiboost.cpp maps MAXIBOOST ON's camera, scene passes and the
+# pass scaling the scene into the display buffer).
+UPSCALERS_AVAILABLE = True
 UPSCALERS = [("FSR 4", "fsr4"), ("FSR 4.1.1", "fsr411"), ("FSR 3", "fsr3"),
              ("DLSS (NVIDIA RTX)", "dlss"),
              ("TAA (нативное сглаживание)", "taa"), ("Выключен", "off")]
@@ -196,7 +196,6 @@ DEFAULTS = {
 
 # bbport.ini keys the launcher edits; the rest of the file is kept.
 INI_DEFAULTS = {
-    # Off: MAXIBOOST ON's frame is not mapped for the upscalers yet (UPSCALERS_AVAILABLE).
     "upscaler": "off",
     "preset": "4",
     "sharpen": "1",
