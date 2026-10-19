@@ -134,7 +134,8 @@ all.
   is shown), **join** with that address on the others.
 - **An always-on PC** (a home server, no GPU or game needed): build the server alone with
   `bash tools/gvnet-server/build.sh` (it needs g++ and protobuf), copy
-  `tools/gvnet-server/out/gvnet-server` to `~/mbnet-server/` there and start it by hand with
+  `tools/gvnet-server/out/gvnet-server` there as `~/mbnet-server/mbnet-server` (its own name, so a
+  GUNDAM VERSUS port's `gvserver` does not take it for its own and stop it) and start it by hand with
   `tools/gvnet-server/mbserver toggle | start | stop | status | log`, or run it as a user service
   (`tools/gvnet-server/mbnet-server.service`, how to install it is in the file). It listens on
   port 31333 (TCP, and UDP 31334), so a GODZILLA shadNet server (31313-31315) and a GUNDAM VERSUS

@@ -1,6 +1,6 @@
 # MAXIBOOST ON's matching server for the PCs of a LAN, as a systemd user service:
 #   cp tools/gvnet-server/mbnet-server.service ~/.config/systemd/user/
-#   (ExecStart: where the gvnet-server binary is; the port: other PCs join at <this PC>:31333)
+#   (ExecStart: where the server binary is, tools/gvnet-server/out/gvnet-server copied as mbnet-server; the port: other PCs join at <this PC>:31333)
 #   systemctl --user daemon-reload && systemctl --user enable --now mbnet-server
 #   loginctl enable-linger      # runs without anyone logged in
 # Port 31333 (TCP, and UDP 31334) leaves 31313-31315 to GODZILLA's shadNet server and 31323-31324
@@ -10,7 +10,7 @@ Description=MAXIBOOST ON (mbport) matching server for LAN play
 After=network-online.target
 
 [Service]
-ExecStart=%h/mbnet-server/gvnet-server --bind 0.0.0.0 --port 31333
+ExecStart=%h/mbnet-server/mbnet-server --bind 0.0.0.0 --port 31333
 Restart=on-failure
 RestartSec=3
 
