@@ -61,12 +61,12 @@ if [[ -z ${PYTHON:-} ]]; then
 fi
 if [[ -z ${PYTHON:-} ]]; then echo 'Install Python 3 or set PYTHON.' >&2; exit 1; fi
 # BB_GAME_DIR: the game's folder (eboot.bin, sce_module, ...); default the merged dump (base game
-# with the 1.13 update) in this directory.
-game=${BB_GAME_DIR:-CUSA08790-full}
+# with the 1.15 update) in this directory.
+game=${BB_GAME_DIR:-CUSA18758-full}
 if [[ ! -f $game/eboot.bin ]]; then echo "No eboot.bin in $game (set BB_GAME_DIR)." >&2; exit 1; fi
 original_game=$game
 # Bloodborne's button prompts and gestures menu (scripts/menu_prompts.py) are edits of its
-# dvdroot_ps4/menu files; GUNDAM VERSUS has none of them, so nothing is laid under the mods.
+# dvdroot_ps4/menu files; MAXIBOOST ON has none of them, so nothing is laid under the mods.
 ui_mods=
 game=$("$PYTHON" scripts/mods.py "$game" --out "$out" \
     --mods-dir "${BB_MODS_DIR:-$data/mods}" --config "${BB_MODS_CONFIG:-$data/mods.json}" \
@@ -77,10 +77,8 @@ if [[ $game != "$(realpath "$original_game")" ]]; then
     trap '"$PYTHON" -c '\''import shutil,sys; shutil.rmtree(sys.argv[1])'\'' "$mod_game"' EXIT
 fi
 "$PYTHON" scripts/prepare.py "$game" --out "$out"
-# Couch versus (BB_COOP=1, launcher: "Two players"): two games, one per player and controller,
-# play each other through Player Match on a server on this PC (GUNDAM VERSUS has no local
-# multiplayer: its versus modes are online only). See the end of this script.
-if [[ ${BB_COOP:-0} == 1 ]]; then export BB_ONLINE=1; fi
+# Two players on one PC: MAXIBOOST ON has its own local versus (Free Battle: a player slot set
+# to 2P, the screen split in two); each further gamepad is another PS4 user (runtime_pad.c).
 # Play over the local network (BB_LAN, launcher: "Over the network"): host, this PC's matching server
 # takes the other PCs' games too (TCP 31313, UDP 31314; each game's own UDP 3658); join, the games
 # of this PC play through the host PC's server at BB_LAN_SERVER (its address, port 31313 unless
@@ -102,13 +100,13 @@ join)
     export SHADPS4_P2P_PORT=${SHADPS4_P2P_PORT:-3658}
     ;;
 esac
-# Online play (BB_ONLINE=1) also links the game's own libSceNpToolkit2.prx: GUNDAM VERSUS leaves
+# Online play (BB_ONLINE=1) also links the game's own libSceNpToolkit2.prx: MAXIBOOST ON leaves
 # PSN to it (sign-in state, callbacks, sessions); offline the runtime answers for it.
 modules=(libc.prx libSceFios2.prx)
 if [[ ${BB_ONLINE:-0} == 1 && -f $game/sce_module/libSceNpToolkit2.prx ]]; then modules+=(libSceNpToolkit2.prx); fi
 "$PYTHON" scripts/link_modules.py "$game" --out "$out" --modules "${modules[@]}"
 # BB_DLC_DIR (the launcher's DLC folder): this title's add-ons, dumped (one folder each, named by its
-# entitlement label, e.g. SPEXPANSIONDLC03) or as their .pkg files (GUNDAM VERSUS' are unlock keys:
+# entitlement label, e.g. GUNDAMVSMBDLC001) or as their .pkg files (MAXIBOOST ON's are unlock keys:
 # the mobile suits are in the game already). The runtime reports <user>/addcont/<title id>/<label>
 # as installed (shadPS4's layout); scripts/dlc.py makes those entries, a real folder of your own in
 # their place is left alone.
@@ -125,7 +123,7 @@ if [[ ${BB_AUTO_RENDER_RES:-} == 1 ]]; then
 fi
 # BB_RENDER_RES=WxH explicitly sets the game's render resolution (a patch at start).
 # Frame rate: BB_FPS=60 (default: the game's own rate, unpatched) or uncap (a frame-rate patch
-# from patches/Gundam.xml, once written; scripts/patches.py FPS_PRESETS). BB_PATCHES adds patch
+# from patches/Maxiboost.xml, once written; scripts/patches.py FPS_PRESETS). BB_PATCHES adds patch
 # names ("a;b").
 fps=${BB_FPS:-60}
 # bbport.ini output_res other than 1080p (720p for the Steam Deck, 1440p, 2160p), or a temporal
@@ -133,7 +131,7 @@ fps=${BB_FPS:-60}
 # its display buffer (the HUD) at the output size, both patched at start (scripts/patches.py
 # RESOLUTION_SITES, DISPLAY_SITES). The upscaler takes the place of the game's pass scaling the
 # scene into the display buffer. Preset and output changes need a restart (the in-game menu offers
-# it). bbport.ini live_resolution (Bloodborne's host-side scaling) does not apply to GUNDAM VERSUS;
+# it). bbport.ini live_resolution (Bloodborne's host-side scaling) does not apply to MAXIBOOST ON;
 # BB_LIVE_RES=1 still selects it for comparisons.
 # The GPU tools (bb-gpu-capabilities: the game's GPU, below).
 if [[ -n ${BB_PROBE:-} ]]; then caps=$(dirname -- "$BB_PROBE")/bb-gpu-capabilities
@@ -272,7 +270,7 @@ else
     bash build.sh
     probe=${BB_PROBE:-out/bb-probe}  # BB_PROBE: a wrapper (gdb) around it
 fi
-# Online play (BB_ONLINE=1; the online module gpu/bbnet): GUNDAM VERSUS' PSN matching goes to a
+# Online play (BB_ONLINE=1; the online module gpu/bbnet): MAXIBOOST ON's PSN matching goes to a
 # shadNet server, gvnet-server (gpu/bbnet/server): BB_SHADNET_SERVER host:port, default one on
 # this PC, started for this launch when none listens there. BB_SHADNET_NPID: the player's name.
 if [[ ${BB_ONLINE:-0} == 1 ]]; then
@@ -304,60 +302,13 @@ if trophies=$("$PYTHON" scripts/trophies.py prepare --game "$original_game" \
     export BB_TROPHY_DIR=$trophies
 fi
 # Discord Rich Presence, off by default: BB_DISCORD=1 with BB_DISCORD_CLIENT_ID, the id of a
-# Discord application of your own (its name is what Discord shows as played), shows "GUNDAM VERSUS" and
+# Discord application of your own (its name is what Discord shows as played), shows "MAXIBOOST ON" and
 # the time played (scripts/discord_presence.py). $$ becomes the game below (exec), and the helper
 # ends with it.
 if [[ ${BB_DISCORD:-0} == 1 && -n ${BB_DISCORD_CLIENT_ID:-} ]]; then
     "$PYTHON" scripts/discord_presence.py --pid $$ </dev/null &
 fi
 probe_args=("$out/boot-linked.bin" --content-profile "$out/content.bin" --patches "$out/patches.bin" --app0 "$game" --user "${BB_USER_DIR:-$data/user}" --timeout "${BB_TIMEOUT:-0}" "$@")
-# Couch versus: player 1 plays from the usual saves, player 2 from $data/user-p2 (BB_COOP_USER2),
-# a copy of player 1's saves the first time. Each game takes its own gamepad (BB_GAMEPAD_SLOT: the
-# launcher's choice first, then the others; a missing one leaves the keyboard of a focused window)
-# and keeps reading it without the focus. Layout (BB_COOP_LAYOUT): split, the two windows side by
-# side on one monitor (BB_DISPLAY); displays, each game full screen on its own monitor
-# (BB_DISPLAY and BB_COOP_DISPLAY2, default 1 and 2). Player 2's sound is off unless
-# BB_COOP_AUDIO2=1 (the same music twice otherwise). Names: BB_COOP_NAME1/2. Closing either game
-# ends both.
-if [[ ${BB_COOP:-0} == 1 ]]; then
-    user1=${BB_USER_DIR:-$data/user} user2=${BB_COOP_USER2:-$data/user-p2}
-    if [[ ! -d $user2/savedata && -d $user1/savedata ]]; then
-        mkdir -p "$user2" && cp -a "$user1/savedata" "$user2/"
-        echo "Couch versus: player 2's saves start as a copy of player 1's ($user2)"
-    fi
-    mkdir -p "$user2"
-    layout=${BB_COOP_LAYOUT:-split}
-    common=(BB_PLAYERS=1 BB_PAD_BACKGROUND=1)
-    one=("${common[@]}" BB_GAMEPAD_SLOT=1 SHADPS4_P2P_PORT=${BB_COOP_PORT1:-3658} BB_SHADNET_NPID=${BB_COOP_NAME1:-Player1})
-    two=("${common[@]}" BB_GAMEPAD_SLOT=2 SHADPS4_P2P_PORT=${BB_COOP_PORT2:-3659} BB_SHADNET_NPID=${BB_COOP_NAME2:-Player2}
-         BB_USER_DIR=$user2 BB_GPU_USER_DIR=$user2)
-    if [[ $layout == displays ]]; then
-        one+=(BB_DISPLAY=${BB_DISPLAY:-1} BB_FULLSCREEN=1); two+=(BB_DISPLAY=${BB_COOP_DISPLAY2:-2} BB_FULLSCREEN=1)
-    else
-        one+=(BB_WINDOW_SPLIT=left BB_FULLSCREEN=0); two+=(BB_WINDOW_SPLIT=right BB_FULLSCREEN=0)
-    fi
-    [[ ${BB_COOP_AUDIO2:-0} == 1 ]] || two+=(BB_AUDIO=none)
-    # Player 2's own copies of the files a test or the log names (frame log, pad file, dumps).
-    [[ -n ${BB_FRAME_LOG:-} ]] && two+=(BB_FRAME_LOG=${BB_FRAME_LOG%.frames.csv}.p2.frames.csv)
-    [[ -n ${BB_READBACK_LOG:-} ]] && two+=(BB_READBACK_LOG=${BB_READBACK_LOG%.readbacks.csv}.p2.readbacks.csv)
-    [[ -n ${BB_PAD_FILE:-} ]] && two+=(BB_PAD_FILE=${BB_COOP_PAD_FILE2:-$BB_PAD_FILE.p2})
-    [[ -n ${BB_PRESENT_DUMP_TRIGGER:-} ]] && two+=(BB_PRESENT_DUMP_TRIGGER=$BB_PRESENT_DUMP_TRIGGER.p2)
-    [[ -n ${BB_DUMP_DIR:-} ]] && two+=(BB_DUMP_DIR=$BB_DUMP_DIR/p2)
-    [[ -n ${BB_PEEK_FILE:-} ]] && two+=(BB_PEEK_FILE=$BB_PEEK_FILE.p2)
-    args2=("$out/boot-linked.bin" --content-profile "$out/content.bin" --patches "$out/patches.bin" --app0 "$game" --user "$user2" --timeout "${BB_TIMEOUT:-0}" "$@")
-    echo "Couch versus: ${BB_COOP_NAME1:-Player1} (gamepad 1) and ${BB_COOP_NAME2:-Player2} (gamepad 2), layout $layout"
-    echo "  In both games: PLAY > PLAYER MATCH. One creates a room (Room type: 1 on 1), the other finds it with Search for Room (same Room type)."
-    env "${one[@]}" "$probe" "${probe_args[@]}" &
-    pid1=$!
-    env "${two[@]}" "$probe" "${args2[@]}" > >(while IFS= read -r line; do printf '[P2] %s\n' "$line"; done) 2>&1 &
-    pid2=$!
-    trap 'kill -TERM "$pid1" "$pid2" 2>/dev/null || true' TERM INT
-    status=0
-    wait -n "$pid1" "$pid2" || status=$?
-    kill -TERM "$pid1" "$pid2" 2>/dev/null || true
-    wait "$pid1" "$pid2" 2>/dev/null || true
-    exit "$status"
-fi
 if [[ -n ${mod_game:-} ]]; then
     "$probe" "${probe_args[@]}" &
     mod_pid=$!
