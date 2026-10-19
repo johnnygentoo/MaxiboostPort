@@ -4,7 +4,7 @@ Patch addresses are PS4 virtual addresses (eboot base 0x400000); the loader's
 image places eboot vaddr 0 at image offset 0. Only literal writes are supported
 (bytes, bytes16/32/64, float32/64, utf8, utf16); pattern ("mask") patches are rejected.
 
-The built-in patches are patches/Gundam.xml (GUNDAM VERSUS 1.13). Frame rate and effect switches
+The built-in patches are patches/Maxiboost.xml (MAXIBOOST ON 1.15). Frame rate and effect switches
 name patches in it; a name the file does not have yet is reported and skipped, so the port runs
 the game as it is until the patch is written.
 """
@@ -17,9 +17,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 EBOOT_BASE=0x400000
-APP_VERSION='01.13'
-BUILTIN_XML=Path(__file__).resolve().parent.parent/'patches/Gundam.xml'
-# BB_FPS presets: patch names from patches/Gundam.xml. The game runs at 60 FPS (flip rate 0).
+APP_VERSION='01.15'
+BUILTIN_XML=Path(__file__).resolve().parent.parent/'patches/Maxiboost.xml'
+# BB_FPS presets: patch names from patches/Maxiboost.xml. The game runs at 60 FPS (flip rate 0).
 FPS_PRESETS={'60':[]}
 # The game renders its scene at 1920x1080 on a PS4 Pro (1440x1080 on a base PS4), scales it into a
 # 1920x1080 display buffer in one pass and draws the HUD over it there. Both sizes are set once,
@@ -28,9 +28,9 @@ FPS_PRESETS={'60':[]}
 # constant read only by that object (1920, 1080, 1920, 1080 into [r13+0xa4], DISPLAY_SITES). Every
 # scene target, the effects' half-size ones and the bloom chain follow the scene size.
 OUTPUT_SIZE=(1920,1080)
-RESOLUTION_SITES=[(0x53170b,0x53170f)]
+RESOLUTION_SITES=[]  # MAXIBOOST ON's: not mapped yet (GUNDAM VERSUS': 0x53170b, 0x53170f)
 RESOLUTION_CLAMP=[]
-DISPLAY_SITES=[(0x3ec5670,0x3ec5674),(0x3ec5678,0x3ec567c)]
+DISPLAY_SITES=[]  # not mapped yet (GUNDAM VERSUS': 0x3ec5670 0x3ec5678)
 
 
 def boot_image(out):
@@ -51,11 +51,11 @@ def resolution_writes(size,image):
     writes=[]
     for wa,ha in RESOLUTION_SITES:
         if struct.unpack_from('<I',image,wa)[0]!=1920 or struct.unpack_from('<I',image,ha)[0]!=1080:
-            raise ValueError(f'the executable has no 1920x1080 at {wa:#x}: not GUNDAM VERSUS 1.13')
+            raise ValueError(f'the executable has no 1920x1080 at {wa:#x}: not MAXIBOOST ON 1.15')
         writes+=[(wa,struct.pack('<I',w)),(ha,struct.pack('<I',h))]
     for at,original,patched in RESOLUTION_CLAMP:
         if image[at:at+len(original)]!=original:
-            raise ValueError(f'unexpected display clamp at {at:#x}: not GUNDAM VERSUS 1.13')
+            raise ValueError(f'unexpected display clamp at {at:#x}: not MAXIBOOST ON 1.15')
         writes.append((at,patched))
     return writes
 
@@ -68,7 +68,7 @@ def display_writes(size,image):
     writes=[]
     for wa,ha in DISPLAY_SITES:
         if struct.unpack_from('<I',image,wa)[0]!=1920 or struct.unpack_from('<I',image,ha)[0]!=1080:
-            raise ValueError(f'the executable has no 1920x1080 at {wa:#x}: not GUNDAM VERSUS 1.13')
+            raise ValueError(f'the executable has no 1920x1080 at {wa:#x}: not MAXIBOOST ON 1.15')
         writes+=[(wa,struct.pack('<I',w)),(ha,struct.pack('<I',h))]
     return writes
 
@@ -139,7 +139,7 @@ def available(xml, names, app_version):
     have={meta.get('Name') for meta in ET.parse(xml).getroot().iter('Metadata')
           if meta.get('AppVer')==app_version}
     for name in names:
-        if name not in have: print(f'Patches: {name!r} not available for GUNDAM VERSUS {app_version} yet',file=sys.stderr)
+        if name not in have: print(f'Patches: {name!r} not available for MAXIBOOST ON {app_version} yet',file=sys.stderr)
     return [n for n in names if n in have]
 
 
@@ -185,7 +185,7 @@ def compile_patches(xml, names, app_version, segments):
 
 # Third-party patch files (shadPS4/GoldHEN XML) in the data directory's patches/ folder.
 # A file for any retail release applies when it has the same executable (game_check.py).
-GAME_IDS={'CUSA08790'}
+GAME_IDS={'CUSA18758'}
 
 
 def same_app_version(value, app_version):
@@ -259,7 +259,7 @@ def main():
     p.add_argument('--app-version',default=APP_VERSION)
     p.add_argument('--out',type=Path,default=Path(__file__).resolve().parent.parent/'out')
     p.add_argument('--settings',type=Path,default=Path(__file__).resolve().parent.parent/'bbport.ini')
-    p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('BB_GAME_DIR','CUSA08790-full')))
+    p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('BB_GAME_DIR','CUSA18758-full')))
     p.add_argument('--render-res',default='',help='render resolution WxH (the game renders natively at it)')
     p.add_argument('--output-res',default='',help='output resolution WxH')
     p.add_argument('--print-preset-size',action='store_true',help='print the selected preset size, if reduced')
