@@ -26,17 +26,28 @@ points them at MAXIBOOST ON.
   plays with the second gamepad and the game splits the screen (verified with a virtual second
   pad). See [Two players](#two-players).
 - **Saves** persist across restarts (see [Saves](#saves)).
+- **Other output sizes** (720p, 1440p, 4K): the game renders natively at them, its 3D scene, its
+  menus and its HUD (sizes patched at start, `scripts/patches.py`; above 1080p its GPU memory pools
+  grow). Native 4K holds 60 FPS on an RX 7800 XT.
+- **Upscalers (FSR 3.1, FSR 4, TAA)**: the scene renders at the output size divided by the preset's
+  scale and the upscaler fills the output where the game scales its scene into the display buffer;
+  the HUD stays the game's own, at the output size (`gpu/games/maxiboost.cpp`). Measured in Free
+  Battle on an RX 7800 XT: FSR 3 Quality to 4K 60 FPS (FSR 2.2 ms), FSR 4 Performance to 4K 58-60
+  FPS (its model ~8 ms), TAA at 1080p 60 FPS. Preset and output changes need a restart.
 
 Not verified or not done yet:
 
-- **Sound** has not been checked by ear.
+- **Sound** has not been checked by ear (the game's mix comes out; nothing was listened to).
 - **Trophies**: the list is read from your dump, but none has been seen unlocking.
-- **DLC** (the add-ons' unlock-key `.pkg` files, see [DLC](#dlc)) has not been checked in the game.
-- **Online and LAN play** through a matching server (`BB_ONLINE=1`, launcher: **Over the
-  network**) are not tested with this game; without a server the port answers as a console not
-  signed in to PSN.
-- **Native resolutions other than the game's own and the upscalers** (FSR 3.1, FSR 4, DLSS, TAA)
-  are pending: the game's frame is not mapped yet, so the launcher keeps the upscaler off.
+- **DLC**: the add-on (`.pkg` unlock key, see [DLC](#dlc)) is seen by the game, but its mobile
+  suit is not offered offline: the game unlocks add-ons through a release schedule it reads from
+  its publisher's server only when signed in.
+- **Online and LAN play**: signed in to a matching server of our own the game gets through its
+  sign-in, its configuration (answered by the port, `data/maxiboost_env.json`; the publisher's
+  server is never contacted) and the matching context, then starts over at its title screen; the
+  cause is not found yet. The game's own **LAN Battle** (Options) needs the same.
+- **Upscalers in motion** (ghosting of the player's mech, effects), DLSS and FSR 4.1.1, and the
+  upscalers or other sizes in split screen.
 - The other modes, long sessions and a full play-through.
 
 ## What mbport inherits
@@ -114,8 +125,10 @@ second physical controller and the other modes' 2P are not tested yet.
 
 ### Over the network
 
-Not tested with MAXIBOOST ON yet. The port keeps gvport's network play: each PC needs its own copy
-of the game and of the port, and one matching server serves them all.
+**Not working yet with MAXIBOOST ON**: signed in, the game returns to its title screen after its
+online start (see [Status](#status)). The setup below is gvport's network play, kept for when it
+does: each PC needs its own copy of the game and of the port, and one matching server serves them
+all.
 
 - **One of the players' PCs:** in the launcher, **Over the network: host** on that PC (its address
   is shown), **join** with that address on the others.
