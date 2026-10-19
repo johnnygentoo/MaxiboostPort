@@ -184,6 +184,26 @@ static void fault(int sig, siginfo_t *info, void *context) {
     else
         snprintf(line, sizeof(line), "Fault (signal %d) at RIP %p, address %p\n", sig, (void *)rip, info->si_addr);
     { ssize_t written_=write(2, line, strlen(line)); (void)written_; }
+    /* The thread, its stack pointer and the stack's host mapping: a stack overflow shows as a
+     * fault just below the mapping that holds rsp. */
+    {
+        char thread[32] = "?";
+        pthread_getname_np(pthread_self(), thread, sizeof(thread));
+        uintptr_t rsp = (uintptr_t)uc->uc_mcontext.gregs[REG_RSP];
+        snprintf(line, sizeof(line), "  thread %s, rsp %p, rbp %p; stack mapping: ", thread, (void *)rsp,
+                 (void *)(uintptr_t)uc->uc_mcontext.gregs[REG_RBP]);
+        { ssize_t written_=write(2, line, strlen(line)); (void)written_; }
+        FILE *maps = fopen("/proc/self/maps", "r");
+        int found = 0;
+        while (maps && fgets(line, sizeof(line), maps)) {
+            unsigned long from, to;
+            if (sscanf(line, "%lx-%lx", &from, &to) == 2 && rsp >= from && rsp < to) {
+                ssize_t written_=write(2, line, strlen(line)); (void)written_; found = 1; break;
+            }
+        }
+        if (maps) fclose(maps);
+        if (!found) { ssize_t written_=write(2, "none\n", 5); (void)written_; }
+    }
     if (gpu_enabled) bbgpu_dump_guest_writes(context);
     /* Outside the image and any shared object (generated code, a freed mapping): the mapping
      * from /proc/self/maps, and the thread. */
@@ -663,7 +683,10 @@ int main(int argc, char **argv) {
     enum { MAIN_STACK=8*1024*1024 };
     unsigned char *stack=runtime_low_map(MAIN_STACK,PROT_READ|PROT_WRITE);
     if (!stack) fail("cannot allocate guest main stack");
-    enter_on_stack(image+entry,&params,(void *)guest_exit,stack+MAIN_STACK-64);
+    /* 64 KiB above the entry's stack pointer stay mapped (zeros): a PS4's main thread starts below
+     * the process's start-up data, and MAXIBOOST ON's main thread reads ~0x340 bytes above where
+     * it was entered (guest+0x192b10, once signed in to PSN). */
+    enter_on_stack(image+entry,&params,(void *)guest_exit,stack+MAIN_STACK-0x10000);
 #endif
     fail("entry unexpectedly returned");
 }

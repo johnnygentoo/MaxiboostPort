@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <cctype>
 #include <chrono>
 #include <condition_variable>
@@ -1779,7 +1780,30 @@ int PS4_SYSV_ABI sceHttpSendRequest(int reqId, const void* postData, u64 size) {
 
     ApplyBloodborneSeamlessRoute(plan);
 
-    const bool online = EmulatorSettings.IsConnectedToNetwork();
+    // mbport: online play goes to a server of our own (BB_SHADNET_SERVER). Any other host (the
+    // publisher's: MAXIBOOST ON posts to cosmos.channel.or.jp at start) gets the offline answer, a
+    // name that does not resolve, unless BB_HTTP_INTERNET=1.
+    bool allowed_host = true;
+    {
+        static const bool internet = [] {
+            const char* env = std::getenv("BB_HTTP_INTERNET");
+            return env && *env == '1';
+        }();
+        const std::string server = EmulatorSettings.GetShadNetServer();
+        const std::string server_host = server.substr(0, server.rfind(':'));
+        allowed_host = internet || plan.host == server_host || plan.host == "127.0.0.1" ||
+                       plan.host == "localhost";
+        if (!allowed_host) {
+            static std::atomic<u32> told{0};
+            if (told.fetch_add(1, std::memory_order_relaxed) < 16) {
+                std::printf("Http: %s://%s%s not sent: only our own server (%s) is reached "
+                            "(BB_HTTP_INTERNET=1: any host)\n",
+                            plan.scheme.c_str(), plan.host.c_str(), plan.path.c_str(),
+                            server_host.c_str());
+            }
+        }
+    }
+    const bool online = EmulatorSettings.IsConnectedToNetwork() && allowed_host;
     LOG_INFO(Lib_Http, "reqId={} dispatched to async worker [{} {} {}://{}:{}{}]", reqId,
              online ? "ONLINE" : "OFFLINE", HttpMethodName(plan.method), plan.scheme, plan.host,
              plan.port, plan.path);

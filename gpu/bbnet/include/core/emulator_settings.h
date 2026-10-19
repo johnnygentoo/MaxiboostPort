@@ -83,7 +83,7 @@ public:
     bool IsConnectedToNetwork() { static const auto value = Flag("BB_ONLINE", false); return value; }
     bool IsShadNetEnabled() { return IsConnectedToNetwork() && !shadnet_session_disabled.load(); }
     void SetShadNetSessionDisabled(bool v) { shadnet_session_disabled.store(v); }
-    std::string GetShadNetServer() { return Text("BB_SHADNET_SERVER", "127.0.0.1:31313"); }
+    std::string GetShadNetServer() { return Text("BB_SHADNET_SERVER", "127.0.0.1:31333"); }
     std::string GetShadNetWebApiServer() { return Text("BB_SHADNET_WEBAPI", "http://127.0.0.1:31315"); }
     bool IsUPnPEnabled() { static const auto value = Flag("BB_UPNP", true); return value; }
 

@@ -28,6 +28,7 @@ typedef struct ThreadAttr {
     uint32_t magic;
     int detached, policy, prio, inherit;
     uint64_t stack, guard, affinity;
+    uintptr_t stack_address; /* scePthreadAttrSetstack: the game's own stack (0: ours) */
     struct ThreadAttr *next;
 } ThreadAttr;
 typedef struct GuestThread {
@@ -217,6 +218,19 @@ static void set_host_name(const char *name) {
     memcpy(host,name,strnlen(name,sizeof(host)-1));
     pthread_setname_np(pthread_self(),host);
 }
+/* Calls fn(arg) with rsp at stack_top (16-byte aligned), then returns on the caller's stack: a
+ * thread created with a stack of the game's own (scePthreadAttrSetstack) runs its guest code on
+ * it, as on a PS4 (MAXIBOOST ON reads its callers' frames there, above the entry's own). The
+ * thread's exit (longjmp to host_start) leaves it as any return does. */
+void *runtime_call_on_stack(void *(ABI *fn)(void *),void *arg,uintptr_t stack_top);
+__asm__(".text\n.globl runtime_call_on_stack\n.type runtime_call_on_stack,@function\n"
+        "runtime_call_on_stack:\n"
+        "  push %rbp\n  mov %rsp,%rbp\n"
+        "  mov %rdx,%rsp\n  and $-16,%rsp\n"
+        "  mov %rdi,%rax\n  mov %rsi,%rdi\n"
+        "  call *%rax\n"
+        "  mov %rbp,%rsp\n  pop %rbp\n  ret\n"
+        ".size runtime_call_on_stack,.-runtime_call_on_stack\n");
 /* libc.prx's thread-exit hook (_sceKernelSetThreadDtors): its thread_local destructors. A
  * newer libc (MAXIBOOST ON's) registers it with libkernel, which calls it as a thread ends. */
 static void (ABI *thread_dtors)(void);
@@ -224,7 +238,9 @@ static void *host_start(void *p) {
     GuestThread *t=p;
     attach(t);
     set_host_name(t->name);
-    if (!setjmp(t->exit_jump)) t->result=t->entry(t->argument);
+    if (!setjmp(t->exit_jump))
+        t->result=t->attr.stack_address ? runtime_call_on_stack(t->entry,t->argument,t->attr.stack_address+t->attr.stack)
+                                        : t->entry(t->argument);
     if (thread_dtors) thread_dtors();
     runtime_thread_keys_cleanup();
     pthread_mutex_lock(&lock); t->finished=1; ++exited; pthread_mutex_unlock(&lock);
@@ -255,7 +271,10 @@ static int32_t create(GuestThread **out,ThreadAttr **attr_slot,GuestEntry entry,
     if (e) { fprintf(stderr,"STOP: host pthread_create failed: %d\n",e); exit(21); }
     if (t->detached) pthread_detach(t->host);
     pthread_mutex_lock(&lock); ++created; pthread_mutex_unlock(&lock);
-    printf("Runtime: guest thread '%s' created (stack=%llu, prio=%d)\n",t->name,(unsigned long long)stack,t->attr.prio);
+    if (t->attr.stack_address)
+        printf("Runtime: guest thread '%s' created on the game's stack %#llx (%llu bytes, prio=%d)\n",t->name,
+               (unsigned long long)t->attr.stack_address,(unsigned long long)t->attr.stack,t->attr.prio);
+    else printf("Runtime: guest thread '%s' created (stack=%llu, prio=%d)\n",t->name,(unsigned long long)stack,t->attr.prio);
     return 0;
 }
 static ABI int32_t thread_create(GuestThread **out,ThreadAttr **attr,GuestEntry entry,void *argument,const char *name) {
@@ -320,17 +339,17 @@ static ABI int32_t thread_get_name(GuestThread *t,char *name) {
     memcpy(name,t->name,sizeof(t->name)); name[sizeof(t->name)-1]=0;
     return 0;
 }
-/* A stack of the game's own memory: its size is kept, the host thread gets a stack of ours (the
- * game frees its block only after the thread ends). */
+/* A stack of the game's own memory: the thread's guest code runs on it (host_start); the host
+ * thread keeps a stack of ours for what runs before and after. */
 static ABI int32_t attr_set_user_stack(ThreadAttr **slot,void *address,uint64_t size) {
     ThreadAttr *a=find_attr(slot);
     if (!a || !address || size<16384) return ERR(22);
-    a->stack=size; return 0;
+    a->stack=size; a->stack_address=(uintptr_t)address; return 0;
 }
 static ABI int32_t attr_get_user_stack(ThreadAttr **slot,void **address,uint64_t *size) {
     ThreadAttr *a=find_attr(slot);
     if (!a || !address || !size) return ERR(22);
-    *address=NULL; *size=a->stack; return 0;
+    *address=(void *)a->stack_address; *size=a->stack; return 0;
 }
 /* libc.prx's hooks into libkernel for thread exit: the destructor runner is called as each
  * thread ends; the atexit count and report only serve libkernel's diagnostics. */
