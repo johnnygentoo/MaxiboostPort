@@ -4767,6 +4767,30 @@ void Rasterizer::UpdateViewportScissorState() const {
 
         viewports.push_back(viewport);
 
+        // bbport BB_TRACE_VIEWPORT=<pixel shader hash>: that shader's viewport and scissors (once
+        // per distinct value), to find which of a game's sizes a pass uses.
+        static const u64 trace_viewport_ps = [] {
+            const char* env = std::getenv("BB_TRACE_VIEWPORT");
+            return env ? std::strtoull(env, nullptr, 16) : 0ull;
+        }();
+        if (trace_viewport_ps && i == 0) {
+            const u64 ps = u64(regs.ps_program.address) << 8;
+            static std::set<std::tuple<s32, s32, s32, s32, s32, s32>> seen;
+            const auto& vs = regs.viewport_scissors[0];
+            const auto key = std::make_tuple(s32(viewport.width), s32(viewport.height),
+                                             s32(scsr.GetWidth()), s32(scsr.GetHeight()),
+                                             s32(vs.bottom_right_x), s32(vs.bottom_right_y));
+            (void)ps;
+            if (seen.size() < 64 && seen.insert(key).second) {
+                std::printf("Viewport trace: vp %.0fx%.0f at %.0f,%.0f; scissor %ux%u; vp scissor br "
+                            "%d,%d; window offset %d,%d\n",
+                            viewport.width, viewport.height, viewport.x, viewport.y,
+                            scsr.GetWidth(), scsr.GetHeight(), s32(vs.bottom_right_x),
+                            s32(vs.bottom_right_y), s32(regs.window_offset.window_x_offset),
+                            s32(regs.window_offset.window_y_offset));
+            }
+        }
+
         auto vp_scsr = scsr;
         if (regs.mode_control.vport_scissor_enable) {
             vp_scsr.top_left_x =

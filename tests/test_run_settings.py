@@ -12,9 +12,8 @@ import unittest
 
 import patches
 
-# GUNDAM VERSUS' frame size is not mapped yet (scripts/patches.py RESOLUTION_SITES): run.sh makes no
-# resolution patch, so the startup-patch path these tests drive stays off until it is.
-NEEDS_RESOLUTION_PATCH = unittest.skipUnless(patches.RESOLUTION_SITES, 'the frame size of GUNDAM VERSUS is not mapped yet')
+# The startup resolution patch (scripts/patches.py: MAXIBOOST ON's SCENE_SITES).
+NEEDS_RESOLUTION_PATCH = unittest.skipUnless(patches.RESOLUTION_SITES or patches.SCENE_SITES, 'the frame size is not mapped')
 
 
 class RestartResolutionTests(unittest.TestCase):
@@ -34,12 +33,10 @@ class RestartResolutionTests(unittest.TestCase):
             # where the 1.01 executable has them.
             sys.path.insert(0, str(ROOT / 'scripts'))
             import patches
-            image = bytearray(max([0x670000] + [ha + 4 for _, ha in patches.DISPLAY_SITES]))
-            for wa, ha in patches.RESOLUTION_SITES + patches.DISPLAY_SITES:
-                struct.pack_into('<I', image, wa, 1920)
-                struct.pack_into('<I', image, ha, 1080)
-            for at, original, _ in patches.RESOLUTION_CLAMP:
-                image[at:at + len(original)] = original
+            sites = patches.original_bytes()
+            image = bytearray(max([0x670000] + [at + len(raw) for at, raw in sites]))
+            for at, raw in sites:
+                image[at:at + len(raw)] = raw
             (out / 'boot.bin').write_bytes(struct.pack('<8s6Q', b'BBPROBE2', len(image), 0, 0, 0, 0, 0)
                                            + bytes(image))
             (data / 'eboot.bin').touch()
@@ -106,7 +103,7 @@ class RestartResolutionTests(unittest.TestCase):
 
     @NEEDS_RESOLUTION_PATCH
     def test_live_resolution_setting_does_not_apply(self):
-        # GUNDAM VERSUS renders at the patched sizes whatever bbport.ini's live_resolution says
+        # MAXIBOOST ON renders at the patched sizes whatever bbport.ini's live_resolution says
         # (Bloodborne's host-side scaling); the GPU check is not asked.
         for extra in ('live_resolution=1\n', 'live_resolution=auto\n', 'live_resolution=0\n', ''):
             self.assertEqual(self.run_restarts(ini_extra=extra, caps=1)[0]['BB_RENDER_RES'], '854x480')

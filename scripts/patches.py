@@ -21,16 +21,82 @@ APP_VERSION='01.15'
 BUILTIN_XML=Path(__file__).resolve().parent.parent/'patches/Maxiboost.xml'
 # BB_FPS presets: patch names from patches/Maxiboost.xml. The game runs at 60 FPS (flip rate 0).
 FPS_PRESETS={'60':[]}
-# The game renders its scene at 1920x1080 on a PS4 Pro (1440x1080 on a base PS4), scales it into a
-# 1920x1080 display buffer in one pass and draws the HUD over it there. Both sizes are set once,
-# by the renderer's constructor and setup (image offsets): the scene size for a Pro at 0x531709
-# (movabs 1920 | 1080 << 32 into [r13+0xb4], RESOLUTION_SITES), the display size from a 16-byte
-# constant read only by that object (1920, 1080, 1920, 1080 into [r13+0xa4], DISPLAY_SITES). Every
-# scene target, the effects' half-size ones and the bloom chain follow the scene size.
+# Sizes (MAXIBOOST ON 1.15, image offsets). The game renders its 3D scene and draws its 2D layer
+# (menus, HUD) at 1920x1080 and makes its render targets with the sizes as immediates
+# (SCENE_SITES, the scene size); the display buffers' size is a 16-byte constant (DISPLAY_SITES) and
+# the 2D layer's viewports are floats (VIEWPORT_FLOAT_SITES), both the output size. Found with a
+# frame capture and BB_CPU_WATCH: the 3D pass's descriptor got its size from a movabs into r12
+# (guest+0x687e92) that a search for rax-only encodings had missed. Above 1080p the game's GPU
+# memory pools grow (POOL_SITES, POOL1_SITES), or a 4K start fails loading a texture.
 OUTPUT_SIZE=(1920,1080)
-RESOLUTION_SITES=[]  # MAXIBOOST ON's: not mapped yet (GUNDAM VERSUS': 0x53170b, 0x53170f)
+RESOLUTION_SITES=[]  # GUNDAM VERSUS' kind (one movabs): MAXIBOOST ON has SCENE_SITES
 RESOLUTION_CLAMP=[]
-DISPLAY_SITES=[]  # not mapped yet (GUNDAM VERSUS': 0x3ec5670 0x3ec5678)
+# MAXIBOOST ON 1.15: the display (VideoOut) buffers' size, a 16-byte constant 1920,1080,1920,1080.
+DISPLAY_SITES=[(0xba1d30,0xba1d34),(0xba1d38,0xba1d3c)]
+# The renderer's targets (guest+0x687e92 to +0x689fe9): 1920 (w), 1080 (h) and the half-size 960 (w2),
+# 540 (h2); (image offset, kind).
+SCENE_SITES=[
+    (0x687e94,'w'),(0x687e98,'h'),(0x689feb,'w'),(0x689fef,'h'),
+    (0x6880eb,'w'),
+    (0x6880ef,'h'),
+    (0x688400,'w'),
+    (0x688408,'h'),
+    (0x68840e,'w'),
+    (0x688414,'h'),
+    (0x688447,'w'),
+    (0x68844d,'h'),
+    (0x688453,'w'),
+    (0x688462,'h'),
+    (0x6884d6,'w'),
+    (0x6884da,'h'),
+    (0x68864a,'w'),
+    (0x68864f,'h'),
+    (0x68867b,'w2'),
+    (0x688680,'h2'),
+    (0x688692,'w2'),
+    (0x688697,'h2'),
+    (0x6886b0,'w'),
+    (0x6886b5,'h'),
+    (0x6886e9,'w'),
+    (0x6886ee,'h'),
+    (0x6887f7,'w'),
+    (0x688812,'w'),
+    (0x688817,'h'),
+    (0x68882d,'w'),
+    (0x688832,'h'),
+    (0x688848,'w'),
+    (0x68884d,'h'),
+    (0x688863,'w'),
+    (0x688868,'h'),
+    (0x68890e,'w'),
+    (0x688913,'h'),
+    (0x68892c,'w'),
+    (0x688931,'h'),
+    (0x6889ab,'w'),
+    (0x6889b0,'h'),
+    (0x6889e7,'w'),
+    (0x6889ec,'h')]
+SCENE_VALUES={'w':1920,'h':1080,'w2':960,'h2':540}
+# BB_SCENE_SITES_ONLY=i,j,... (diagnostics): only these entries of SCENE_SITES are patched.
+if os.environ.get('BB_SCENE_SITES_ONLY'):
+    SCENE_SITES=[SCENE_SITES[int(i)] for i in os.environ['BB_SCENE_SITES_ONLY'].split(',')]
+# Float sites of the scene size: none needed so far (kept for other builds' patches).
+SCENE_HALF_FLOAT_SITES=[]
+# MAXIBOOST ON 1.15: its 2 GiB pool of GPU memory (render targets and textures; guest+0x685a66
+# allocates, +0x685aa6 maps it) is too small for its targets above 1080p (a 4K start failed in a
+# texture load). Its allocator keeps the size too (guest+0x68615a, +0x68620c, +0x686246). Above
+# 1080p it gets POOL_LARGE (run.sh gives the game 9 GiB of direct memory then).
+POOL_SITES=[0x685a67,0x685aa7,0x686160,0x686212,0x686247]
+POOL_SIZE=0x80000000
+POOL_LARGE=0xf0000000
+# Its 1 GiB pool (guest+0x685982 allocates, +0x6859bf maps).
+POOL1_SITES=[0x685983,0x6859c0,0x68605b]
+POOL1_SIZE=0x40000000
+POOL1_LARGE=0x80000000
+SCENE_FLOAT_SITES=[]
+# MAXIBOOST ON 1.15: viewports of the 2D layer (menus, HUD) as floats {x, y, 1920, 1080, 0, 1}, and a
+# 1920.0f|1080.0f movabs (guest+0x6dfa19): (width offset, height offset).
+VIEWPORT_FLOAT_SITES=[(0xba1f00,0xba1f04),(0xbc1c88,0xbc1c8c),(0x6dfa1b,0x6dfa1f),(0xbcd400,0xbcd404)]
 
 
 def boot_image(out):
@@ -43,6 +109,28 @@ def boot_image(out):
     return raw[pos:pos+size]
 
 
+def original_bytes():
+    """[(image offset, bytes)]: what every size site holds in the supported executable (tests build
+    a stand-in image from it)."""
+    out=[]
+    for wa,ha in RESOLUTION_SITES+DISPLAY_SITES:
+        out+=[(wa,struct.pack('<I',1920)),(ha,struct.pack('<I',1080))]
+    for at,kind in SCENE_SITES:
+        out.append((at,struct.pack('<I',SCENE_VALUES[kind])))
+    for at,kind in SCENE_FLOAT_SITES:
+        out.append((at,struct.pack('<f',{'w':1920.0,'h':1080.0}[kind])))
+    for wa,ha in SCENE_HALF_FLOAT_SITES:
+        out+=[(wa,struct.pack('<f',960.0)),(ha,struct.pack('<f',540.0))]
+    for wa,ha in VIEWPORT_FLOAT_SITES:
+        out+=[(wa,struct.pack('<f',1920.0)),(ha,struct.pack('<f',1080.0))]
+    out+=[(at,struct.pack('<I',POOL_SIZE)) for at in POOL_SITES]
+    out+=[(at,struct.pack('<I',POOL1_SIZE)) for at in POOL1_SITES]
+    out.append((0x68606a,struct.pack('<I',POOL1_SIZE-0x40)))
+    for at,original,_ in RESOLUTION_CLAMP:
+        out.append((at,original))
+    return out
+
+
 def resolution_writes(size,image):
     """Writes that make the game render at size (w, h); the original bytes are checked first."""
     w,h=size
@@ -53,6 +141,32 @@ def resolution_writes(size,image):
         if struct.unpack_from('<I',image,wa)[0]!=1920 or struct.unpack_from('<I',image,ha)[0]!=1080:
             raise ValueError(f'the executable has no 1920x1080 at {wa:#x}: not MAXIBOOST ON 1.15')
         writes+=[(wa,struct.pack('<I',w)),(ha,struct.pack('<I',h))]
+    for at,kind in SCENE_FLOAT_SITES:
+        if struct.unpack_from('<f',image,at)[0]!={'w':1920.0,'h':1080.0}[kind]:
+            raise ValueError(f'unexpected float at {at:#x}: not MAXIBOOST ON 1.15')
+        writes.append((at,struct.pack('<f',float(w if kind=='w' else h))))
+    for wa,ha in SCENE_HALF_FLOAT_SITES:
+        if struct.unpack_from('<ff',image,wa)!=(960.0,540.0):
+            raise ValueError(f'the executable has no 960.0, 540.0 at {wa:#x}: not MAXIBOOST ON 1.15')
+        writes+=[(wa,struct.pack('<f',w/2)),(ha,struct.pack('<f',h/2))]
+    if w*h>1920*1080:
+        for at in POOL_SITES:
+            if struct.unpack_from('<I',image,at)[0]!=POOL_SIZE:
+                raise ValueError(f'the executable has no {POOL_SIZE:#x} at {at:#x}: not MAXIBOOST ON 1.15')
+            writes.append((at,struct.pack('<I',POOL_LARGE)))
+        # Pool 1's first free block: its size less a 0x40 header (guest+0x686067).
+        if struct.unpack_from('<I',image,0x68606a)[0]!=POOL1_SIZE-0x40:
+            raise ValueError('the executable has no pool block size at 0x68606a: not MAXIBOOST ON 1.15')
+        writes.append((0x68606a,struct.pack('<I',POOL1_LARGE-0x40)))
+        for at in POOL1_SITES:
+            if struct.unpack_from('<I',image,at)[0]!=POOL1_SIZE:
+                raise ValueError(f'the executable has no {POOL1_SIZE:#x} at {at:#x}: not MAXIBOOST ON 1.15')
+            writes.append((at,struct.pack('<I',POOL1_LARGE)))
+    for at,kind in SCENE_SITES:
+        if struct.unpack_from('<I',image,at)[0]!=SCENE_VALUES[kind]:
+            raise ValueError(f'the executable has no {SCENE_VALUES[kind]} at {at:#x}: not MAXIBOOST ON 1.15')
+        value={'w':w,'h':h,'w2':w//2,'h2':h//2}[kind]
+        writes.append((at,struct.pack('<I',value)))
     for at,original,patched in RESOLUTION_CLAMP:
         if image[at:at+len(original)]!=original:
             raise ValueError(f'unexpected display clamp at {at:#x}: not MAXIBOOST ON 1.15')
@@ -66,6 +180,12 @@ def display_writes(size,image):
     if not (256<=w<=7680 and 144<=h<=4320) or w%2 or h%2:
         raise ValueError(f'unsupported display size {w}x{h}')
     writes=[]
+    for wa,ha in VIEWPORT_FLOAT_SITES:
+        if struct.unpack_from('<f',image,wa)[0]!=1920.0:
+            raise ValueError(f'the executable has no 1920.0 at {wa:#x}: not MAXIBOOST ON 1.15')
+        if struct.unpack_from('<f',image,ha)[0]!=1080.0:
+            raise ValueError(f'the executable has no 1080.0 at {ha:#x}: not MAXIBOOST ON 1.15')
+        writes+=[(wa,struct.pack('<f',float(w))),(ha,struct.pack('<f',float(h)))]
     for wa,ha in DISPLAY_SITES:
         if struct.unpack_from('<I',image,wa)[0]!=1920 or struct.unpack_from('<I',image,ha)[0]!=1080:
             raise ValueError(f'the executable has no 1920x1080 at {wa:#x}: not MAXIBOOST ON 1.15')
@@ -84,7 +204,7 @@ def scaled_sizes(settings):
     """(render, output): the size the game renders at (the output, divided by the upscaler
     preset's scale with a temporal upscaler) and the output. None when both are 1920x1080 (the
     game's own size, no patch)."""
-    if not RESOLUTION_SITES:
+    if not RESOLUTION_SITES and not SCENE_SITES:
         return None  # the frame size is not mapped yet: the presenter scales the 1080p frame
     out=output_size(settings)
     scale=1.0

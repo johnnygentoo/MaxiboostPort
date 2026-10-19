@@ -194,12 +194,21 @@ static ABI void *guest_memset(void *dst, int value, size_t size) {
     runtime_memory_prepare_cpu_write((uintptr_t)dst, size);
     memset(dst, value, size); runtime_memory_note_cpu_write((uintptr_t)dst, size); return dst;
 }
+/* BB_CPU_WATCH (probe.c): copies into the watched range name the game's code that asked for them. */
+uintptr_t runtime_cpu_watch_lo, runtime_cpu_watch_hi;
+static void watch_copy(const void *dst, size_t size, const void *caller) {
+    const uintptr_t d=(uintptr_t)dst;
+    if (runtime_cpu_watch_hi && d<runtime_cpu_watch_hi && d+size>runtime_cpu_watch_lo)
+        printf("CPU watch: memcpy of %zu bytes to %#lx from %p\n",size,(unsigned long)d,caller);
+}
 static ABI void *guest_memcpy(void *dst, const void *src, size_t size) {
+    watch_copy(dst,size,__builtin_return_address(0));
     atomic_fetch_add_explicit(&memory_calls,1,memory_order_relaxed);
     runtime_memory_prepare_cpu_write((uintptr_t)dst, size);
     memcpy(dst, src, size); runtime_memory_note_cpu_write((uintptr_t)dst, size); return dst;
 }
 static ABI void *guest_memmove(void *dst, const void *src, size_t size) {
+    watch_copy(dst,size,__builtin_return_address(0));
     atomic_fetch_add_explicit(&memory_calls,1,memory_order_relaxed);
     runtime_memory_prepare_cpu_write((uintptr_t)dst, size);
     memmove(dst, src, size); runtime_memory_note_cpu_write((uintptr_t)dst, size); return dst;

@@ -157,7 +157,51 @@ void bb_fault_wait(const char *what) {
     }
     for (;;) pause();
 }
+/* BB_CPU_WATCH=<image offset>[:<length>] (diagnostics): the game's code that writes those bytes of
+ * its image (data, bss). Their page is write-protected; a write anywhere in it is let through by
+ * single-stepping that one instruction (the page is closed again after it); writes into the range
+ * are logged with their code offset (the first 64). */
+static unsigned char *cpu_watch_page;
+static uintptr_t cpu_watch_lo, cpu_watch_hi;
+static _Atomic int cpu_watch_hits;
+static void cpu_watch_step(int sig, siginfo_t *info, void *context) {
+    (void)sig; (void)info;
+    ucontext_t *uc = context;
+    uc->uc_mcontext.gregs[REG_EFL] &= ~0x100ll;
+    mprotect(cpu_watch_page, 4096, PROT_READ);
+}
+static void cpu_watch_install(void) {
+    const char *env = getenv("BB_CPU_WATCH");
+    if (!env || !*env) return;
+    char *end = NULL;
+    const unsigned long long at = strtoull(env, &end, 16);
+    const unsigned long long length = end && *end == ':' ? strtoull(end + 1, NULL, 0) : 4;
+    cpu_watch_lo = (uintptr_t)(image + at); cpu_watch_hi = cpu_watch_lo + length;
+    cpu_watch_page = image + (at & ~0xfffull);
+    { extern uintptr_t runtime_cpu_watch_lo, runtime_cpu_watch_hi; runtime_cpu_watch_lo = cpu_watch_lo; runtime_cpu_watch_hi = cpu_watch_hi; }
+    struct sigaction step = {0};
+    step.sa_sigaction = cpu_watch_step; step.sa_flags = SA_SIGINFO;
+    sigaction(SIGTRAP, &step, NULL);
+    mprotect(cpu_watch_page, 4096, PROT_READ);
+    printf("CPU watch: writes to image+%#llx (%llu bytes)\n", at, length);
+}
 static void fault(int sig, siginfo_t *info, void *context) {
+    if (cpu_watch_page && sig == SIGSEGV && (unsigned char *)info->si_addr >= cpu_watch_page &&
+        (unsigned char *)info->si_addr < cpu_watch_page + 4096) {
+        ucontext_t *uc = context;
+        const uintptr_t rip = (uintptr_t)uc->uc_mcontext.gregs[REG_RIP];
+        const uintptr_t addr = (uintptr_t)info->si_addr;
+        if (addr + 64 > cpu_watch_lo && addr < cpu_watch_hi && cpu_watch_hits < 64) {
+            char line[160];
+            snprintf(line, sizeof(line), "CPU watch: write to image+%#lx from guest+%#lx\n",
+                     (unsigned long)(addr - (uintptr_t)image), (unsigned long)(rip - (uintptr_t)image));
+            { ssize_t w = write(1, line, strlen(line)); (void)w; }
+            ++cpu_watch_hits;
+        }
+        mprotect(cpu_watch_page, 4096, PROT_READ | PROT_WRITE);
+        uc->uc_mcontext.gregs[REG_EFL] |= 0x100;
+        return;
+    }
     /* GPU page tracking (write-protected guest pages) is resolved first. */
     if (gpu_enabled && sig == SIGSEGV && bbgpu_handle_fault(context, info->si_addr)) return;
     /* A speculative guest memory read (runtime_memory.c) failed: resume its recovery point. */
@@ -203,6 +247,15 @@ static void fault(int sig, siginfo_t *info, void *context) {
         }
         if (maps) fclose(maps);
         if (!found) { ssize_t written_=write(2, "none\n", 5); (void)written_; }
+    }
+    {
+        const greg_t *g = uc->uc_mcontext.gregs;
+        snprintf(line, sizeof(line), "  rax %llx rbx %llx rcx %llx rdx %llx rsi %llx rdi %llx r12 %llx r13 %llx r14 %llx r15 %llx\n",
+                 (unsigned long long)g[REG_RAX], (unsigned long long)g[REG_RBX], (unsigned long long)g[REG_RCX],
+                 (unsigned long long)g[REG_RDX], (unsigned long long)g[REG_RSI], (unsigned long long)g[REG_RDI],
+                 (unsigned long long)g[REG_R12], (unsigned long long)g[REG_R13], (unsigned long long)g[REG_R14],
+                 (unsigned long long)g[REG_R15]);
+        { ssize_t written_=write(2, line, strlen(line)); (void)written_; }
     }
     if (gpu_enabled) bbgpu_dump_guest_writes(context);
     /* Outside the image and any shared object (generated code, a freed mapping): the mapping
@@ -646,6 +699,7 @@ int main(int argc, char **argv) {
     }
     if (!executable_entry) fail("entry is not executable");
     runtime_count_install(image);
+    cpu_watch_install();
     printf("Mapped %" PRIu64 " bytes, %" PRIu64 " segments; applied %" PRIu64 " relocations\n", size, ns, nr);
     if (native_libc) {
         for (uint64_t m=0;m<module_count;++m) {
