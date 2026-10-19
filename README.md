@@ -136,7 +136,8 @@ Each PC needs its own copy of the game and of the port. One matching server serv
   is shown), **join** with that address on the others.
 - **An always-on PC** (a home server, no GPU or game needed): build the server alone with
   `bash tools/gvnet-server/build.sh` (it needs g++ and protobuf), copy
-  `tools/gvnet-server/out/gvnet-server` to `~/gvnet-server/` there and run it as a user service
+  `tools/gvnet-server/out/gvnet-server` to `~/gvnet-server/` there and start it by hand with
+  `tools/gvnet-server/gvserver toggle | start | stop | status | log`, or run it as a user service
   (`tools/gvnet-server/gvnet-server.service`, how to install it is in the file). It listens on
   port 31323 (TCP, and UDP 31324), so a GODZILLA shadNet server can run on the same PC. Every PC
   then plays with **join** and the address `<server>:31323`.

@@ -1,0 +1,39 @@
+#!/bin/sh
+# gvserver: start and stop GUNDAM VERSUS' LAN matching server (gvnet-server) by hand, like GODZILLA's
+# gzserver. The PCs' launchers join it at <this PC>:31323 ("Over the network: join").
+#   gvserver toggle | start | stop | restart | status | log [lines] | follow
+# Expects the binary at ~/gvnet-server/gvnet-server (tools/gvnet-server/build.sh builds it); its
+# output goes to ~/gvnet-server/gvnet.log. GVNET_PORT changes the port (TCP; UDP is the next one).
+dir=$HOME/gvnet-server
+port=${GVNET_PORT:-31323}
+log=$dir/gvnet.log
+running() { pgrep -x gvnet-server >/dev/null; }
+case ${1:-status} in
+toggle)
+    # On if off, off if on.
+    if running; then "$0" stop; else "$0" start; fi ;;
+start)
+    if running; then echo "gvserver: already running (pid $(pgrep -x gvnet-server))"; exit 0; fi
+    if [ ! -x "$dir/gvnet-server" ]; then echo "gvserver: no $dir/gvnet-server (tools/gvnet-server/build.sh)" >&2; exit 1; fi
+    # Detached from this shell: it keeps running after you log out of ssh.
+    cd "$dir" && setsid nohup ./gvnet-server --bind 0.0.0.0 --port "$port" >> "$log" 2>&1 < /dev/null &
+    sleep 1
+    if running; then echo "gvserver: started (pid $(pgrep -x gvnet-server)), players join at $(hostname -i 2>/dev/null | awk '{print $1}'):$port"
+    else echo "gvserver: did not start, see: gvserver log" >&2; exit 1; fi ;;
+stop)
+    if running; then pkill -x gvnet-server; sleep 1; echo "gvserver: stopped"; else echo "gvserver: not running"; fi ;;
+restart)
+    "$0" stop; "$0" start ;;
+status)
+    if running; then
+        echo "gvserver: running (pid $(pgrep -x gvnet-server)) on port $port"
+        echo "  signed in: $(ss -tn state established "( sport = :$port )" | tail -n +2 | wc -l)"
+    else echo "gvserver: stopped"; fi ;;
+log)
+    # The last lines: sign-ins, rooms created, joined, closed.
+    tail -n "${2:-40}" "$log" ;;
+follow)
+    tail -f "$log" ;;
+*)
+    echo "usage: gvserver toggle | start | stop | restart | status | log [lines] | follow" >&2; exit 2 ;;
+esac
