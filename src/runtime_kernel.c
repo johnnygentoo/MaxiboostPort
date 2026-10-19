@@ -294,6 +294,10 @@ static ABI int32_t posix_key_create(uint32_t *k,KeyDestructor d) { int32_t r=key
 static ABI int32_t posix_key_delete(uint32_t k) { int32_t r=key_delete(k); return r ? r&0xffff : 0; }
 static ABI int32_t posix_key_set(uint32_t k,void *v) { int32_t r=key_set(k,v); return r ? r&0xffff : 0; }
 
+/* Nothing to do or report: sync (writes go straight to the host), no address sanitizer, no
+ * sanitizer allocator replacement (NULL), crash dump settings. */
+static ABI int32_t kernel_nothing(void) { return 0; }
+static ABI void *kernel_null(void) { return NULL; }
 static const RuntimeExport exports[]={
     {"sceKernelClockGettime",kernel_clock_gettime}, {"clock_gettime",posix_clock_gettime},
     {"clock_getres",posix_clock_getres},
@@ -302,7 +306,11 @@ static const RuntimeExport exports[]={
     {"sceKernelReadTsc",read_tsc}, {"sceKernelGetTscFrequency",tsc_frequency},
     {"sceKernelSleep",kernel_sleep}, {"sceKernelMlock",kernel_mlock}, {"msync",posix_msync},
     {"sceKernelUsleep",kernel_usleep}, {"usleep",posix_usleep}, {"sleep",posix_sleep},
-    {"nanosleep",posix_nanosleep}, {"sceKernelNanosleep",kernel_nanosleep},
+    {"nanosleep",posix_nanosleep}, {"_nanosleep",posix_nanosleep}, {"sceKernelNanosleep",kernel_nanosleep},
+    {"sceKernelSync",kernel_nothing}, {"sceKernelIsAddressSanitizerEnabled",kernel_nothing},
+    {"sceKernelGetSanitizerMallocReplaceExternal",kernel_null},
+    {"sceKernelGetSanitizerNewReplaceExternal",kernel_null},
+    {"sceCoredumpSetUserDataType",kernel_nothing},
     {"sceKernelGettimezone",kernel_gettimezone}, {"gettimeofday",posix_gettimeofday},
     {"sceKernelGettimeofday",kernel_gettimeofday},
     {"time",posix_time},

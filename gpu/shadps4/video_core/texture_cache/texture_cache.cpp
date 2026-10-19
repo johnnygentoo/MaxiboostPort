@@ -893,6 +893,21 @@ void TextureCache::RefreshImage(Image& image) {
     RENDERER_TRACE;
     TRACE_HINT(fmt::format("{:x}:{:x}", image.info.guest_address, image.info.guest_size));
 
+    // bbport: memory the game has unmapped since (a skipped movie's frames, freed while a queued
+    // draw still samples them) is not read: the image keeps its last contents, as a PS4 would
+    // sample whatever stayed in that memory.
+    if (!tracker.IsMapped(image.info.guest_address, image.info.guest_size)) {
+        static std::atomic<u32> told{0};
+        if (told.fetch_add(1, std::memory_order_relaxed) < 4) {
+            std::fprintf(stderr, "Texture cache: image %#llx (%ux%u) sampled after its memory was "
+                                 "unmapped; its last contents are kept\n",
+                         (unsigned long long)image.info.guest_address, image.info.size.width,
+                         image.info.size.height);
+        }
+        image.flags &= ~(ImageFlagBits::Dirty | ImageFlagBits::MaybeCpuDirty);
+        return;
+    }
+
     if (True(image.flags & ImageFlagBits::MaybeCpuDirty) &&
         False(image.flags & ImageFlagBits::CpuDirty)) {
         const u64 hash = MaybeDirtyHash(image);

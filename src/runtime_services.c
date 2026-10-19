@@ -191,7 +191,7 @@ typedef struct { const char *name; int initialized, status, persistent; uint32_t
 static Dialog dialogs[]={{"CommonDialog",0,0,0,0},{"MsgDialog",0,0,0,0},{"SaveDataDialog",0,0,0,0},
                          {"NpProfileDialog",0,0,0,0},{"NpCommerceDialog",0,0,0,0},{"ImeDialog",0,0,0,0},
                          {"ErrorDialog",0,0,0,0},{"NpFriendListDialog",0,0,0,0},{"SigninDialog",0,0,0,0},
-                         {"InvitationDialog",0,0,0,0},{"WebBrowserDialog",0,0,0,0}};
+                         {"InvitationDialog",0,0,0,0},{"WebBrowserDialog",0,0,0,0},{"UsbStorageDialog",0,0,0,0}};
 static int common_initialized;
 static ABI int32_t common_init(void) { common_initialized=1; return 0; }
 /* BB_DIALOG_TRACE=1: every dialog call and its result (a status poll only when it changes). */
@@ -215,7 +215,7 @@ static int32_t dialog_open_mode(int i,uint32_t mode,int persistent) {
 }
 static int32_t dialog_open(int i) { return dialog_open_mode(i,0,0); }
 static int32_t dialog_status(int i) {
-    static int last[sizeof(dialogs)/sizeof(*dialogs)]={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+    static int last[sizeof(dialogs)/sizeof(*dialogs)]={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
     if (dialogs[i].status==2 && !dialogs[i].persistent) dialogs[i].status=3; /* answered: OK / Yes */
     if (last[i]!=dialogs[i].status) { last[i]=dialogs[i].status; DTRACE("%s status %d\n",dialogs[i].name,dialogs[i].status); }
     return dialogs[i].status;
@@ -236,7 +236,7 @@ static int32_t dialog_term(int i) {
         return dialog_open(i); } \
     static ABI int32_t tag##_status(void) { return dialog_status(i); } \
     static ABI int32_t tag##_term(void) { return dialog_term(i); }
-DIALOG(profile,3) DIALOG(commerce,4) DIALOG(friends,7) DIALOG(signin,8) DIALOG(invitation,9) DIALOG(browser,10)
+DIALOG(profile,3) DIALOG(commerce,4) DIALOG(friends,7) DIALOG(signin,8) DIALOG(invitation,9) DIALOG(browser,10) DIALOG(usb_dialog,11)
 static ABI int32_t msg_init(void) { return dialog_init(1); }
 static ABI int32_t msg_status(void) { return dialog_status(1); }
 static ABI int32_t msg_term(void) { return dialog_term(1); }
@@ -716,7 +716,50 @@ static ABI int32_t user_event_callback(void *cb,void *arg) { (void)cb; (void)arg
 static ABI int32_t word_filter_request(int32_t ctx) { (void)ctx; return new_id(); }
 static ABI int32_t trophy_none(void) { return (int32_t)0x80551600 | 0x16; } /* no icon/list here */
 
+/* ---- What MAXIBOOST ON asks besides. ---- */
+/* USB storage (exporting replays, MAXIBOOST ON): no USB drive is connected; its dialog finishes
+ * cancelled. */
+#define AUTO_MOUNTER_NOENT ((int32_t)0x80920002)
+static ABI int32_t usb_device_list(uint32_t *ids,uint32_t *count) { (void)ids; if (!count) return (int32_t)0x80920001; *count=0; return 0; }
+static ABI int32_t usb_map(void) { return AUTO_MOUNTER_NOENT; }
+/* Tournaments (PS4 tournaments, MAXIBOOST ON's event lists): the system's own screens do not open. */
+static ABI int32_t launch_not_supported(void) { return (int32_t)0x80A10003; } /* SYSTEM_SERVICE: not supported */
+/* Http without a network: URIs parse (the game builds them), connections fail at send. */
+typedef struct { const char *scheme, *username, *password, *hostname, *path, *query, *fragment; uint16_t port; uint8_t reserved[10]; } HttpUriElement;
+static ABI int32_t http_uri_parse(HttpUriElement *out,const char *uri,void *pool,uint64_t *require,uint64_t prepare) {
+    (void)out; (void)uri; (void)pool; (void)prepare;
+    if (require) *require=0;
+    return (int32_t)0x80431061; /* HTTP: invalid URL; nothing is fetched offline */
+}
+/* Toolkit objects: copy assignment keeps the game's object (its fields are the game's own). */
+static ABI void *tk_assign(void *self,const void *other) { (void)other; return self; }
+static ABI int32_t tk_server_error(const void *response) { (void)response; return 0; }
+/* sce::Json values the game reads back: null and 0 (nothing parses offline). */
+static ABI void *json_string_from(void *self,const char *text) { (void)text; memset(self,0,8); return self; }
+static ABI void *json_get_value(const void *self,const void *key) { (void)self; (void)key; return json_null; }
+static ABI int64_t json_get_integer(const void *self) { (void)self; return 0; }
+
 static const RuntimeExport exports[]={
+    {"sceUsbStorageInit",ok_void}, {"sceUsbStorageTerm",ok_void}, {"sceUsbStorageGetDeviceList",usb_device_list},
+    {"sceUsbStorageRequestMap",usb_map}, {"sceUsbStorageRequestUnmap",ok_void},
+    {"sceUsbStorageDialogInitialize",usb_dialog_init}, {"sceUsbStorageDialogOpen",usb_dialog_open},
+    {"sceUsbStorageDialogUpdateStatus",usb_dialog_status}, {"sceUsbStorageDialogGetResult",cancelled_result},
+    {"sceUsbStorageDialogTerminate",usb_dialog_term},
+    {"sceSystemServiceLaunchTournamentList",launch_not_supported},
+    {"sceSystemServiceLaunchEventDetails",launch_not_supported},
+    {"sceHttpUriParse",http_uri_parse}, {"sceHttpCreateConnection",http_object},
+    {"sceNpAuthCreateRequest",np_request}, {"sceNpAuthGetAuthorizationCodeA",np_signed_out},
+    {"sceNpWebApiCreateContextA",np_signed_out}, {"sceNpWebApiSendRequest2",np_signed_out},
+    {"sceNpWebApiSetMaxConnection",ok_void},
+    {"sceNpInGameMessageGetMemoryPoolStatistics",not_supported},
+    {"_ZN3sce4Json6StringC1EPKc",json_string_from}, /* sce::Json::String::String(char const*) */
+    {"_ZNK3sce4Json5Value8getValueERKNS0_6StringE",json_get_value}, /* sce::Json::Value::getValue(sce::Json::String const&) const */
+    {"_ZNK3sce4Json5Value10getIntegerEv",json_get_integer}, /* sce::Json::Value::getInteger() const */
+    {"_ZN3sce7Toolkit2NP2V24Core4termERKNS3_7Request10TermParamsE",tk_ok},
+    {"_ZN3sce7Toolkit2NP2V24Core7Request10TermParamsC1Ev",tk_this},
+    {"_ZN3sce7Toolkit2NP2V24Core7Request10TermParamsD1Ev",tk_destroy},
+    {"_ZN3sce7Toolkit2NP2V24Core11RequestBaseC2ERKS4_",tk_assign},
+    {"_ZN3sce7Toolkit2NP2V24Core12ResponseBase14getServerErrorEv",tk_server_error},
     {"sceNpCommerceShowPsStoreIcon",ok_void}, {"sceNpCommerceHidePsStoreIcon",ok_void},
     {"sceGameCustomDataDialogInitialize",ok_void}, {"sceGameCustomDataDialogOpenA",ok_void},
     {"sceGameCustomDataDialogUpdateStatus",custom_data_status}, {"sceGameCustomDataDialogGetResultA",custom_data_result},
@@ -1027,6 +1070,23 @@ static const RuntimeExport exports[]={
     {"sceNpScoreGetFriendsRanking",np_signed_out}, {"sceNpScoreGetRankingByNpId",np_signed_out},
     {"sceUserServiceGetUserColor",user_color},
 };
+/* The rest of the toolkit offline, by the shape of the symbol (MAXIBOOST ON's tournaments and
+ * commerce: dozens of request and response classes): constructors return the object,
+ * destructors and assignments keep it, a response's data is empty, a request function (named
+ * by NID only) fails signed out. Each of the game's calls of the unnamed ones was checked: they
+ * take (request, response) and test the sign of the result. */
+static uintptr_t toolkit_generic(const char *symbol) {
+    if (!symbol) return 0;
+    if (!strncmp(symbol,"sceNpToolkit2_",14)) return (uintptr_t)tk_request;
+    if (strncmp(symbol,"_ZN3sce7Toolkit2NP2V2",21)) return 0;
+    const size_t n=strlen(symbol);
+    const char *end=symbol+n;
+    if (n>4 && (!strcmp(end-4,"C1Ev") || !strcmp(end-4,"C2Ev"))) return (uintptr_t)tk_this;
+    if (n>4 && (!strcmp(end-4,"D1Ev") || !strcmp(end-4,"D2Ev"))) return (uintptr_t)tk_destroy;
+    if (n>8 && !strcmp(end-8,"aSERKS4_")) return (uintptr_t)tk_assign;
+    if (n>7 && !strcmp(end-7,"E3getEv")) return (uintptr_t)tk_response_get;
+    return 0;
+}
 uintptr_t runtime_services_resolve(const char *name) {
     /* Online play links the game's own libSceNpToolkit2.prx (run.sh): its functions are the
      * game's, the offline answers below only stand in for it offline. */
@@ -1035,7 +1095,10 @@ uintptr_t runtime_services_resolve(const char *name) {
         if (symbol && (!strncmp(symbol,"_ZN3sce7Toolkit",15) || !strncmp(symbol,"sceNpToolkit2_",14))) return 0;
     }
     const uintptr_t online=runtime_net_resolve(name); /* BB_ONLINE=1: the online module first */
-    return online ? online : RUNTIME_LOOKUP(exports,name);
+    if (online) return online;
+    const uintptr_t listed=RUNTIME_LOOKUP(exports,name);
+    if (listed) return listed;
+    return toolkit_generic(runtime_symbol(name));
 }
 #else
 uintptr_t runtime_services_resolve(const char *name) { (void)name; return 0; }

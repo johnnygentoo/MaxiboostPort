@@ -52,6 +52,20 @@ static ABI int32_t module_unload(uint16_t id) {
     if (id==0xb4) { refs=module_refs[id]; if (!refs) initialized=0; }
     return 0;
 }
+/* Internal system modules (ids 0x80000000 and up, libc.prx loads some at start): provided by the
+ * host runtime as well; the module's start result is 0. */
+static ABI int32_t module_load_internal_with_arg(uint32_t id,int32_t argc,const void *argv,uint64_t flags,int32_t *result) {
+    (void)argc; (void)argv; (void)flags;
+    printf("Runtime: internal system module 0x%x loaded (host implementation)\n",id);
+    if (result) *result=0;
+    return 0;
+}
+/* Download data: as much room as the console's 1 GiB of download data (sceAppContentDownloadData*). */
+static ABI int32_t download_space_kb(const void *mount_point,uint64_t *space_kb) {
+    (void)mount_point;
+    if (!space_kb) return (int32_t)0x80D90002;
+    *space_kb=1024*1024; return 0;
+}
 static void require_loaded(void) {
     require_provider();
     if (!refs) { fputs("STOP: AppContent called before module load\n",stderr); exit(21); }
@@ -157,6 +171,8 @@ uintptr_t runtime_content_resolve(const char *name) {
     if (runtime_nid_is(name,"R9lA82OraNs#c#d")) return (uintptr_t)content_init;
     if (runtime_nid_is(name,"99b82IKXpH4#c#d")) return (uintptr_t)param_int;
     if (runtime_nid_is(name,"xnd8BJzAxmk#c#d")) return (uintptr_t)addon_list;
+    if (runtime_nid_is(name,"hHrGoGoNf+s#8#w")) return (uintptr_t)module_load_internal_with_arg; /* sceSysmoduleLoadModuleInternalWithArg */
+    if (runtime_nid_is(name,"Gl6w5i0JokY#j#j")) return (uintptr_t)download_space_kb; /* sceAppContentDownloadDataGetAvailableSpaceKb */
     return 0;
 }
 void runtime_content_report(void) {

@@ -404,11 +404,14 @@ static ABI int32_t memory_sync(const void *sync) { (void)sync; return 0; } /* wr
 static ABI int32_t backup_none(const void *param) { (void)param; save_trace("CheckBackupData/RestoreBackupData","(no backup)"); return ERR_NOT_FOUND; }
 static ABI int32_t save_umount_backup(const MountPoint *point) { save_trace("UmountWithBackup",point ? point->data : NULL); return save_umount(point); }
 
+/* Saves of another title (a transferred save, MAXIBOOST ON looks for its predecessor's): none. */
+static ABI int32_t save_transferring_mount(const void *mount,void *result) { (void)mount; (void)result; return (int32_t)0x809F0008; } /* NOT_FOUND */
 static const RuntimeExport exports[]={
     {"sceSaveDataCheckBackupData",backup_none}, {"sceSaveDataRestoreBackupData",backup_none},
     {"sceSaveDataUmountWithBackup",save_umount_backup},
     {"sceSaveDataInitialize",save_initialize}, {"sceSaveDataInitialize2",save_initialize},
     {"sceSaveDataInitialize3",save_initialize}, {"sceSaveDataTerminate",save_terminate},
+    {"sceSaveDataTransferringMount",save_transferring_mount},
     {"sceSaveDataMount",save_mount}, {"sceSaveDataMount2",save_mount2}, {"sceSaveDataUmount",save_umount},
     {"sceSaveDataSetParam",save_set_param}, {"sceSaveDataSaveIcon",save_icon}, {"sceSaveDataDelete",save_delete},
     {"sceSaveDataDirNameSearch",save_search},

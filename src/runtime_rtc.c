@@ -195,6 +195,34 @@ static ABI int32_t rtc_parse_date_time(uint64_t *tick, const char *text) {
     *tick=to_tick(&t)-(uint64_t)(offset*1000000);
     return 0;
 }
+/* Tick arithmetic (MAXIBOOST ON's timers and events): out = in + n units. */
+static int32_t tick_add(uint64_t *out, const uint64_t *in, int64_t n, int64_t unit) {
+    if (!out || !in) return ERR_INVALID_POINTER;
+    *out=(uint64_t)((int64_t)*in+n*unit); return 0;
+}
+static ABI int32_t rtc_tick_add_ticks(uint64_t *out, const uint64_t *in, int64_t n) { return tick_add(out,in,n,1); }
+static ABI int32_t rtc_tick_add_microseconds(uint64_t *out, const uint64_t *in, int64_t n) { return tick_add(out,in,n,1); }
+static ABI int32_t rtc_tick_add_minutes(uint64_t *out, const uint64_t *in, int64_t n) { return tick_add(out,in,n,60000000); }
+static ABI int32_t rtc_tick_add_hours(uint64_t *out, const uint64_t *in, int64_t n) { return tick_add(out,in,n,INT64_C(3600000000)); }
+static ABI int32_t rtc_tick_add_days(uint64_t *out, const uint64_t *in, int64_t n) { return tick_add(out,in,n,(int64_t)TICKS_PER_DAY); }
+/* Months: the same day of the month, the last day of a shorter month. */
+static ABI int32_t rtc_tick_add_months(uint64_t *out, const uint64_t *in, int32_t n) {
+    if (!out || !in) return ERR_INVALID_POINTER;
+    DateTime t; from_tick(*in,&t);
+    int64_t month=(int64_t)t.year*12+(t.month-1)+n;
+    if (month<12 || month>=10000*12) return ERR_INVALID_YEAR;
+    t.year=(uint16_t)(month/12); t.month=(uint16_t)(month%12+1);
+    const int last=days_in_month(t.year,t.month);
+    if (t.day>last) t.day=(uint16_t)last;
+    *out=to_tick(&t); return 0;
+}
+static ABI int32_t rtc_days_in_month(int32_t year, int32_t month) {
+    if (year<1) return ERR_INVALID_YEAR;
+    if (month<1 || month>12) return ERR_INVALID_MONTH;
+    return days_in_month(year,month);
+}
+static ABI int32_t rtc_is_leap_year(int32_t year) { return year<1 ? ERR_INVALID_YEAR : leap(year); }
+static ABI int32_t rtc_check_valid(const DateTime *t) { return t ? validate(t) : ERR_INVALID_POINTER; }
 static const RuntimeExport exports[]={
     {"sceRtcFormatRFC3339LocalTime",rtc_rfc3339_local}, {"sceRtcTickAddSeconds",rtc_tick_add_seconds},
     {"sceRtcGetCurrentClockLocalTime",rtc_current_local}, {"sceRtcGetCurrentClock",rtc_current_clock},
@@ -205,5 +233,11 @@ static const RuntimeExport exports[]={
     {"sceRtcParseDateTime",rtc_parse_date_time},
     {"sceRtcGetTickResolution",rtc_tick_resolution}, {"sceRtcSetTime_t",rtc_set_time_t},
     {"sceRtcGetTime_t",rtc_get_time_t}, {"sceRtcFormatRFC2822LocalTime",rtc_rfc2822_local},
+    {"sceRtcParseRFC3339",rtc_parse_date_time},
+    {"sceRtcTickAddTicks",rtc_tick_add_ticks}, {"sceRtcTickAddMicroseconds",rtc_tick_add_microseconds},
+    {"sceRtcTickAddMinutes",rtc_tick_add_minutes}, {"sceRtcTickAddHours",rtc_tick_add_hours},
+    {"sceRtcTickAddDays",rtc_tick_add_days}, {"sceRtcTickAddMonths",rtc_tick_add_months},
+    {"sceRtcGetDaysInMonth",rtc_days_in_month}, {"sceRtcIsLeapYear",rtc_is_leap_year},
+    {"sceRtcCheckValid",rtc_check_valid},
 };
 uintptr_t runtime_rtc_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }

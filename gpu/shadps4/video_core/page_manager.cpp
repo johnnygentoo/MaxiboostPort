@@ -746,6 +746,10 @@ void PageManager::OnGpuMap(VAddr address, size_t size) {
     impl->OnMap(address, size);
 }
 
+bool PageManager::IsMapped(VAddr address, u64 size) const {
+    return Impl::rasterizer && Impl::rasterizer->IsMapped(address, size);
+}
+
 void PageManager::OnGpuUnmap(VAddr address, size_t size) {
     impl->OnUnmap(address, size);
 }

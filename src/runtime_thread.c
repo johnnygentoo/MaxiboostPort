@@ -217,11 +217,15 @@ static void set_host_name(const char *name) {
     memcpy(host,name,strnlen(name,sizeof(host)-1));
     pthread_setname_np(pthread_self(),host);
 }
+/* libc.prx's thread-exit hook (_sceKernelSetThreadDtors): its thread_local destructors. A
+ * newer libc (MAXIBOOST ON's) registers it with libkernel, which calls it as a thread ends. */
+static void (ABI *thread_dtors)(void);
 static void *host_start(void *p) {
     GuestThread *t=p;
     attach(t);
     set_host_name(t->name);
     if (!setjmp(t->exit_jump)) t->result=t->entry(t->argument);
+    if (thread_dtors) thread_dtors();
     runtime_thread_keys_cleanup();
     pthread_mutex_lock(&lock); t->finished=1; ++exited; pthread_mutex_unlock(&lock);
     return t->result;
@@ -310,6 +314,37 @@ static ABI int32_t thread_rename(GuestThread *t,const char *name) {
     return 0;
 }
 static ABI int32_t thread_equal(GuestThread *a,GuestThread *b) { return a==b; }
+static ABI int32_t thread_get_name(GuestThread *t,char *name) {
+    if (!find_thread(t)) return ERR(3);
+    if (!name) return ERR(22);
+    memcpy(name,t->name,sizeof(t->name)); name[sizeof(t->name)-1]=0;
+    return 0;
+}
+/* A stack of the game's own memory: its size is kept, the host thread gets a stack of ours (the
+ * game frees its block only after the thread ends). */
+static ABI int32_t attr_set_user_stack(ThreadAttr **slot,void *address,uint64_t size) {
+    ThreadAttr *a=find_attr(slot);
+    if (!a || !address || size<16384) return ERR(22);
+    a->stack=size; return 0;
+}
+static ABI int32_t attr_get_user_stack(ThreadAttr **slot,void **address,uint64_t *size) {
+    ThreadAttr *a=find_attr(slot);
+    if (!a || !address || !size) return ERR(22);
+    *address=NULL; *size=a->stack; return 0;
+}
+/* libc.prx's hooks into libkernel for thread exit: the destructor runner is called as each
+ * thread ends; the atexit count and report only serve libkernel's diagnostics. */
+static ABI void set_thread_dtors(void (ABI *fn)(void)) { thread_dtors=fn; }
+static ABI void set_thread_hook(void *fn) { (void)fn; }
+static ABI void rtld_thread_atexit(void) {}
+static const RuntimeExport named_exports[]={
+    {"scePthreadGetname",thread_get_name},
+    {"scePthreadAttrSetstack",attr_set_user_stack}, {"scePthreadAttrGetstack",attr_get_user_stack},
+    {"_sceKernelSetThreadDtors",set_thread_dtors},
+    {"_sceKernelSetThreadAtexitCount",set_thread_hook}, {"_sceKernelSetThreadAtexitReport",set_thread_hook},
+    {"_sceKernelRtldThreadAtexitIncrement",rtld_thread_atexit},
+    {"_sceKernelRtldThreadAtexitDecrement",rtld_thread_atexit},
+};
 
 /* POSIX (libScePosix) variants return positive errno values. */
 static int32_t posix(int32_t r) { return r ? (int32_t)((uint32_t)r&0xffff) : 0; }
@@ -358,7 +393,7 @@ uintptr_t runtime_thread_resolve(const char *name) {
     };
     for (size_t i=0;i<sizeof(table)/sizeof(*table);++i)
         if (runtime_nid_is(name,table[i].nid)) return (uintptr_t)table[i].fn;
-    return 0;
+    return RUNTIME_LOOKUP(named_exports,name);
 }
 void runtime_thread_report(void) {
     pthread_mutex_lock(&lock);

@@ -69,7 +69,9 @@ bool ProgramReadable(const Program& pgm) {
     if (!runtime_memory_vma_info(address, &prot, &type, &end)) {
         return true; // not a guest mapping (the executable's image)
     }
-    if ((prot & 1) == 0) {
+    // Readable by the CPU or the GPU (0x10): MAXIBOOST ON keeps its shaders in memory mapped
+    // CPU-write and GPU-read only (0x32); a writable host page is readable all the same.
+    if ((prot & 0x13) == 0) {
         static std::atomic<int> reports{0};
         if (reports.fetch_add(1, std::memory_order_relaxed) < 8) {
             std::fprintf(stderr, "Pipeline: shader program address %#llx is not readable; the draw "

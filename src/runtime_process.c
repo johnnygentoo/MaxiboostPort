@@ -191,6 +191,7 @@ static const RuntimeExport exports[]={
     {"sceKernelDlsym",dlsym},
     {"sceKernelGetModuleInfoFromAddr",module_info_from_addr},
     {"sceKernelGetModuleInfoForUnwind",module_info_for_unwind},
+    {"sceSysmoduleGetModuleInfoForUnwind",module_info_for_unwind},
     {"sceKernelInternalMemoryGetModuleSegmentInfo",module_segment_info},
     {"__elf_phdr_match_addr",phdr_match_addr}, {"_is_signal_return",is_signal_return},
     {"sigreturn",guest_sigreturn}, {"__pthread_cxa_finalize",cxa_finalize},

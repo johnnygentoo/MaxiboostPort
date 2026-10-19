@@ -162,9 +162,22 @@ static ABI int32_t rw_attr_gettype(int32_t *const *attr, int32_t *type) {
     if (!attr || !*attr || !type) return error(EINVAL);
     *type=**attr; return 0;
 }
+/* POSIX names (libc.prx calls them): positive errno values instead of Orbis codes. */
+static int32_t posix(int32_t r) { return r ? (int32_t)((uint32_t)r&0xffff) : 0; }
+static ABI int32_t posix_read(Rwlock **r) { return posix(rw_read(r)); }
+static ABI int32_t posix_write(Rwlock **r) { return posix(rw_write(r)); }
+static ABI int32_t posix_unlock(Rwlock **r) { return posix(rw_unlock(r)); }
+static ABI int32_t posix_tryread(Rwlock **r) { return posix(rw_tryread(r)); }
+static ABI int32_t posix_trywrite(Rwlock **r) { return posix(rw_trywrite(r)); }
+static ABI int32_t posix_init(Rwlock **r,void *const *attr) { return posix(rw_init(r,attr,NULL)); }
+static ABI int32_t posix_destroy(Rwlock **r) { return posix(rw_destroy(r)); }
 static const RuntimeExport attr_exports[]={
     {"scePthreadRwlockattrInit",rw_attr_init}, {"scePthreadRwlockattrDestroy",rw_attr_destroy},
     {"scePthreadRwlockattrSettype",rw_attr_settype}, {"scePthreadRwlockattrGettype",rw_attr_gettype},
+    {"pthread_rwlock_rdlock",posix_read}, {"pthread_rwlock_wrlock",posix_write},
+    {"pthread_rwlock_unlock",posix_unlock}, {"pthread_rwlock_tryrdlock",posix_tryread},
+    {"pthread_rwlock_trywrlock",posix_trywrite}, {"pthread_rwlock_init",posix_init},
+    {"pthread_rwlock_destroy",posix_destroy},
 };
 uintptr_t runtime_rwlock_resolve(const char *name) {
     const uintptr_t attr=RUNTIME_LOOKUP(attr_exports,name);

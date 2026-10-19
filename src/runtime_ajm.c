@@ -480,6 +480,7 @@ static ABI int32_t ajm_batch_cancel(uint32_t id, uint32_t batch) {
     return r; /* already processed at submission: nothing to cancel */
 }
 static ABI int32_t ajm_error_dump(void) { return 0; }
+static ABI int32_t ajm_memory_unregister(uint32_t id, void *p) { (void)p; return context(id) ? 0 : ERR_INVALID_CONTEXT; }
 static ABI int32_t ajm_memory_register(uint32_t id, void *p, uint64_t pages) { (void)p; (void)pages; return context(id) ? 0 : ERR_INVALID_CONTEXT; }
 
 static const RuntimeExport exports[]={
@@ -491,7 +492,7 @@ static const RuntimeExport exports[]={
     {"sceAjmBatchJobRunSplitBufferRa",job_run_split}, {"sceAjmBatchJobInlineBuffer",job_inline},
     {"sceAjmBatchStartBuffer",ajm_batch_start}, {"sceAjmBatchWait",ajm_batch_wait},
     {"sceAjmBatchCancel",ajm_batch_cancel}, {"sceAjmBatchErrorDump",ajm_error_dump},
-    {"sceAjmMemoryRegister",ajm_memory_register},
+    {"sceAjmMemoryRegister",ajm_memory_register}, {"sceAjmMemoryUnregister",ajm_memory_unregister},
 };
 uintptr_t runtime_ajm_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
 void runtime_ajm_report(void) {

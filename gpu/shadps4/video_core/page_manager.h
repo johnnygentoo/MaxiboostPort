@@ -46,6 +46,10 @@ public:
     /// Unregister a range of gpu memory that was unmapped.
     void OnGpuUnmap(VAddr address, size_t size);
 
+    /// bbport: whether the guest range is still mapped for the GPU (the game may unmap memory a
+    /// queued draw still samples: MAXIBOOST ON frees its movie frames when the movie is skipped).
+    bool IsMapped(VAddr address, u64 size) const;
+
     /// Updates watches in the pages touching the specified region.
     template <bool track>
     void UpdatePageWatchers(VAddr addr, u64 size) const;
