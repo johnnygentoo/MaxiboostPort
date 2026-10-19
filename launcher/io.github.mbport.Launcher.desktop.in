@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=MAXIBOOST ON
+GenericName=mbport launcher
+Comment=Launcher for mbport, the native Linux port of MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (PS4)
+Exec=@LAUNCHER@
+Path=@PATH@
+Icon=@ICON@
+Terminal=false
+Categories=Game;
+Keywords=Gundam;Extreme;Versus;Maxiboost;mbport;PS4;mecha;
+StartupWMClass=io.github.mbport.Launcher

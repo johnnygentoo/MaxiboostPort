@@ -4,11 +4,12 @@ The runtime reports <user>/addcont/<title id>/<entitlement label> as installed (
 src/runtime_content.c). A DLC folder may hold:
 - dumped add-ons, one folder each, named by the label, with sce_sys/param.sfo (Bloodborne's The
   Old Hunters: its data ships with a patch, the folder is only the entitlement);
-- the add-ons' .pkg files as they are. GUNDAM VERSUS' 28 add-ons (mobile suits, navigators) are
-  128 KB unlock keys: their data is in the game and its update, the package carries none.
+- the add-ons' .pkg files as they are. MAXIBOOST ON's add-ons (mobile suits, such as
+  GUNDAMVSMBDLC001, Gundam Barbatos Lupus Rex) are unlock keys, as GUNDAM VERSUS' were: their data
+  is in the game and its update, the package carries none.
 
     python3 scripts/dlc.py link --dlc DIR --game GAME_DIR --user USER_DIR
-    python3 scripts/dlc.py list --dlc DIR --title CUSA08790
+    python3 scripts/dlc.py list --dlc DIR --title CUSA18758
 """
 import argparse
 import os
@@ -22,7 +23,7 @@ from prepare import sfo  # noqa: E402
 
 # A folder of entitlements this script made: <user>/addcont/<title id> holding this file is
 # rebuilt every launch; a real folder without it (someone's own) is left alone.
-MARKER = '.gvport-dlc'
+MARKER = '.mbport-dlc'
 
 
 def pkg_param(path):

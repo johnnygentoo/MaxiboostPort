@@ -310,7 +310,8 @@ EN = {
     "Новая: видеокарта работает с памятью игры напрямую, как в игре для ПК, а команды графики переводятся, а не эмулируются. Старая — модель памяти 0.3 со всеми исправлениями. Если драйвер не проходит проверку при запуске — старая":
         "The new one: the GPU works with the game's memory directly, as in a PC game, and graphics commands are translated rather than emulated. The old one: the memory model of 0.3 with all the fixes. If the driver fails the startup check, the old one",
     "Модель памяти и трансляции": "Memory and translation model",
-    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Auto: old (GUNDAM VERSUS runs faster with it)",
+    'Авто: старая':
+        'Auto: old',
     "Новая": "New",
     "Старая (как в 0.3)": "Old (as in 0.3)",
     "Синхронизация как в 0.3": "Synchronisation as in 0.3",
@@ -661,53 +662,53 @@ EN = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: co-op on The Hunter's Dream's pool with bbhost players",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Video memory on 4 GB cards and crashes: flips, the swapchain, descriptors and page faults; swapped sticks and camera inversion, save import, the version selector',
     'Большие группы команд записи и swapchain после изменений экрана': 'Large recorded command groups and the swapchain after display changes',
-    # GUNDAM VERSUS (gvport)
+    # GUNDAM VERSUS (gvport) and MAXIBOOST ON (mbport)
     '60 (патч)':
         '60 (patch)',
-    'GUNDAM VERSUS {}, версия 1.13':
-        'GUNDAM VERSUS {}, version 1.13',
-    'GUNDAM VERSUS добавлена в библиотеку Steam':
-        'GUNDAM VERSUS added to the Steam library',
-    'GUNDAM VERSUS © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
-        'GUNDAM VERSUS © SOTSU · SUNRISE; the PS4 game was published by Bandai Namco Entertainment. This project is not affiliated with them.',
-    'XML-патчи в формате shadPS4 для версии 01.13 из папки патчей. Применяются при запуске.':
-        'shadPS4-format XML patches for version 01.13 from the patches folder. Applied at start.',
-    'eboot.bin не от версии 1.13: скопируйте eboot.bin из дампа обновления 1.13 в папку игры с заменой':
-        'eboot.bin is not from 1.13: copy eboot.bin from the dumped 1.13 update into the game folder, replacing it',
-    'gvport — нативный порт для Linux':
-        'gvport — native Linux port',
-    'Авторы bbport и bloodborne_linux, на которых построен gvport, и все, кто им помогал':
-        'The authors of bbport and bloodborne_linux, which gvport is built on, and everyone who helped them',
-    'В папке игры нет: {}. Распакуйте игру и обновление 1.13 заново':
-        'Missing from the game folder: {}. Extract the game and the 1.13 update again',
-    'В этой папке нет сохранений GUNDAM VERSUS (SAVEDATA00 с DATA.BIN)':
-        'No GUNDAM VERSUS saves in this folder (SAVEDATA00 with DATA.BIN)',
+    'MAXIBOOST ON {}, версия 1.15':
+        'MAXIBOOST ON {}, version 1.15',
+    'MAXIBOOST ON добавлена в библиотеку Steam':
+        'MAXIBOOST ON added to the Steam library',
+    'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; the PS4 game was published by Bandai Namco Entertainment. This project is not affiliated with them.',
+    'XML-патчи в формате shadPS4 для версии 01.15 из папки патчей. Применяются при запуске.':
+        'shadPS4-format XML patches for version 01.15 from the patches folder. Applied at start.',
+    'eboot.bin не от версии 1.15: скопируйте eboot.bin из дампа обновления 1.15 в папку игры с заменой':
+        'eboot.bin is not from 1.15: copy eboot.bin from the dumped 1.15 update into the game folder, replacing it',
+    'mbport — нативный порт для Linux':
+        'mbport — native Linux port',
+    'Авторы bbport и bloodborne_linux, на которых построен mbport, и все, кто им помогал':
+        'The authors of bbport and bloodborne_linux, which mbport is built on, and everyone who helped them',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.15 заново':
+        'Missing from the game folder: {}. Extract the game and the 1.15 update again',
+    'В этой папке нет сохранений MAXIBOOST ON (memory.dat или папка REPLAY)':
+        'No MAXIBOOST ON saves in this folder (memory.dat or a REPLAY folder)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'The game runs at 60 FPS, as on the PS4. Above 60 FPS needs a frame-rate patch, not available yet',
-    'Для GUNDAM VERSUS пока недоступен: кадр игры ещё не размечен':
-        "Not available for GUNDAM VERSUS yet: the game's frame is not mapped yet",
-    'Игра, обновление 1.13 и DLC из ваших файлов .pkg':
-        'The game, update 1.13 and DLC from your .pkg files',
+    'Для MAXIBOOST ON пока недоступен: кадр игры ещё не размечен':
+        "Not available for MAXIBOOST ON yet: the game's frame is not mapped yet",
+    'Игра, обновление 1.15 и DLC из ваших файлов .pkg':
+        'The game, update 1.15 and DLC from your .pkg files',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
         "The PS4's trophy key (TrophyKey in shadPS4), 32 hexadecimal digits: with it, the names and descriptions are in the game's language. Kept on this computer. Without it, only the icons are shown",
     'Нативный порт для Linux, версия {}':
         'Native Linux port, version {}',
-    'Нужен патч для версии 1.13, его пока нет':
-        'Needs a patch for version 1.13, not available yet',
-    'Нужно обновление 1.13: скопируйте файлы дампа обновления 1.13 в папку игры с заменой (найдена версия {})':
-        'The 1.13 update is needed: copy the dumped 1.13 update into the game folder, replacing files (found version {})',
+    'Нужен патч для версии 1.15, его пока нет':
+        'Needs a patch for version 1.15, not available yet',
+    'Нужно обновление 1.15: скопируйте файлы дампа обновления 1.15 в папку игры с заменой (найдена версия {})':
+        'The 1.15 update is needed: copy the dumped 1.15 update into the game folder, replacing files (found version {})',
     'Основано на bloodborne_linux от ayozetr':
         'Based on bloodborne_linux by ayozetr',
-    'bloodborne_linux: порт для Linux, на котором построен gvport':
-        'bloodborne_linux: the Linux port gvport is built on',
-    'Папка с сохранениями GUNDAM VERSUS':
-        'Folder with GUNDAM VERSUS saves',
+    'bloodborne_linux: порт для Linux, на котором построен mbport':
+        'bloodborne_linux: the Linux port mbport is built on',
+    'Папка с сохранениями MAXIBOOST ON':
+        'Folder with MAXIBOOST ON saves',
     'Патчи игры':
         'Game patches',
     'Португальский (Бразилия)':
         'Portuguese (Brazil)',
-    'Это не GUNDAM VERSUS (найдено {}): нужна GUNDAM VERSUS (CUSA08790) с обновлением 1.13':
-        'This is not GUNDAM VERSUS (found {}): GUNDAM VERSUS (CUSA08790) with update 1.13 is needed',
+    'Это не MAXIBOOST ON (найдено {}): нужна MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) с обновлением 1.15':
+        'This is not MAXIBOOST ON (found {}): MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) with update 1.15 is needed',
     'Тачпад, левая половина':
         'Touchpad, left half',
     'Тачпад, правая половина':
@@ -746,18 +747,11 @@ EN = {
         'Could not save {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Current settings saved as your defaults',
-    'Рядом на одном мониторе': 'Side by side on one monitor',
-    'Каждое окно на своём мониторе': 'Each window on its own monitor',
     'Два игрока': 'Two players',
-    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': 'In both games: PLAY → PLAYER MATCH. One creates a room (Room type: 1 on 1), the other finds it with Search for Room and the same Room type.',
-    'Два игрока на одном ПК': 'Two players on one PC',
-    'Два окна игры, у каждого игрока свой геймпад': 'Two game windows, each player with their own gamepad',
-    'Окна': 'Windows',
-    'Монитор второго игрока': "Player 2's monitor",
-    'Звук второго окна': 'Sound of the second window',
-    'Иначе музыка и звуки играют дважды': 'Otherwise music and sounds play twice',
-    'Имя игрока 1': "Player 1's name",
-    'Имя игрока 2': "Player 2's name",
+    'Второй геймпад играет за 2P в Free Battle: в Mobile Suit Settings переключите слот игрока на 2P. Экран игра делит сама.':
+        'The second gamepad plays as 2P in Free Battle: under Mobile Suit Settings, set a player slot to 2P. The game splits the screen itself.',
+    'Имя игрока':
+        'Player name',
     'По сети': 'Over the network',
     'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Each PC needs its own copy of the game. One takes the players, the others connect to it by its address.',
     'Игра по сети': 'Network play',
@@ -765,7 +759,6 @@ EN = {
     'Подключиться к другому ПК': 'Join another PC',
     'Адрес ПК, который принимает игроков': 'Address of the PC that takes the players',
     'Адрес этого ПК: {}': "This PC's address: {}",
-    'Второй': 'Second',
 }
 
 PT_BR = {
@@ -976,7 +969,8 @@ PT_BR = {
     "Новая: видеокарта работает с памятью игры напрямую, как в игре для ПК, а команды графики переводятся, а не эмулируются. Старая — модель памяти 0.3 со всеми исправлениями. Если драйвер не проходит проверку при запуске — старая":
         "O novo: a GPU usa a memória do jogo diretamente, como em um jogo de PC, e os comandos gráficos são traduzidos em vez de emulados. O antigo: o modelo de memória da 0.3 com todas as correções. Se o driver falhar na verificação inicial, o antigo",
     "Модель памяти и трансляции": "Modelo de memória e tradução",
-    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Automático: antigo (GUNDAM VERSUS roda mais rápido com ele)",
+    'Авто: старая':
+        'Automático: antigo',
     "Новая": "Novo",
     "Старая (как в 0.3)": "Antigo (como na 0.3)",
     "Синхронизация как в 0.3": "Sincronização como na 0.3",
@@ -1481,53 +1475,53 @@ PT_BR = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: cooperativo no pool do The Hunter's Dream com jogadores do bbhost",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Memória de vídeo em placas de 4 GB e travamentos: flips, swapchain, descritores e falhas de página; troca dos analógicos e inversão da câmera, importação de saves, seletor de versão',
     'Большие группы команд записи и swapchain после изменений экрана': 'Grandes grupos de comandos gravados e a swapchain após mudanças de tela',
-    # GUNDAM VERSUS (gvport)
+    # GUNDAM VERSUS (gvport) and MAXIBOOST ON (mbport)
     '60 (патч)':
         '60 (patch)',
-    'GUNDAM VERSUS {}, версия 1.13':
-        'GUNDAM VERSUS {}, versão 1.13',
-    'GUNDAM VERSUS добавлена в библиотеку Steam':
-        'GUNDAM VERSUS adicionado à biblioteca da Steam',
-    'GUNDAM VERSUS © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
-        'GUNDAM VERSUS © SOTSU · SUNRISE; o jogo de PS4 foi publicado pela Bandai Namco Entertainment. Este projeto não tem ligação com elas.',
-    'XML-патчи в формате shadPS4 для версии 01.13 из папки патчей. Применяются при запуске.':
-        'Patches XML no formato do shadPS4 para a versão 01.13, carregados da pasta de patches. Aplicados ao iniciar.',
-    'eboot.bin не от версии 1.13: скопируйте eboot.bin из дампа обновления 1.13 в папку игры с заменой':
-        'O eboot.bin não é da 1.13: copie o eboot.bin do dump da atualização 1.13 para a pasta do jogo, substituindo-o',
-    'gvport — нативный порт для Linux':
-        'gvport — port nativo para Linux',
-    'Авторы bbport и bloodborne_linux, на которых построен gvport, и все, кто им помогал':
-        'Os autores do bbport e do bloodborne_linux, sobre os quais o gvport foi construído, e todos que os ajudaram',
-    'В папке игры нет: {}. Распакуйте игру и обновление 1.13 заново':
-        'Faltam na pasta do jogo: {}. Extraia o jogo e a atualização 1.13 de novo',
-    'В этой папке нет сохранений GUNDAM VERSUS (SAVEDATA00 с DATA.BIN)':
-        'Não há saves do GUNDAM VERSUS nesta pasta (SAVEDATA00 com DATA.BIN)',
+    'MAXIBOOST ON {}, версия 1.15':
+        'MAXIBOOST ON {}, versão 1.15',
+    'MAXIBOOST ON добавлена в библиотеку Steam':
+        'MAXIBOOST ON adicionado à biblioteca da Steam',
+    'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; o jogo de PS4 foi publicado pela Bandai Namco Entertainment. Este projeto não tem ligação com elas.',
+    'XML-патчи в формате shadPS4 для версии 01.15 из папки патчей. Применяются при запуске.':
+        'Patches XML no formato do shadPS4 para a versão 01.15, carregados da pasta de patches. Aplicados ao iniciar.',
+    'eboot.bin не от версии 1.15: скопируйте eboot.bin из дампа обновления 1.15 в папку игры с заменой':
+        'O eboot.bin não é da 1.15: copie o eboot.bin do dump da atualização 1.15 para a pasta do jogo, substituindo-o',
+    'mbport — нативный порт для Linux':
+        'mbport — port nativo para Linux',
+    'Авторы bbport и bloodborne_linux, на которых построен mbport, и все, кто им помогал':
+        'Os autores do bbport e do bloodborne_linux, sobre os quais o mbport foi construído, e todos que os ajudaram',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.15 заново':
+        'Faltam na pasta do jogo: {}. Extraia o jogo e a atualização 1.15 de novo',
+    'В этой папке нет сохранений MAXIBOOST ON (memory.dat или папка REPLAY)':
+        'Não há saves do MAXIBOOST ON nesta pasta (memory.dat ou uma pasta REPLAY)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'O jogo roda a 60 FPS, como no PS4. Acima de 60 FPS precisa de um patch de taxa de quadros, ainda indisponível',
-    'Для GUNDAM VERSUS пока недоступен: кадр игры ещё не размечен':
-        'Ainda indisponível para GUNDAM VERSUS: o quadro do jogo ainda não foi mapeado',
-    'Игра, обновление 1.13 и DLC из ваших файлов .pkg':
-        'O jogo, a atualização 1.13 e as DLC dos seus arquivos .pkg',
+    'Для MAXIBOOST ON пока недоступен: кадр игры ещё не размечен':
+        'Ainda indisponível para MAXIBOOST ON: o quadro do jogo ainda não foi mapeado',
+    'Игра, обновление 1.15 и DLC из ваших файлов .pkg':
+        'O jogo, a atualização 1.15 e as DLC dos seus arquivos .pkg',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
         'A chave de troféus do PS4 (TrophyKey no shadPS4), 32 dígitos hexadecimais: com ela, os nomes e as descrições ficam no idioma do jogo. Fica neste computador. Sem ela, só os ícones aparecem',
     'Нативный порт для Linux, версия {}':
         'Port nativo para Linux, versão {}',
-    'Нужен патч для версии 1.13, его пока нет':
-        'Precisa de um patch para a versão 1.13, ainda indisponível',
-    'Нужно обновление 1.13: скопируйте файлы дампа обновления 1.13 в папку игры с заменой (найдена версия {})':
-        'É preciso a atualização 1.13: copie o dump da atualização 1.13 para a pasta do jogo, substituindo os arquivos (versão encontrada: {})',
+    'Нужен патч для версии 1.15, его пока нет':
+        'Precisa de um patch para a versão 1.15, ainda indisponível',
+    'Нужно обновление 1.15: скопируйте файлы дампа обновления 1.15 в папку игры с заменой (найдена версия {})':
+        'É preciso a atualização 1.15: copie o dump da atualização 1.15 para a pasta do jogo, substituindo os arquivos (versão encontrada: {})',
     'Основано на bloodborne_linux от ayozetr':
         'Baseado no bloodborne_linux de ayozetr',
-    'bloodborne_linux: порт для Linux, на котором построен gvport':
-        'bloodborne_linux: o port para Linux sobre o qual o gvport foi construído',
-    'Папка с сохранениями GUNDAM VERSUS':
-        'Pasta com saves do GUNDAM VERSUS',
+    'bloodborne_linux: порт для Linux, на котором построен mbport':
+        'bloodborne_linux: o port para Linux sobre o qual o mbport foi construído',
+    'Папка с сохранениями MAXIBOOST ON':
+        'Pasta com saves do MAXIBOOST ON',
     'Патчи игры':
         'Patches do jogo',
     'Португальский (Бразилия)':
         'Português (Brasil)',
-    'Это не GUNDAM VERSUS (найдено {}): нужна GUNDAM VERSUS (CUSA08790) с обновлением 1.13':
-        'Isto não é o GUNDAM VERSUS (encontrado: {}): é preciso o GUNDAM VERSUS (CUSA08790) com a atualização 1.13',
+    'Это не MAXIBOOST ON (найдено {}): нужна MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) с обновлением 1.15':
+        'Isto não é o MAXIBOOST ON (encontrado: {}): é preciso o MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) com a atualização 1.15',
     'Тачпад, левая половина':
         'Touchpad, metade esquerda',
     'Тачпад, правая половина':
@@ -1566,18 +1560,11 @@ PT_BR = {
         'Não foi possível salvar {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Configurações atuais salvas como seus padrões',
-    'Рядом на одном мониторе': 'Lado a lado em um monitor',
-    'Каждое окно на своём мониторе': 'Cada janela em seu próprio monitor',
     'Два игрока': 'Dois jogadores',
-    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': 'Nos dois jogos: PLAY → PLAYER MATCH. Um cria uma sala (Room type: 1 on 1), o outro a encontra em Search for Room com o mesmo Room type.',
-    'Два игрока на одном ПК': 'Dois jogadores no mesmo PC',
-    'Два окна игры, у каждого игрока свой геймпад': 'Duas janelas do jogo, cada jogador com seu próprio controle',
-    'Окна': 'Janelas',
-    'Монитор второго игрока': 'Monitor do jogador 2',
-    'Звук второго окна': 'Som da segunda janela',
-    'Иначе музыка и звуки играют дважды': 'Senão a música e os sons tocam duas vezes',
-    'Имя игрока 1': 'Nome do jogador 1',
-    'Имя игрока 2': 'Nome do jogador 2',
+    'Второй геймпад играет за 2P в Free Battle: в Mobile Suit Settings переключите слот игрока на 2P. Экран игра делит сама.':
+        'O segundo controle joga como 2P no Free Battle: em Mobile Suit Settings, mude um slot de jogador para 2P. O próprio jogo divide a tela.',
+    'Имя игрока':
+        'Nome do jogador',
     'По сети': 'Pela rede',
     'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Cada PC precisa da sua própria cópia do jogo. Um recebe os jogadores, os outros se conectam a ele pelo endereço dele.',
     'Игра по сети': 'Jogo em rede',
@@ -1585,7 +1572,6 @@ PT_BR = {
     'Подключиться к другому ПК': 'Conectar a outro PC',
     'Адрес ПК, который принимает игроков': 'Endereço do PC que recebe os jogadores',
     'Адрес этого ПК: {}': 'Endereço deste PC: {}',
-    'Второй': 'Segundo',
 }
 
 
@@ -1926,7 +1912,8 @@ ES = {
         "El nuevo: la tarjeta gráfica trabaja directamente con la memoria del juego, como en un juego de PC, y los comandos gráficos se traducen en vez de emularse. El antiguo: el modelo de memoria de la 0.3 con todas las correcciones. Si el controlador no pasa la comprobación al arrancar, el antiguo",
     "Модель памяти и трансляции":
         "Modelo de memoria y traducción",
-    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Automático: antiguo (GUNDAM VERSUS va más rápido con él)",
+    'Авто: старая':
+        'Automático: antiguo',
     "Новая":
         "Nuevo",
     "Старая (как в 0.3)":
@@ -2211,53 +2198,53 @@ ES = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: cooperativo en el pool de The Hunter's Dream con jugadores de bbhost",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Memoria de vídeo en tarjetas de 4 GB y cierres: flips, swapchain, descriptores y fallos de página; intercambio de sticks e inversión de la cámara, importación de partidas, selector de versión',
     'Большие группы команд записи и swapchain после изменений экрана': 'Grupos grandes de comandos grabados y el swapchain tras cambios de pantalla',
-    # GUNDAM VERSUS (gvport)
+    # GUNDAM VERSUS (gvport) and MAXIBOOST ON (mbport)
     '60 (патч)':
         '60 (parche)',
-    'GUNDAM VERSUS {}, версия 1.13':
-        'GUNDAM VERSUS {}, versión 1.13',
-    'GUNDAM VERSUS добавлена в библиотеку Steam':
-        'GUNDAM VERSUS añadido a la biblioteca de Steam',
-    'GUNDAM VERSUS © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
-        'GUNDAM VERSUS © SOTSU · SUNRISE; el juego de PS4 lo publicó Bandai Namco Entertainment. Este proyecto no está afiliado a ellas.',
-    'XML-патчи в формате shadPS4 для версии 01.13 из папки патчей. Применяются при запуске.':
-        'Parches XML en formato shadPS4 para la versión 01.13, de la carpeta de parches. Se aplican al iniciar.',
-    'eboot.bin не от версии 1.13: скопируйте eboot.bin из дампа обновления 1.13 в папку игры с заменой':
-        'eboot.bin no es de la 1.13: copia eboot.bin de la actualización 1.13 volcada en la carpeta del juego, reemplazándolo',
-    'gvport — нативный порт для Linux':
-        'gvport — port nativo para Linux',
-    'Авторы bbport и bloodborne_linux, на которых построен gvport, и все, кто им помогал':
-        'Los autores de bbport y bloodborne_linux, sobre los que se construye gvport, y todos los que les ayudaron',
-    'В папке игры нет: {}. Распакуйте игру и обновление 1.13 заново':
-        'Faltan en la carpeta del juego: {}. Vuelve a extraer el juego y la actualización 1.13',
-    'В этой папке нет сохранений GUNDAM VERSUS (SAVEDATA00 с DATA.BIN)':
-        'No hay partidas de GUNDAM VERSUS en esta carpeta (SAVEDATA00 con DATA.BIN)',
+    'MAXIBOOST ON {}, версия 1.15':
+        'MAXIBOOST ON {}, versión 1.15',
+    'MAXIBOOST ON добавлена в библиотеку Steam':
+        'MAXIBOOST ON añadido a la biblioteca de Steam',
+    'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; el juego de PS4 lo publicó Bandai Namco Entertainment. Este proyecto no está afiliado a ellas.',
+    'XML-патчи в формате shadPS4 для версии 01.15 из папки патчей. Применяются при запуске.':
+        'Parches XML en formato shadPS4 para la versión 01.15, de la carpeta de parches. Se aplican al iniciar.',
+    'eboot.bin не от версии 1.15: скопируйте eboot.bin из дампа обновления 1.15 в папку игры с заменой':
+        'eboot.bin no es de la 1.15: copia eboot.bin de la actualización 1.15 volcada en la carpeta del juego, reemplazándolo',
+    'mbport — нативный порт для Linux':
+        'mbport — port nativo para Linux',
+    'Авторы bbport и bloodborne_linux, на которых построен mbport, и все, кто им помогал':
+        'Los autores de bbport y bloodborne_linux, sobre los que se construye mbport, y todos los que les ayudaron',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.15 заново':
+        'Faltan en la carpeta del juego: {}. Vuelve a extraer el juego y la actualización 1.15',
+    'В этой папке нет сохранений MAXIBOOST ON (memory.dat или папка REPLAY)':
+        'No hay partidas de MAXIBOOST ON en esta carpeta (memory.dat o una carpeta REPLAY)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'El juego va a 60 FPS, como en PS4. Más de 60 FPS necesita un parche de tasa de fotogramas, aún no disponible',
-    'Для GUNDAM VERSUS пока недоступен: кадр игры ещё не размечен':
-        'Aún no disponible para GUNDAM VERSUS: el fotograma del juego todavía no está mapeado',
-    'Игра, обновление 1.13 и DLC из ваших файлов .pkg':
-        'El juego, la actualización 1.13 y los DLC desde tus archivos .pkg',
+    'Для MAXIBOOST ON пока недоступен: кадр игры ещё не размечен':
+        'Aún no disponible para MAXIBOOST ON: el fotograma del juego todavía no está mapeado',
+    'Игра, обновление 1.15 и DLC из ваших файлов .pkg':
+        'El juego, la actualización 1.15 y los DLC desde tus archivos .pkg',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
         'La clave de trofeos de PS4 (TrophyKey en shadPS4), 32 dígitos hexadecimales: con ella, los nombres y las descripciones salen en el idioma del juego. Se guarda en este equipo. Sin ella solo se ven los iconos',
     'Нативный порт для Linux, версия {}':
         'Port nativo para Linux, versión {}',
-    'Нужен патч для версии 1.13, его пока нет':
-        'Necesita un parche para la versión 1.13, aún no disponible',
-    'Нужно обновление 1.13: скопируйте файлы дампа обновления 1.13 в папку игры с заменой (найдена версия {})':
-        'Se necesita la actualización 1.13: copia la actualización 1.13 volcada en la carpeta del juego, reemplazando los archivos (versión encontrada: {})',
+    'Нужен патч для версии 1.15, его пока нет':
+        'Necesita un parche para la versión 1.15, aún no disponible',
+    'Нужно обновление 1.15: скопируйте файлы дампа обновления 1.15 в папку игры с заменой (найдена версия {})':
+        'Se necesita la actualización 1.15: copia la actualización 1.15 volcada en la carpeta del juego, reemplazando los archivos (versión encontrada: {})',
     'Основано на bloodborne_linux от ayozetr':
         'Basado en bloodborne_linux de ayozetr',
-    'bloodborne_linux: порт для Linux, на котором построен gvport':
-        'bloodborne_linux: el port para Linux sobre el que se construye gvport',
-    'Папка с сохранениями GUNDAM VERSUS':
-        'Carpeta con partidas de GUNDAM VERSUS',
+    'bloodborne_linux: порт для Linux, на котором построен mbport':
+        'bloodborne_linux: el port para Linux sobre el que se construye mbport',
+    'Папка с сохранениями MAXIBOOST ON':
+        'Carpeta con partidas de MAXIBOOST ON',
     'Патчи игры':
         'Parches del juego',
     'Португальский (Бразилия)':
         'Portugués (Brasil)',
-    'Это не GUNDAM VERSUS (найдено {}): нужна GUNDAM VERSUS (CUSA08790) с обновлением 1.13':
-        'Esto no es GUNDAM VERSUS (encontrado: {}): se necesita GUNDAM VERSUS (CUSA08790) con la actualización 1.13',
+    'Это не MAXIBOOST ON (найдено {}): нужна MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) с обновлением 1.15':
+        'Esto no es MAXIBOOST ON (encontrado: {}): se necesita MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) con la actualización 1.15',
     'Тачпад, левая половина':
         'Panel táctil, mitad izquierda',
     'Тачпад, правая половина':
@@ -2296,18 +2283,11 @@ ES = {
         'No se pudo guardar {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Ajustes actuales guardados como tus valores predeterminados',
-    'Рядом на одном мониторе': 'Una junto a otra en un monitor',
-    'Каждое окно на своём мониторе': 'Cada ventana en su propio monitor',
     'Два игрока': 'Dos jugadores',
-    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': 'En ambos juegos: PLAY → PLAYER MATCH. Uno crea una sala (Room type: 1 on 1) y el otro la encuentra con Search for Room y el mismo Room type.',
-    'Два игрока на одном ПК': 'Dos jugadores en un PC',
-    'Два окна игры, у каждого игрока свой геймпад': 'Dos ventanas del juego, cada jugador con su propio mando',
-    'Окна': 'Ventanas',
-    'Монитор второго игрока': 'Monitor del jugador 2',
-    'Звук второго окна': 'Sonido de la segunda ventana',
-    'Иначе музыка и звуки играют дважды': 'Si no, la música y los sonidos suenan dos veces',
-    'Имя игрока 1': 'Nombre del jugador 1',
-    'Имя игрока 2': 'Nombre del jugador 2',
+    'Второй геймпад играет за 2P в Free Battle: в Mobile Suit Settings переключите слот игрока на 2P. Экран игра делит сама.':
+        'El segundo mando juega como 2P en Free Battle: en Mobile Suit Settings, cambia un puesto de jugador a 2P. El propio juego divide la pantalla.',
+    'Имя игрока':
+        'Nombre del jugador',
     'По сети': 'Por la red',
     'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Cada PC necesita su propia copia del juego. Uno recibe a los jugadores y los demás se conectan a él por su dirección.',
     'Игра по сети': 'Juego en red',
@@ -2315,7 +2295,6 @@ ES = {
     'Подключиться к другому ПК': 'Conectarse a otro PC',
     'Адрес ПК, который принимает игроков': 'Dirección del PC que recibe a los jugadores',
     'Адрес этого ПК: {}': 'Dirección de este PC: {}',
-    'Второй': 'Segundo',
 }
 
 
@@ -2656,7 +2635,8 @@ IT = {
         "Il nuovo: la scheda video lavora direttamente con la memoria del gioco, come in un gioco per PC, e i comandi grafici vengono tradotti invece che emulati. Il vecchio: il modello di memoria della 0.3 con tutte le correzioni. Se il driver non supera il controllo all'avvio, il vecchio",
     "Модель памяти и трансляции":
         "Modello di memoria e traduzione",
-    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Automatico: vecchio (GUNDAM VERSUS è più veloce così)",
+    'Авто: старая':
+        'Automatico: vecchio',
     "Новая":
         "Nuovo",
     "Старая (как в 0.3)":
@@ -2941,53 +2921,53 @@ IT = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: cooperativa nel pool di The Hunter's Dream con i giocatori di bbhost",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Memoria video su schede da 4 GB e crash: flip, swapchain, descrittori ed errori di pagina; scambio degli stick e inversione della telecamera, importazione dei salvataggi, selettore di versione',
     'Большие группы команд записи и swapchain после изменений экрана': 'Grandi gruppi di comandi registrati e la swapchain dopo i cambi di schermo',
-    # GUNDAM VERSUS (gvport)
+    # GUNDAM VERSUS (gvport) and MAXIBOOST ON (mbport)
     '60 (патч)':
         '60 (patch)',
-    'GUNDAM VERSUS {}, версия 1.13':
-        'GUNDAM VERSUS {}, versione 1.13',
-    'GUNDAM VERSUS добавлена в библиотеку Steam':
-        'GUNDAM VERSUS aggiunto alla libreria di Steam',
-    'GUNDAM VERSUS © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
-        'GUNDAM VERSUS © SOTSU · SUNRISE; il gioco per PS4 è stato pubblicato da Bandai Namco Entertainment. Questo progetto non è affiliato con loro.',
-    'XML-патчи в формате shadPS4 для версии 01.13 из папки патчей. Применяются при запуске.':
-        "Patch XML in formato shadPS4 per la versione 01.13 dalla cartella delle patch. Si applicano all'avvio.",
-    'eboot.bin не от версии 1.13: скопируйте eboot.bin из дампа обновления 1.13 в папку игры с заменой':
-        "eboot.bin non è della 1.13: copia eboot.bin dall'aggiornamento 1.13 estratto nella cartella del gioco, sostituendolo",
-    'gvport — нативный порт для Linux':
-        'gvport — port nativo per Linux',
-    'Авторы bbport и bloodborne_linux, на которых построен gvport, и все, кто им помогал':
-        'Gli autori di bbport e bloodborne_linux, su cui è costruito gvport, e tutti quelli che li hanno aiutati',
-    'В папке игры нет: {}. Распакуйте игру и обновление 1.13 заново':
-        'Mancano nella cartella del gioco: {}. Estrai di nuovo il gioco e l’aggiornamento 1.13',
-    'В этой папке нет сохранений GUNDAM VERSUS (SAVEDATA00 с DATA.BIN)':
-        'Nessun salvataggio di GUNDAM VERSUS in questa cartella (SAVEDATA00 con DATA.BIN)',
+    'MAXIBOOST ON {}, версия 1.15':
+        'MAXIBOOST ON {}, versione 1.15',
+    'MAXIBOOST ON добавлена в библиотеку Steam':
+        'MAXIBOOST ON aggiunto alla libreria di Steam',
+    'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; il gioco per PS4 è stato pubblicato da Bandai Namco Entertainment. Questo progetto non è affiliato con loro.',
+    'XML-патчи в формате shadPS4 для версии 01.15 из папки патчей. Применяются при запуске.':
+        "Patch XML in formato shadPS4 per la versione 01.15 dalla cartella delle patch. Si applicano all'avvio.",
+    'eboot.bin не от версии 1.15: скопируйте eboot.bin из дампа обновления 1.15 в папку игры с заменой':
+        "eboot.bin non è della 1.15: copia eboot.bin dall'aggiornamento 1.15 estratto nella cartella del gioco, sostituendolo",
+    'mbport — нативный порт для Linux':
+        'mbport — port nativo per Linux',
+    'Авторы bbport и bloodborne_linux, на которых построен mbport, и все, кто им помогал':
+        'Gli autori di bbport e bloodborne_linux, su cui è costruito mbport, e tutti quelli che li hanno aiutati',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.15 заново':
+        'Mancano nella cartella del gioco: {}. Estrai di nuovo il gioco e l’aggiornamento 1.15',
+    'В этой папке нет сохранений MAXIBOOST ON (memory.dat или папка REPLAY)':
+        'Nessun salvataggio di MAXIBOOST ON in questa cartella (memory.dat o una cartella REPLAY)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'Il gioco gira a 60 FPS, come su PS4. Oltre i 60 FPS serve una patch del frame rate, non ancora disponibile',
-    'Для GUNDAM VERSUS пока недоступен: кадр игры ещё не размечен':
-        'Non ancora disponibile per GUNDAM VERSUS: il fotogramma del gioco non è ancora mappato',
-    'Игра, обновление 1.13 и DLC из ваших файлов .pkg':
-        'Il gioco, l’aggiornamento 1.13 e i DLC dai tuoi file .pkg',
+    'Для MAXIBOOST ON пока недоступен: кадр игры ещё не размечен':
+        'Non ancora disponibile per MAXIBOOST ON: il fotogramma del gioco non è ancora mappato',
+    'Игра, обновление 1.15 и DLC из ваших файлов .pkg':
+        'Il gioco, l’aggiornamento 1.15 e i DLC dai tuoi file .pkg',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
         'La chiave dei trofei PS4 (TrophyKey in shadPS4), 32 cifre esadecimali: con essa nomi e descrizioni sono nella lingua del gioco. Resta su questo computer. Senza, si vedono solo le icone',
     'Нативный порт для Linux, версия {}':
         'Port nativo per Linux, versione {}',
-    'Нужен патч для версии 1.13, его пока нет':
-        'Richiede una patch per la versione 1.13, non ancora disponibile',
-    'Нужно обновление 1.13: скопируйте файлы дампа обновления 1.13 в папку игры с заменой (найдена версия {})':
-        "Serve l'aggiornamento 1.13: copia l'aggiornamento 1.13 estratto nella cartella del gioco, sostituendo i file (versione trovata {})",
+    'Нужен патч для версии 1.15, его пока нет':
+        'Richiede una patch per la versione 1.15, non ancora disponibile',
+    'Нужно обновление 1.15: скопируйте файлы дампа обновления 1.15 в папку игры с заменой (найдена версия {})':
+        "Serve l'aggiornamento 1.15: copia l'aggiornamento 1.15 estratto nella cartella del gioco, sostituendo i file (versione trovata {})",
     'Основано на bloodborne_linux от ayozetr':
         'Basato su bloodborne_linux di ayozetr',
-    'bloodborne_linux: порт для Linux, на котором построен gvport':
-        'bloodborne_linux: il port per Linux su cui è costruito gvport',
-    'Папка с сохранениями GUNDAM VERSUS':
-        'Cartella con i salvataggi di GUNDAM VERSUS',
+    'bloodborne_linux: порт для Linux, на котором построен mbport':
+        'bloodborne_linux: il port per Linux su cui è costruito mbport',
+    'Папка с сохранениями MAXIBOOST ON':
+        'Cartella con i salvataggi di MAXIBOOST ON',
     'Патчи игры':
         'Patch del gioco',
     'Португальский (Бразилия)':
         'Portoghese (Brasile)',
-    'Это не GUNDAM VERSUS (найдено {}): нужна GUNDAM VERSUS (CUSA08790) с обновлением 1.13':
-        'Questo non è GUNDAM VERSUS (trovato {}): serve GUNDAM VERSUS (CUSA08790) con l’aggiornamento 1.13',
+    'Это не MAXIBOOST ON (найдено {}): нужна MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) с обновлением 1.15':
+        'Questo non è MAXIBOOST ON (trovato {}): serve MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) con l’aggiornamento 1.15',
     'Тачпад, левая половина':
         'Touchpad, metà sinistra',
     'Тачпад, правая половина':
@@ -3026,18 +3006,11 @@ IT = {
         'Impossibile salvare {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Impostazioni attuali salvate come tuoi predefiniti',
-    'Рядом на одном мониторе': 'Affiancate su un monitor',
-    'Каждое окно на своём мониторе': 'Ogni finestra sul proprio monitor',
     'Два игрока': 'Due giocatori',
-    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': "In entrambi i giochi: PLAY → PLAYER MATCH. Uno crea una stanza (Room type: 1 on 1), l'altro la trova con Search for Room e lo stesso Room type.",
-    'Два игрока на одном ПК': 'Due giocatori su un PC',
-    'Два окна игры, у каждого игрока свой геймпад': 'Due finestre di gioco, ogni giocatore con il proprio controller',
-    'Окна': 'Finestre',
-    'Монитор второго игрока': 'Monitor del giocatore 2',
-    'Звук второго окна': 'Audio della seconda finestra',
-    'Иначе музыка и звуки играют дважды': 'Altrimenti musica e suoni si sentono due volte',
-    'Имя игрока 1': 'Nome del giocatore 1',
-    'Имя игрока 2': 'Nome del giocatore 2',
+    'Второй геймпад играет за 2P в Free Battle: в Mobile Suit Settings переключите слот игрока на 2P. Экран игра делит сама.':
+        'Il secondo controller gioca come 2P in Free Battle: in Mobile Suit Settings imposta uno slot giocatore su 2P. Il gioco divide lo schermo da solo.',
+    'Имя игрока':
+        'Nome del giocatore',
     'По сети': 'In rete',
     'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Ogni PC ha bisogno della propria copia del gioco. Uno accoglie i giocatori, gli altri si collegano a lui tramite il suo indirizzo.',
     'Игра по сети': 'Gioco in rete',
@@ -3045,7 +3018,6 @@ IT = {
     'Подключиться к другому ПК': 'Collegati a un altro PC',
     'Адрес ПК, который принимает игроков': 'Indirizzo del PC che accoglie i giocatori',
     'Адрес этого ПК: {}': 'Indirizzo di questo PC: {}',
-    'Второй': 'Secondo',
 }
 
 
@@ -3386,7 +3358,8 @@ FR = {
         "Le nouveau : la carte graphique travaille directement avec la mémoire du jeu, comme dans un jeu PC, et les commandes graphiques sont traduites au lieu d'être émulées. L'ancien : le modèle mémoire de la 0.3 avec toutes les corrections. Si le pilote échoue à la vérification au démarrage, l'ancien",
     "Модель памяти и трансляции":
         "Modèle de mémoire et de traduction",
-    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Auto : ancien (GUNDAM VERSUS est plus rapide ainsi)",
+    'Авто: старая':
+        'Auto : ancien',
     "Новая":
         "Nouveau",
     "Старая (как в 0.3)":
@@ -3671,53 +3644,53 @@ FR = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge : coopération sur le pool de The Hunter's Dream avec les joueurs de bbhost",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Mémoire vidéo sur les cartes de 4 Go et plantages : flips, swapchain, descripteurs et défauts de page ; sticks inversés et caméra inversée, import des sauvegardes, choix de version',
     'Большие группы команд записи и swapchain после изменений экрана': 'Grands groupes de commandes enregistrées et la swapchain après un changement d’affichage',
-    # GUNDAM VERSUS (gvport)
+    # GUNDAM VERSUS (gvport) and MAXIBOOST ON (mbport)
     '60 (патч)':
         '60 (patch)',
-    'GUNDAM VERSUS {}, версия 1.13':
-        'GUNDAM VERSUS {}, version 1.13',
-    'GUNDAM VERSUS добавлена в библиотеку Steam':
-        'GUNDAM VERSUS ajouté à la bibliothèque Steam',
-    'GUNDAM VERSUS © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
-        "GUNDAM VERSUS © SOTSU · SUNRISE ; le jeu PS4 a été édité par Bandai Namco Entertainment. Ce projet n'a aucun lien avec elles.",
-    'XML-патчи в формате shadPS4 для версии 01.13 из папки патчей. Применяются при запуске.':
-        'Correctifs XML au format shadPS4 pour la version 01.13, depuis le dossier des correctifs. Appliqués au démarrage.',
-    'eboot.bin не от версии 1.13: скопируйте eboot.bin из дампа обновления 1.13 в папку игры с заменой':
-        "eboot.bin n'est pas celui de la 1.13 : copiez eboot.bin de la mise à jour 1.13 extraite dans le dossier du jeu, en le remplaçant",
-    'gvport — нативный порт для Linux':
-        'gvport — portage natif pour Linux',
-    'Авторы bbport и bloodborne_linux, на которых построен gvport, и все, кто им помогал':
-        'Les auteurs de bbport et de bloodborne_linux, sur lesquels gvport est construit, et tous ceux qui les ont aidés',
-    'В папке игры нет: {}. Распакуйте игру и обновление 1.13 заново':
-        'Absent du dossier du jeu : {}. Extrayez de nouveau le jeu et la mise à jour 1.13',
-    'В этой папке нет сохранений GUNDAM VERSUS (SAVEDATA00 с DATA.BIN)':
-        'Aucune sauvegarde de GUNDAM VERSUS dans ce dossier (SAVEDATA00 avec DATA.BIN)',
+    'MAXIBOOST ON {}, версия 1.15':
+        'MAXIBOOST ON {}, version 1.15',
+    'MAXIBOOST ON добавлена в библиотеку Steam':
+        'MAXIBOOST ON ajouté à la bibliothèque Steam',
+    'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        "MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE ; le jeu PS4 a été édité par Bandai Namco Entertainment. Ce projet n'a aucun lien avec elles.",
+    'XML-патчи в формате shadPS4 для версии 01.15 из папки патчей. Применяются при запуске.':
+        'Correctifs XML au format shadPS4 pour la version 01.15, depuis le dossier des correctifs. Appliqués au démarrage.',
+    'eboot.bin не от версии 1.15: скопируйте eboot.bin из дампа обновления 1.15 в папку игры с заменой':
+        "eboot.bin n'est pas celui de la 1.15 : copiez eboot.bin de la mise à jour 1.15 extraite dans le dossier du jeu, en le remplaçant",
+    'mbport — нативный порт для Linux':
+        'mbport — portage natif pour Linux',
+    'Авторы bbport и bloodborne_linux, на которых построен mbport, и все, кто им помогал':
+        'Les auteurs de bbport et de bloodborne_linux, sur lesquels mbport est construit, et tous ceux qui les ont aidés',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.15 заново':
+        'Absent du dossier du jeu : {}. Extrayez de nouveau le jeu et la mise à jour 1.15',
+    'В этой папке нет сохранений MAXIBOOST ON (memory.dat или папка REPLAY)':
+        'Aucune sauvegarde de MAXIBOOST ON dans ce dossier (memory.dat ou un dossier REPLAY)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         "Le jeu tourne à 60 FPS, comme sur PS4. Au-delà de 60 FPS, il faut un correctif de fréquence d'images, pas encore disponible",
-    'Для GUNDAM VERSUS пока недоступен: кадр игры ещё не размечен':
-        "Pas encore disponible pour GUNDAM VERSUS : l'image du jeu n'est pas encore cartographiée",
-    'Игра, обновление 1.13 и DLC из ваших файлов .pkg':
-        'Le jeu, la mise à jour 1.13 et les DLC depuis vos fichiers .pkg',
+    'Для MAXIBOOST ON пока недоступен: кадр игры ещё не размечен':
+        "Pas encore disponible pour MAXIBOOST ON : l'image du jeu n'est pas encore cartographiée",
+    'Игра, обновление 1.15 и DLC из ваших файлов .pkg':
+        'Le jeu, la mise à jour 1.15 et les DLC depuis vos fichiers .pkg',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
         'La clé des trophées PS4 (TrophyKey dans shadPS4), 32 chiffres hexadécimaux : avec elle, les noms et descriptions sont dans la langue du jeu. Conservée sur cet ordinateur. Sans elle, seules les icônes sont visibles',
     'Нативный порт для Linux, версия {}':
         'Portage natif pour Linux, version {}',
-    'Нужен патч для версии 1.13, его пока нет':
-        'Nécessite un correctif pour la version 1.13, pas encore disponible',
-    'Нужно обновление 1.13: скопируйте файлы дампа обновления 1.13 в папку игры с заменой (найдена версия {})':
-        'La mise à jour 1.13 est nécessaire : copiez la mise à jour 1.13 extraite dans le dossier du jeu, en remplaçant les fichiers (version trouvée : {})',
+    'Нужен патч для версии 1.15, его пока нет':
+        'Nécessite un correctif pour la version 1.15, pas encore disponible',
+    'Нужно обновление 1.15: скопируйте файлы дампа обновления 1.15 в папку игры с заменой (найдена версия {})':
+        'La mise à jour 1.15 est nécessaire : copiez la mise à jour 1.15 extraite dans le dossier du jeu, en remplaçant les fichiers (version trouvée : {})',
     'Основано на bloodborne_linux от ayozetr':
         'Basé sur bloodborne_linux par ayozetr',
-    'bloodborne_linux: порт для Linux, на котором построен gvport':
-        'bloodborne_linux : le portage Linux sur lequel gvport est construit',
-    'Папка с сохранениями GUNDAM VERSUS':
-        'Dossier des sauvegardes de GUNDAM VERSUS',
+    'bloodborne_linux: порт для Linux, на котором построен mbport':
+        'bloodborne_linux : le portage Linux sur lequel mbport est construit',
+    'Папка с сохранениями MAXIBOOST ON':
+        'Dossier des sauvegardes de MAXIBOOST ON',
     'Патчи игры':
         'Correctifs du jeu',
     'Португальский (Бразилия)':
         'Portugais (Brésil)',
-    'Это не GUNDAM VERSUS (найдено {}): нужна GUNDAM VERSUS (CUSA08790) с обновлением 1.13':
-        "Ce n'est pas GUNDAM VERSUS (trouvé : {}) : il faut GUNDAM VERSUS (CUSA08790) avec la mise à jour 1.13",
+    'Это не MAXIBOOST ON (найдено {}): нужна MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) с обновлением 1.15':
+        "Ce n'est pas MAXIBOOST ON (trouvé : {}) : il faut MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) avec la mise à jour 1.15",
     'Тачпад, левая половина':
         'Pavé tactile, moitié gauche',
     'Тачпад, правая половина':
@@ -3756,18 +3729,11 @@ FR = {
         "Impossible d'enregistrer {}",
     'Текущие настройки сохранены как ваши по умолчанию':
         'Réglages actuels enregistrés comme vos valeurs par défaut',
-    'Рядом на одном мониторе': 'Côte à côte sur un écran',
-    'Каждое окно на своём мониторе': 'Chaque fenêtre sur son propre écran',
     'Два игрока': 'Deux joueurs',
-    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': "Dans les deux jeux : PLAY → PLAYER MATCH. L'un crée un salon (Room type : 1 on 1), l'autre le trouve avec Search for Room et le même Room type.",
-    'Два игрока на одном ПК': 'Deux joueurs sur un PC',
-    'Два окна игры, у каждого игрока свой геймпад': 'Deux fenêtres de jeu, chaque joueur avec sa propre manette',
-    'Окна': 'Fenêtres',
-    'Монитор второго игрока': 'Écran du joueur 2',
-    'Звук второго окна': 'Son de la deuxième fenêtre',
-    'Иначе музыка и звуки играют дважды': 'Sinon la musique et les sons sont joués deux fois',
-    'Имя игрока 1': 'Nom du joueur 1',
-    'Имя игрока 2': 'Nom du joueur 2',
+    'Второй геймпад играет за 2P в Free Battle: в Mobile Suit Settings переключите слот игрока на 2P. Экран игра делит сама.':
+        "La deuxième manette joue en 2P dans Free Battle : dans Mobile Suit Settings, passez un emplacement de joueur sur 2P. Le jeu partage l'écran lui-même.",
+    'Имя игрока':
+        'Nom du joueur',
     'По сети': 'Par le réseau',
     'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Chaque PC a besoin de sa propre copie du jeu. L’un accueille les joueurs, les autres s’y connectent par son adresse.',
     'Игра по сети': 'Jeu en réseau',
@@ -3775,7 +3741,6 @@ FR = {
     'Подключиться к другому ПК': 'Se connecter à un autre PC',
     'Адрес ПК, который принимает игроков': 'Adresse du PC qui accueille les joueurs',
     'Адрес этого ПК: {}': 'Adresse de ce PC : {}',
-    'Второй': 'Deuxième',
 }
 
 
@@ -4116,7 +4081,8 @@ DE = {
         "Das neue: Die Grafikkarte arbeitet direkt mit dem Speicher des Spiels, wie bei einem PC-Spiel, und Grafikbefehle werden übersetzt statt emuliert. Das alte: das Speichermodell von 0.3 mit allen Korrekturen. Besteht der Treiber die Prüfung beim Start nicht, das alte",
     "Модель памяти и трансляции":
         "Speicher- und Übersetzungsmodell",
-    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "Auto: alt (GUNDAM VERSUS läuft damit schneller)",
+    'Авто: старая':
+        'Auto: alt',
     "Новая":
         "Neu",
     "Старая (как в 0.3)":
@@ -4401,53 +4367,53 @@ DE = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge: Koop im Pool von The Hunter's Dream mit bbhost-Spielern",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': 'Videospeicher auf 4-GB-Karten und Abstürze: Flips, Swapchain, Deskriptoren und Seitenfehler; Sticks tauschen und Kamera invertieren, Spielstände importieren, Versionsauswahl',
     'Большие группы команд записи и swapchain после изменений экрана': 'Große aufgezeichnete Befehlsgruppen und die Swapchain nach Anzeigeänderungen',
-    # GUNDAM VERSUS (gvport)
+    # GUNDAM VERSUS (gvport) and MAXIBOOST ON (mbport)
     '60 (патч)':
         '60 (Patch)',
-    'GUNDAM VERSUS {}, версия 1.13':
-        'GUNDAM VERSUS {}, Version 1.13',
-    'GUNDAM VERSUS добавлена в библиотеку Steam':
-        'GUNDAM VERSUS wurde zur Steam-Bibliothek hinzugefügt',
-    'GUNDAM VERSUS © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
-        'GUNDAM VERSUS © SOTSU · SUNRISE; das PS4-Spiel wurde von Bandai Namco Entertainment veröffentlicht. Dieses Projekt steht in keiner Verbindung zu ihnen.',
-    'XML-патчи в формате shadPS4 для версии 01.13 из папки патчей. Применяются при запуске.':
-        'XML-Patches im shadPS4-Format für Version 01.13 aus dem Patches-Ordner. Werden beim Start angewendet.',
-    'eboot.bin не от версии 1.13: скопируйте eboot.bin из дампа обновления 1.13 в папку игры с заменой':
-        'Die eboot.bin ist nicht von 1.13: Kopiere die eboot.bin aus dem extrahierten Update 1.13 in den Spielordner und ersetze sie',
-    'gvport — нативный порт для Linux':
-        'gvport — nativer Linux-Port',
-    'Авторы bbport и bloodborne_linux, на которых построен gvport, и все, кто им помогал':
-        'Die Autoren von bbport und bloodborne_linux, auf denen gvport aufbaut, und alle, die ihnen geholfen haben',
-    'В папке игры нет: {}. Распакуйте игру и обновление 1.13 заново':
-        'Im Spielordner fehlt: {}. Entpacke das Spiel und das Update 1.13 erneut',
-    'В этой папке нет сохранений GUNDAM VERSUS (SAVEDATA00 с DATA.BIN)':
-        'Keine GUNDAM VERSUS-Spielstände in diesem Ordner (SAVEDATA00 mit DATA.BIN)',
+    'MAXIBOOST ON {}, версия 1.15':
+        'MAXIBOOST ON {}, Version 1.15',
+    'MAXIBOOST ON добавлена в библиотеку Steam':
+        'MAXIBOOST ON wurde zur Steam-Bibliothek hinzugefügt',
+    'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; das PS4-Spiel wurde von Bandai Namco Entertainment veröffentlicht. Dieses Projekt steht in keiner Verbindung zu ihnen.',
+    'XML-патчи в формате shadPS4 для версии 01.15 из папки патчей. Применяются при запуске.':
+        'XML-Patches im shadPS4-Format für Version 01.15 aus dem Patches-Ordner. Werden beim Start angewendet.',
+    'eboot.bin не от версии 1.15: скопируйте eboot.bin из дампа обновления 1.15 в папку игры с заменой':
+        'Die eboot.bin ist nicht von 1.15: Kopiere die eboot.bin aus dem extrahierten Update 1.15 in den Spielordner und ersetze sie',
+    'mbport — нативный порт для Linux':
+        'mbport — nativer Linux-Port',
+    'Авторы bbport и bloodborne_linux, на которых построен mbport, и все, кто им помогал':
+        'Die Autoren von bbport und bloodborne_linux, auf denen mbport aufbaut, und alle, die ihnen geholfen haben',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.15 заново':
+        'Im Spielordner fehlt: {}. Entpacke das Spiel und das Update 1.15 erneut',
+    'В этой папке нет сохранений MAXIBOOST ON (memory.dat или папка REPLAY)':
+        'Keine Spielstände von MAXIBOOST ON in diesem Ordner (memory.dat oder ein REPLAY-Ordner)',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         'Das Spiel läuft mit 60 FPS wie auf der PS4. Mehr als 60 FPS braucht einen Bildraten-Patch, der noch nicht verfügbar ist',
-    'Для GUNDAM VERSUS пока недоступен: кадр игры ещё не размечен':
-        'Für GUNDAM VERSUS noch nicht verfügbar: das Bild des Spiels ist noch nicht erfasst',
-    'Игра, обновление 1.13 и DLC из ваших файлов .pkg':
-        'Das Spiel, Update 1.13 und DLC aus Ihren .pkg-Dateien',
+    'Для MAXIBOOST ON пока недоступен: кадр игры ещё не размечен':
+        'Für MAXIBOOST ON noch nicht verfügbar: das Bild des Spiels ist noch nicht erfasst',
+    'Игра, обновление 1.15 и DLC из ваших файлов .pkg':
+        'Das Spiel, Update 1.15 und DLC aus Ihren .pkg-Dateien',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
         'Der Trophäen-Schlüssel der PS4 (TrophyKey in shadPS4), 32 Hexadezimalziffern: damit sind Namen und Beschreibungen in der Sprache des Spiels. Bleibt auf diesem Computer. Ohne ihn sind nur die Symbole zu sehen',
     'Нативный порт для Linux, версия {}':
         'Nativer Linux-Port, Version {}',
-    'Нужен патч для версии 1.13, его пока нет':
-        'Braucht einen Patch für Version 1.13, noch nicht verfügbar',
-    'Нужно обновление 1.13: скопируйте файлы дампа обновления 1.13 в папку игры с заменой (найдена версия {})':
-        'Das Update 1.13 wird benötigt: Kopiere das extrahierte Update 1.13 in den Spielordner und ersetze dabei die Dateien (gefundene Version {})',
+    'Нужен патч для версии 1.15, его пока нет':
+        'Braucht einen Patch für Version 1.15, noch nicht verfügbar',
+    'Нужно обновление 1.15: скопируйте файлы дампа обновления 1.15 в папку игры с заменой (найдена версия {})':
+        'Das Update 1.15 wird benötigt: Kopiere das extrahierte Update 1.15 in den Spielordner und ersetze dabei die Dateien (gefundene Version {})',
     'Основано на bloodborne_linux от ayozetr':
         'Basiert auf bloodborne_linux von ayozetr',
-    'bloodborne_linux: порт для Linux, на котором построен gvport':
-        'bloodborne_linux: der Linux-Port, auf dem gvport aufbaut',
-    'Папка с сохранениями GUNDAM VERSUS':
-        'Ordner mit GUNDAM VERSUS-Spielständen',
+    'bloodborne_linux: порт для Linux, на котором построен mbport':
+        'bloodborne_linux: der Linux-Port, auf dem mbport aufbaut',
+    'Папка с сохранениями MAXIBOOST ON':
+        'Ordner mit Spielständen von MAXIBOOST ON',
     'Патчи игры':
         'Spiel-Patches',
     'Португальский (Бразилия)':
         'Portugiesisch (Brasilien)',
-    'Это не GUNDAM VERSUS (найдено {}): нужна GUNDAM VERSUS (CUSA08790) с обновлением 1.13':
-        'Das ist nicht GUNDAM VERSUS (gefunden: {}): Benötigt wird GUNDAM VERSUS (CUSA08790) mit Update 1.13',
+    'Это не MAXIBOOST ON (найдено {}): нужна MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) с обновлением 1.15':
+        'Das ist nicht MAXIBOOST ON (gefunden: {}): Benötigt wird MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) mit Update 1.15',
     'Тачпад, левая половина':
         'Touchpad, linke Hälfte',
     'Тачпад, правая половина':
@@ -4486,18 +4452,11 @@ DE = {
         '{} konnte nicht gespeichert werden',
     'Текущие настройки сохранены как ваши по умолчанию':
         'Aktuelle Einstellungen als Ihre Standardwerte gespeichert',
-    'Рядом на одном мониторе': 'Nebeneinander auf einem Monitor',
-    'Каждое окно на своём мониторе': 'Jedes Fenster auf eigenem Monitor',
     'Два игрока': 'Zwei Spieler',
-    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': 'In beiden Spielen: PLAY → PLAYER MATCH. Einer erstellt einen Raum (Room type: 1 on 1), der andere findet ihn mit Search for Room und demselben Room type.',
-    'Два игрока на одном ПК': 'Zwei Spieler an einem PC',
-    'Два окна игры, у каждого игрока свой геймпад': 'Zwei Spielfenster, jeder Spieler mit eigenem Controller',
-    'Окна': 'Fenster',
-    'Монитор второго игрока': 'Monitor von Spieler 2',
-    'Звук второго окна': 'Ton des zweiten Fensters',
-    'Иначе музыка и звуки играют дважды': 'Sonst laufen Musik und Klänge doppelt',
-    'Имя игрока 1': 'Name von Spieler 1',
-    'Имя игрока 2': 'Name von Spieler 2',
+    'Второй геймпад играет за 2P в Free Battle: в Mobile Suit Settings переключите слот игрока на 2P. Экран игра делит сама.':
+        'Der zweite Controller spielt in Free Battle als 2P: Stelle unter Mobile Suit Settings einen Spielerplatz auf 2P. Das Spiel teilt den Bildschirm selbst.',
+    'Имя игрока':
+        'Spielername',
     'По сети': 'Über das Netzwerk',
     'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': 'Jeder PC braucht eine eigene Kopie des Spiels. Einer nimmt die Spieler auf, die anderen verbinden sich über seine Adresse mit ihm.',
     'Игра по сети': 'Netzwerkspiel',
@@ -4505,7 +4464,6 @@ DE = {
     'Подключиться к другому ПК': 'Mit einem anderen PC verbinden',
     'Адрес ПК, который принимает игроков': 'Adresse des PCs, der die Spieler aufnimmt',
     'Адрес этого ПК: {}': 'Adresse dieses PCs: {}',
-    'Второй': 'Zweiter',
 }
 
 
@@ -4771,7 +4729,8 @@ ZH_CN = {
     "Новая: видеокарта работает с памятью игры напрямую, как в игре для ПК, а команды графики переводятся, а не эмулируются. Старая — модель памяти 0.3 со всеми исправлениями. Если драйвер не проходит проверку при запуске — старая":
         "新模型：显卡像 PC 游戏那样直接读写游戏内存，图形指令被转译而非模拟。旧模型：0.3 版的内存模型，包含所有修复。如果驱动未通过启动检查，则使用旧模型",
     "Модель памяти и трансляции": "内存与指令转译模型",
-    "Авто: старая (GUNDAM VERSUS с ней быстрее)": "自动：旧模型（GUNDAM VERSUS 用它更快）",
+    'Авто: старая':
+        '自动：旧模型',
     "Новая": "新模型",
     "Старая (как в 0.3)": "旧模型（与 0.3 版相同）",
     "Синхронизация как в 0.3": "与 0.3 版相同的同步方式",
@@ -5075,53 +5034,53 @@ ZH_CN = {
     "bbbridge: кооператив на пуле The Hunter's Dream с игроками bbhost": "bbbridge：在 The Hunter's Dream 池中与 bbhost 玩家合作",
     'Видеопамять на картах с 4 ГБ и вылеты: флипы, swapchain, дескрипторы и ошибки страниц; смена стиков и инверсия камеры, импорт сохранений, выбор версии': '4 GB 显卡的显存与崩溃：翻转、交换链、描述符和页错误；交换摇杆与视角反转、导入存档、版本选择',
     'Большие группы команд записи и swapchain после изменений экрана': '大型录制命令组以及显示变化后的交换链',
-    # GUNDAM VERSUS (gvport)
+    # GUNDAM VERSUS (gvport) and MAXIBOOST ON (mbport)
     '60 (патч)':
         '60（补丁）',
-    'GUNDAM VERSUS {}, версия 1.13':
-        'GUNDAM VERSUS {}，版本 1.13',
-    'GUNDAM VERSUS добавлена в библиотеку Steam':
-        'GUNDAM VERSUS 已添加到 Steam 库',
-    'GUNDAM VERSUS © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
-        'GUNDAM VERSUS © SOTSU · SUNRISE；PS4 游戏由 Bandai Namco Entertainment 发行。本项目与它们无关。',
-    'XML-патчи в формате shadPS4 для версии 01.13 из папки патчей. Применяются при запуске.':
-        '补丁文件夹中、shadPS4 格式、适用于 01.13 版本的 XML 补丁。会在游戏启动时生效。',
-    'eboot.bin не от версии 1.13: скопируйте eboot.bin из дампа обновления 1.13 в папку игры с заменой':
-        'eboot.bin 不是 1.13 版本：请将 1.13 更新转储中的 eboot.bin 复制到游戏文件夹并覆盖',
-    'gvport — нативный порт для Linux':
-        'gvport — 原生 Linux 移植版',
-    'Авторы bbport и bloodborne_linux, на которых построен gvport, и все, кто им помогал':
-        'gvport 所基于的 bbport 和 bloodborne_linux 的作者，以及所有帮助过他们的人',
-    'В папке игры нет: {}. Распакуйте игру и обновление 1.13 заново':
-        '游戏文件夹中缺少：{}。请重新解包游戏和 1.13 更新',
-    'В этой папке нет сохранений GUNDAM VERSUS (SAVEDATA00 с DATA.BIN)':
-        '此文件夹中没有 GUNDAM VERSUS 存档（含 DATA.BIN 的 SAVEDATA00）',
+    'MAXIBOOST ON {}, версия 1.15':
+        'MAXIBOOST ON {}，版本 1.15',
+    'MAXIBOOST ON добавлена в библиотеку Steam':
+        'MAXIBOOST ON 已添加到 Steam 库',
+    'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco Entertainment. Этот проект с ними не связан.':
+        'MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE；PS4 游戏由 Bandai Namco Entertainment 发行。本项目与它们无关。',
+    'XML-патчи в формате shadPS4 для версии 01.15 из папки патчей. Применяются при запуске.':
+        '补丁文件夹中、shadPS4 格式、适用于 01.15 版本的 XML 补丁。会在游戏启动时生效。',
+    'eboot.bin не от версии 1.15: скопируйте eboot.bin из дампа обновления 1.15 в папку игры с заменой':
+        'eboot.bin 不是 1.15 版本：请将 1.15 更新转储中的 eboot.bin 复制到游戏文件夹并覆盖',
+    'mbport — нативный порт для Linux':
+        'mbport — 原生 Linux 移植版',
+    'Авторы bbport и bloodborne_linux, на которых построен mbport, и все, кто им помогал':
+        'mbport 所基于的 bbport 和 bloodborne_linux 的作者，以及所有帮助过他们的人',
+    'В папке игры нет: {}. Распакуйте игру и обновление 1.15 заново':
+        '游戏文件夹中缺少：{}。请重新解包游戏和 1.15 更新',
+    'В этой папке нет сохранений MAXIBOOST ON (memory.dat или папка REPLAY)':
+        '此文件夹中没有 MAXIBOOST ON 存档（memory.dat 或 REPLAY 文件夹）',
     'Игра идёт с 60 FPS, как на PS4. Выше 60 FPS: нужен патч частоты кадров, его пока нет':
         '游戏以 60 FPS 运行，与 PS4 一致。高于 60 FPS 需要帧率补丁，目前尚无',
-    'Для GUNDAM VERSUS пока недоступен: кадр игры ещё не размечен':
-        'GUNDAM VERSUS 暂不可用：尚未解析游戏的画面结构',
-    'Игра, обновление 1.13 и DLC из ваших файлов .pkg':
-        '从你的 .pkg 文件安装游戏、1.13 更新和 DLC',
+    'Для MAXIBOOST ON пока недоступен: кадр игры ещё не размечен':
+        'MAXIBOOST ON 暂不可用：尚未解析游戏的画面结构',
+    'Игра, обновление 1.15 и DLC из ваших файлов .pkg':
+        '从你的 .pkg 文件安装游戏、1.15 更新和 DLC',
     'Ключ трофеев PS4 (TrophyKey в shadPS4), 32 шестнадцатеричных символа: с ним названия и описания на языке игры. Хранится на этом компьютере. Без него видны только значки':
         'PS4 的奖杯密钥（shadPS4 中的 TrophyKey），32 位十六进制数：填写后奖杯名称和说明使用游戏语言。仅保存在本机。未填写时只显示图标',
     'Нативный порт для Linux, версия {}':
         '原生 Linux 移植版，版本 {}',
-    'Нужен патч для версии 1.13, его пока нет':
-        '需要适用于 1.13 版本的补丁，目前尚无',
-    'Нужно обновление 1.13: скопируйте файлы дампа обновления 1.13 в папку игры с заменой (найдена версия {})':
-        '需要 1.13 更新：请将转储出的 1.13 更新文件复制到游戏文件夹并覆盖（当前检测到版本 {}）',
+    'Нужен патч для версии 1.15, его пока нет':
+        '需要适用于 1.15 版本的补丁，目前尚无',
+    'Нужно обновление 1.15: скопируйте файлы дампа обновления 1.15 в папку игры с заменой (найдена версия {})':
+        '需要 1.15 更新：请将转储出的 1.15 更新文件复制到游戏文件夹并覆盖（当前检测到版本 {}）',
     'Основано на bloodborne_linux от ayozetr':
         '基于 ayozetr 的 bloodborne_linux',
-    'bloodborne_linux: порт для Linux, на котором построен gvport':
-        'bloodborne_linux：gvport 所基于的 Linux 移植版',
-    'Папка с сохранениями GUNDAM VERSUS':
-        'GUNDAM VERSUS 存档文件夹',
+    'bloodborne_linux: порт для Linux, на котором построен mbport':
+        'bloodborne_linux：mbport 所基于的 Linux 移植版',
+    'Папка с сохранениями MAXIBOOST ON':
+        'MAXIBOOST ON 存档文件夹',
     'Патчи игры':
         '游戏补丁',
     'Португальский (Бразилия)':
         '葡萄牙语（巴西）',
-    'Это не GUNDAM VERSUS (найдено {}): нужна GUNDAM VERSUS (CUSA08790) с обновлением 1.13':
-        '这不是 GUNDAM VERSUS（检测到 {}）：需要带 1.13 更新的 GUNDAM VERSUS（CUSA08790）',
+    'Это не MAXIBOOST ON (найдено {}): нужна MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) с обновлением 1.15':
+        '这不是 MAXIBOOST ON（检测到 {}）：需要带 1.15 更新的 MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON（CUSA18758）',
     'Тачпад, левая половина':
         '触摸板左侧',
     'Тачпад, правая половина':
@@ -5160,18 +5119,11 @@ ZH_CN = {
         '无法保存 {}',
     'Текущие настройки сохранены как ваши по умолчанию':
         '当前设置已保存为您的默认设置',
-    'Рядом на одном мониторе': '在一台显示器上并排',
-    'Каждое окно на своём мониторе': '每个窗口各占一台显示器',
     'Два игрока': '双人',
-    'В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: 1 on 1), другой находит её через Search for Room с тем же Room type.': '两个游戏中都选择 PLAY → PLAYER MATCH。一方创建房间（Room type：1 on 1），另一方用 Search for Room 并选择相同的 Room type 找到它。',
-    'Два игрока на одном ПК': '同一台电脑上的双人对战',
-    'Два окна игры, у каждого игрока свой геймпад': '两个游戏窗口，每位玩家各用一个手柄',
-    'Окна': '窗口',
-    'Монитор второго игрока': '玩家 2 的显示器',
-    'Звук второго окна': '第二个窗口的声音',
-    'Иначе музыка и звуки играют дважды': '否则音乐和音效会播放两次',
-    'Имя игрока 1': '玩家 1 的名字',
-    'Имя игрока 2': '玩家 2 的名字',
+    'Второй геймпад играет за 2P в Free Battle: в Mobile Suit Settings переключите слот игрока на 2P. Экран игра делит сама.':
+        '第二个手柄在 Free Battle 中作为 2P：在 Mobile Suit Settings 中把一个玩家位切换为 2P，游戏会自动分屏。',
+    'Имя игрока':
+        '玩家名字',
     'По сети': '局域网',
     'Каждому ПК нужна своя копия игры. Один принимает игроков, другие подключаются к нему по его адресу.': '每台电脑都需要一份自己的游戏。一台接收玩家，其他电脑通过它的地址连接。',
     'Игра по сети': '联网游戏',
@@ -5179,7 +5131,6 @@ ZH_CN = {
     'Подключиться к другому ПК': '连接到另一台电脑',
     'Адрес ПК, который принимает игроков': '接收玩家的电脑的地址',
     'Адрес этого ПК: {}': '这台电脑的地址：{}',
-    'Второй': '第二台',
 }
 
 # Translations by language code; Russian is the key itself. Strings missing in a translation

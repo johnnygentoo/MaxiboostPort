@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""GUNDAM VERSUS launcher for gvport, the native Linux port (GTK4 / libadwaita).
+"""MAXIBOOST ON launcher for mbport, the native Linux port of MOBILE SUIT GUNDAM EXTREME VS.
+MAXIBOOST ON (GTK4 / libadwaita).
 
 Picks the game folder, edits the port's settings (bbport.ini: upscaler, preset, ...) and the
 start-up tweaks passed as environment variables to run.sh, starts and stops the game and shows
-its output. Launcher settings live in ~/.config/gvport-launcher/settings.json; the packaged
-port's data in ~/.local/share/gvport (BB_DATA_DIR). Nothing of a Bloodborne install
-(bbport-launcher, ~/.local/share/bbport) is read or written.
+its output. Launcher settings live in ~/.config/mbport-launcher/settings.json; the packaged
+port's data in ~/.local/share/mbport (BB_DATA_DIR). Nothing of a Bloodborne, GODZILLA or GUNDAM
+VERSUS install (bbport-, gzport-, gvport-launcher; ~/.local/share/bbport, gzport, gvport) is read
+or written.
 Texts: bbport_i18n (the Russian text is the key; English, Spanish, Italian, French, German,
 Brazilian Portuguese and Simplified Chinese).
 """
 
+import datetime
 import json
 import shutil
 import os
@@ -58,18 +61,19 @@ import trophies  # noqa: E402
 # Packaged (AppImage): generated files, saves and bbport.ini live in BB_DATA_DIR.
 PACKAGED = bool(os.environ.get("BB_PREBUILT"))
 DATA_DIR = Path(os.environ.get("BB_DATA_DIR", PORT_DIR))
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "gvport-launcher"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "mbport-launcher"
 CONFIG_FILE = CONFIG_DIR / "settings.json"
 # The player's own defaults (bbport_defaults): "Restore my defaults" on the Settings page.
 DEFAULTS_FILE = CONFIG_DIR / "defaults.json"
 MAX_LOG_LINES = 5000
-# The memory model (run.sh: BB_PC_MODEL): "auto" is the 0.3 one for GUNDAM VERSUS on every GPU (with
-# the new one its compute queues wait for GPU round trips: ~30 instead of 60 FPS), or either by hand. The new one goes through the layer's memory module on
+# The memory model (run.sh: BB_PC_MODEL): "auto" is run.sh's choice, the 0.3 one on every GPU (GUNDAM
+# VERSUS, the same engine, ran at ~30 instead of 60 FPS with the new one: its compute queues wait for
+# GPU round trips; not measured for MAXIBOOST ON), or either by hand. The new one goes through the layer's memory module on
 # every GPU (no sparse binding of the game's memory; BB_LAYER_MEMORY=0: AMD's sparse arena).
 PC_MODEL_SUBTITLE = ("Новая: видеокарта работает с памятью игры напрямую, как в игре для ПК, а команды "
                      "графики переводятся, а не эмулируются. Старая — модель памяти 0.3 со всеми "
                      "исправлениями. Если драйвер не проходит проверку при запуске — старая")
-MEMORY_MODELS = [("Авто: старая (GUNDAM VERSUS с ней быстрее)", "auto"), ("Новая", "new"),
+MEMORY_MODELS = [("Авто: старая", "auto"), ("Новая", "new"),
                  ("Старая (как в 0.3)", "old")]
 # FSR 4.1.1 assets built from the user's AMD DLL (tools/fsr4cap, also in the package).
 FSR4CAP_DIR = PORT_DIR / "tools" / "fsr4cap"
@@ -105,9 +109,9 @@ UI_LANGUAGES = [("Как в системе", ""), ("Русский", "ru"), ("En
                 ("Español", "es"), ("Italiano", "it"), ("Français", "fr"), ("Deutsch", "de"),
                 ("简体中文", "zh_CN")]
 # The temporal upscalers need the game's scene color, depth and motion, which the GPU library learns
-# from the game profile (gpu/games/gundam.cpp: its camera, G-buffer pass and the pass scaling the
-# scene into the display buffer, where the game draws its HUD at the output size).
-UPSCALERS_AVAILABLE = True
+# from the game profile (gpu/games/gundam.cpp maps GUNDAM VERSUS' camera, G-buffer pass and the pass
+# scaling the scene into the display buffer). MAXIBOOST ON's frame is not mapped yet: off until it is.
+UPSCALERS_AVAILABLE = False
 UPSCALERS = [("FSR 4", "fsr4"), ("FSR 4.1.1", "fsr411"), ("FSR 3", "fsr3"),
              ("DLSS (NVIDIA RTX)", "dlss"),
              ("TAA (нативное сглаживание)", "taa"), ("Выключен", "off")]
@@ -116,12 +120,12 @@ PRESETS = [("Native AA", 0), ("Quality (x1.5)", 1), ("Balanced (x1.7)", 2),
 OUTPUT_RES = [("1280×720 (Steam Deck)", "1280x720"), ("1920×1080", "1920x1080"), ("2560×1440", "2560x1440"), ("3840×2160", "3840x2160")]
 # Game patches applied at start (scripts/patches.py EFFECTS: a bbport.ini key and the patch of
 # built-in patch file, scripts/patches.py BUILTIN_XML, it turns on): bbport.ini key, title, default. A switch whose patch the file
-# does not have yet for 1.13 is shown greyed out.
+# does not have yet for 1.15 is shown greyed out.
 GAME_PATCHES = [
     ("skip_intro", "Пропуск заставок при запуске", False),
 ]
 # Frame rate (BB_FPS; scripts/patches.py FPS_PRESETS). The game runs at 60 FPS; a higher rate
-# needs a frame-rate patch for the 1.13 executable, not written yet: then it is listed here too.
+# needs a frame-rate patch for the 1.15 executable, not written yet: then it is listed here too.
 FPS_MODES = [("60 (как на PS4)", "60")]
 PRESENT_MODES = [("Mailbox", "Mailbox"), ("FIFO (VSync)", "Fifo"),
                  ("FIFO Relaxed", "FifoRelaxed"), ("Immediate", "Immediate")]
@@ -130,11 +134,12 @@ PRESENT_MODES = [("Mailbox", "Mailbox"), ("FIFO (VSync)", "Fifo"),
 DRAW_PIPE = [("Авто", "", "Включён при 8 и более потоках процессора"), ("Включён", "1"),
              ("Выключен", "0", "Стабильнее, но медленнее")]
 # The game's language: the PS4 system language ("": from the desktop's locale). The North American
-# release (CUSA08790) is played in English; which other text languages its archives hold is not
+# release (CUSA18758) is played in English; which other text languages its archives hold is not
 # checked yet, so only English is offered by name.
 LANGUAGES = [("Как в системе", ""), ("Английский", "1")]
 LIVE_RESOLUTION = [("Авто (по видеокарте)", "auto"), ("Выключена (быстрее)", "0"), ("Включена", "1")]
-# "" leaves it to run.sh: precise for GUNDAM VERSUS (its effects are drawn from GPU-written data).
+# "" leaves it to run.sh: precise (MAXIBOOST ON's beams and explosions, like GUNDAM VERSUS', are drawn
+# from GPU-written data).
 READBACKS = [("Авто: Precise", "", "Нужно для эффектов: лучей, взрывов, огня"),
              ("Relaxed", "1", "Эффекты (лучи, взрывы, огонь) не рисуются"),
              ("Выключены", "0", "Эффекты (лучи, взрывы, огонь) не рисуются"), ("Precise", "2")]
@@ -145,12 +150,12 @@ PREUPLOAD = [("Обычная", "", "Без лишней видеопамяти"
 
 def default_game_dir():
     """From a checkout: the dump beside it or inside it (gitignored), else where run.sh looks."""
-    # CUSA08790-full: the base game with the 1.13 update hardlinked over it (the README).
-    for folder in (PORT_DIR / "CUSA08790-full", PORT_DIR.parent / "CUSA08790-full",
-                   PORT_DIR.parent / "CUSA08790", PORT_DIR / "CUSA08790"):
+    # CUSA18758-full: the base game with the 1.15 update hardlinked over it (the README).
+    for folder in (PORT_DIR / "CUSA18758-full", PORT_DIR.parent / "CUSA18758-full",
+                   PORT_DIR.parent / "CUSA18758", PORT_DIR / "CUSA18758"):
         if (folder / "eboot.bin").is_file():
             return folder
-    return PORT_DIR / "CUSA08790-full"
+    return PORT_DIR / "CUSA18758-full"
 
 
 DEFAULTS = {
@@ -180,13 +185,9 @@ DEFAULTS = {
     "gpu_profile": False,
     "vk_validation": False,
     "extra_env": "",
-    # Couch versus (run.sh BB_COOP): two games, one per player and gamepad.
-    "coop": False,
-    "coop_layout": "split",
-    "coop_display2": "",
-    "coop_audio2": False,
-    "coop_name1": "Player1",
-    "coop_name2": "Player2",
+    # Two players need no setting: MAXIBOOST ON splits the screen itself (Free Battle, 2P).
+    # Network play (run.sh BB_LAN): this PC's player name on the matching server.
+    "player_name": "Player1",
     "lan": "off",
     "lan_server": "",
     # The PS4's trophy key (shadPS4's TrophyKey): the trophies' names (scripts/trophies.py).
@@ -195,7 +196,7 @@ DEFAULTS = {
 
 # bbport.ini keys the launcher edits; the rest of the file is kept.
 INI_DEFAULTS = {
-    # Off: GUNDAM VERSUS renders natively at the output size (60 FPS at 4K on an RX 7800 XT).
+    # Off: MAXIBOOST ON's frame is not mapped for the upscalers yet (UPSCALERS_AVAILABLE).
     "upscaler": "off",
     "preset": "4",
     "sharpen": "1",
@@ -282,7 +283,9 @@ def fps_modes(have=None):
     return [mode for mode in FPS_MODES if all(name in have for name in FPS_PRESETS.get(mode[1], ()))]
 
 
-LAUNCHER_ICON = PORT_DIR / "launcher" / "gundam.svg"
+LAUNCHER_ICON = PORT_DIR / "launcher" / "maxiboost.svg"
+# The game's name in the Steam library.
+STEAM_NAME = "MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON"
 
 
 def game_icon(game_dir):
@@ -374,9 +377,8 @@ def game_environment(s):
         env["BB_USER_DIR"] = s["user_dir"]
     if s.get("dlc_dir"):
         env["BB_DLC_DIR"] = str(Path(s["dlc_dir"]).expanduser())
-    # Loose-file mods (scripts/mods.py) replace files under Bloodborne's dvdroot_ps4; GUNDAM VERSUS'
-    # files are .pac archives at the folder's root, so none are laid over the game. The menu's
-    # button prompts (scripts/menu_prompts.py) edit Bloodborne's menu files: run.sh skips them.
+    # Loose-file mods (scripts/mods.py) replace files under Bloodborne's dvdroot_ps4; MAXIBOOST ON
+    # has no such folder, so none are laid over the game. The menu's button prompts (scripts/menu_prompts.py) edit Bloodborne's menu files: run.sh skips them.
     env["BB_MODS_ENABLED"] = "0"
     env["BB_PATCHES_DIR"] = str(patches_dir(s))
     env["BB_PATCHES_CONFIG"] = str(DATA_DIR / "patches.json")
@@ -407,7 +409,7 @@ def game_environment(s):
         env["BB_FRAME_STATS"] = "1"
     if s.get("save_log"):
         env["BB_SAVE_LOG"] = "1"
-    # The memory model: "auto" is run.sh's choice (the 0.3 one for GUNDAM VERSUS on every GPU).
+    # The memory model: "auto" is run.sh's choice (the 0.3 one on every GPU).
     # "pc_model", "pc_memory", "old_memory_model", "new_memory_model" and
     # "legacy_memory_model" of older settings are ignored (0.5: auto for everyone).
     # BB_PC_MODEL from the shell (or the extra variables) still wins over "auto".
@@ -427,22 +429,11 @@ def game_environment(s):
         env["BB_VK_VALIDATION"] = "1"
     if s.get("trophy_key", "").strip():
         env["BB_TROPHY_KEY"] = s["trophy_key"].strip()
-    if s.get("coop"):
-        env["BB_COOP"] = "1"
-        env["BB_COOP_LAYOUT"] = "displays" if s.get("coop_layout") == "displays" else "split"
-        if s.get("coop_display2"):
-            env["BB_COOP_DISPLAY2"] = s["coop_display2"]
-        if s.get("coop_audio2"):
-            env["BB_COOP_AUDIO2"] = "1"
-        for key, default, var in (("coop_name1", "Player1", "BB_COOP_NAME1"),
-                                  ("coop_name2", "Player2", "BB_COOP_NAME2")):
-            env[var] = coop_name(s.get(key, ""), default)
     if s.get("lan") in ("host", "join"):
         env["BB_LAN"] = s["lan"]
         if s["lan"] == "join":
             env["BB_LAN_SERVER"] = s.get("lan_server", "").strip()
-        if not s.get("coop"):
-            env["BB_SHADNET_NPID"] = coop_name(s.get("coop_name1", ""), "Player1")
+        env["BB_SHADNET_NPID"] = player_name(s.get("player_name", ""), "Player1")
     for item in s["extra_env"].split():
         if "=" in item:
             key, value = item.split("=", 1)
@@ -450,17 +441,12 @@ def game_environment(s):
     return env
 
 
-def coop_name(text, default):
+def player_name(text, default):
     """A player's name for the matching server: 3-16 letters, digits, '-' or '_' (a PSN online
     ID's rules), else the default."""
     name = re.sub(r"[^A-Za-z0-9_-]", "", text or "")[:16]
     return name if len(name) >= 3 else default
 
-
-COOP_LAYOUTS = [
-    ("Рядом на одном мониторе", "split"),
-    ("Каждое окно на своём мониторе", "displays"),
-]
 
 LAN_MODES = [
     ("Выключена", "off"),
@@ -669,7 +655,7 @@ THANKS = (
         _github("Monochrome0907", "Нашёл, при каких эффектах зависают загрузки на NVIDIA"),
     )),
     ("Другие благодарности", (
-        ("ayozetr", "bloodborne_linux: порт для Linux, на котором построен gvport",
+        ("ayozetr", "bloodborne_linux: порт для Linux, на котором построен mbport",
          "https://github.com/ayozetr/bloodborne_linux"),
         ("shadPS4", "Рендерер и компилятор шейдеров", "https://github.com/shadps4-emu/shadPS4"),
         ("pkgforge-dev", "Инструмент для сборки AppImage",
@@ -682,7 +668,7 @@ THANKS = (
 
 class LauncherWindow(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="GUNDAM VERSUS")
+        super().__init__(application=app, title="MAXIBOOST ON")
         self.set_default_size(760, 820)
         self.settings = load_settings()
         set_language(self.settings.get("ui_language", ""))
@@ -698,13 +684,13 @@ class LauncherWindow(Adw.ApplicationWindow):
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
         # The brand: the game's icon from the player's dump (or the launcher's) and its name.
-        brand = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER, css_classes=["gv-brand"])
+        brand = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER, css_classes=["mb-brand"])
         self.brand_icon = Gtk.Image(pixel_size=34)
         brand.append(self.brand_icon)
         names = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
-        names.append(Gtk.Label(label="GUNDAM VERSUS", xalign=0, css_classes=["gv-title"]))
-        names.append(Gtk.Label(label=tr("gvport — нативный порт для Linux"), xalign=0,
-                               css_classes=["gv-subtitle"]))
+        names.append(Gtk.Label(label="MAXIBOOST ON", xalign=0, css_classes=["mb-title"]))
+        names.append(Gtk.Label(label=tr("mbport — нативный порт для Linux"), xalign=0,
+                               css_classes=["mb-subtitle"]))
         brand.append(names)
         header.pack_start(brand)
         self.stack = Adw.ViewStack()
@@ -770,7 +756,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         game = Adw.PreferencesGroup(title=tr("Игра"))
         # The game from your own PS4 packages: extracted, the update merged, the add-ons apart.
         self.pkg_row = Adw.ActionRow(title=tr("Установить из PKG"),
-                                     subtitle=tr("Игра, обновление 1.13 и DLC из ваших файлов .pkg"))
+                                     subtitle=tr("Игра, обновление 1.15 и DLC из ваших файлов .pkg"))
         self.pkg_button = Gtk.Button(label=tr("Выбрать .pkg…"), valign=Gtk.Align.CENTER)
         self.pkg_button.connect("clicked", self.on_install_pkg)
         self.pkg_row.add_suffix(self.pkg_button)
@@ -821,7 +807,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         game.add(steam)
         page.add(game)
 
-        # Auto: the 0.3 memory model (faster for GUNDAM VERSUS); or either by hand.
+        # Auto: run.sh's memory model (the 0.3 one); or either by hand.
         mode = Adw.PreferencesGroup(title=tr("Режим работы"))
         self.memory_model_row = combo_row(tr("Модель памяти и трансляции"), tr(PC_MODEL_SUBTITLE),
                                           MEMORY_MODELS, self.settings.get("memory_model", "auto"))
@@ -830,7 +816,7 @@ class LauncherWindow(Adw.ApplicationWindow):
 
         self.patches_group = Adw.PreferencesGroup(
             title=tr("Сторонние патчи"),
-            description=tr("XML-патчи в формате shadPS4 для версии 01.13 из папки патчей. "
+            description=tr("XML-патчи в формате shadPS4 для версии 01.15 из папки патчей. "
                            "Применяются при запуске."))
         self.patches_folder_row = Adw.ActionRow(title=tr("Папка патчей"))
         self.patches_folder_row.add_suffix(flat_button("folder-open-symbolic", tr("Выбрать папку патчей"),
@@ -858,7 +844,7 @@ class LauncherWindow(Adw.ApplicationWindow):
                                   tr("Без перезапуска, но медленнее на Steam Deck и старых GPU"),
                                   LIVE_RESOLUTION, self.ini.get("live_resolution", "0"))
         screen.add(self.live_row)
-        # Bloodborne's host-side scaling: GUNDAM VERSUS renders at the patched sizes (run.sh).
+        # Bloodborne's host-side scaling does not apply to this engine (run.sh).
         self.live_row.set_visible(False)
         self.fullscreen_row = Adw.SwitchRow(title=tr("Полноэкранный режим"),
                                             active=self.settings["fullscreen"])
@@ -942,35 +928,13 @@ class LauncherWindow(Adw.ApplicationWindow):
         mouse_rows_sensitive()
         page.add(controls)
 
-        # Couch versus: GUNDAM VERSUS fights only online, so two games play each other through a
-        # matching server on this PC (run.sh BB_COOP).
-        coop = Adw.PreferencesGroup(
+        # Two players on one PC: MAXIBOOST ON has its own split screen (Free Battle: a player slot
+        # set to 2P plays with the second gamepad), so nothing is set here.
+        local = Adw.PreferencesGroup(
             title=tr("Два игрока"),
-            description=tr("В обеих играх: PLAY → PLAYER MATCH. Один создаёт комнату (Room type: "
-                           "1 on 1), другой находит её через Search for Room с тем же Room type."))
-        self.coop_row = Adw.SwitchRow(title=tr("Два игрока на одном ПК"),
-                                      subtitle=tr("Два окна игры, у каждого игрока свой геймпад"),
-                                      active=self.settings.get("coop", False))
-        self.coop_row.connect("notify::active", lambda *_: self.update_coop_rows())
-        coop.add(self.coop_row)
-        self.coop_layout_row = combo_row(tr("Окна"), None, COOP_LAYOUTS,
-                                         self.settings.get("coop_layout", "split"))
-        self.coop_layout_row.connect("notify::selected", lambda *_: self.update_coop_rows())
-        coop.add(self.coop_layout_row)
-        self.coop_display_row = Adw.ComboRow(title=tr("Монитор второго игрока"))
-        self.fill_coop_displays()
-        coop.add(self.coop_display_row)
-        self.coop_audio_row = Adw.SwitchRow(title=tr("Звук второго окна"),
-                                            subtitle=tr("Иначе музыка и звуки играют дважды"),
-                                            active=self.settings.get("coop_audio2", False))
-        coop.add(self.coop_audio_row)
-        self.coop_name_rows = []
-        for key, title in (("coop_name1", tr("Имя игрока 1")), ("coop_name2", tr("Имя игрока 2"))):
-            row = Adw.EntryRow(title=title)
-            row.set_text(self.settings.get(key, ""))
-            coop.add(row)
-            self.coop_name_rows.append(row)
-        page.add(coop)
+            description=tr("Второй геймпад играет за 2P в Free Battle: в Mobile Suit Settings "
+                           "переключите слот игрока на 2P. Экран игра делит сама."))
+        page.add(local)
 
         # Network play: each PC with its own copy of the game; one PC's matching server takes the
         # others' games (run.sh BB_LAN).
@@ -979,19 +943,22 @@ class LauncherWindow(Adw.ApplicationWindow):
             description=tr("Каждому ПК нужна своя копия игры. Один принимает игроков, другие "
                            "подключаются к нему по его адресу."))
         self.lan_row = combo_row(tr("Игра по сети"), None, LAN_MODES, self.settings.get("lan", "off"))
-        self.lan_row.connect("notify::selected", lambda *_: self.update_coop_rows())
+        self.lan_row.connect("notify::selected", lambda *_: self.update_lan_rows())
         lan.add(self.lan_row)
         self.lan_server_row = Adw.EntryRow(title=tr("Адрес ПК, который принимает игроков"))
         self.lan_server_row.set_text(self.settings.get("lan_server", ""))
         lan.add(self.lan_server_row)
-        self.update_coop_rows()
+        self.player_name_row = Adw.EntryRow(title=tr("Имя игрока"))
+        self.player_name_row.set_text(self.settings.get("player_name", ""))
+        lan.add(self.player_name_row)
+        self.update_lan_rows()
         page.add(lan)
 
         upscaler = Adw.PreferencesGroup(
             title=tr("Апскейлер"),
             description=tr("Хранится в bbport.ini; в игре меняется через меню (Insert или L3+R3)")
             if UPSCALERS_AVAILABLE else tr(
-                "Для GUNDAM VERSUS пока недоступен: кадр игры ещё не размечен"))
+                "Для MAXIBOOST ON пока недоступен: кадр игры ещё не размечен"))
         self.upscaler_row = combo_row(tr("Апскейлер"), None, UPSCALERS, self.ini["upscaler"])
         self.upscaler_row.connect("notify::selected", lambda *_: self.update_upscaler_status())
         upscaler.add(self.upscaler_row)
@@ -1034,7 +1001,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         upscaler.add(self.show_fps_row)
         page.add(upscaler)
 
-        # Built-in patches (scripts/patches.py BUILTIN_XML): a switch is live once its patch exists for 1.13.
+        # Built-in patches (scripts/patches.py BUILTIN_XML): a switch is live once its patch exists for 1.15.
         have = builtin_patches()
         effects = Adw.PreferencesGroup(title=tr("Патчи игры"),
                                        description=tr("Применяется при запуске игры"))
@@ -1044,7 +1011,7 @@ class LauncherWindow(Adw.ApplicationWindow):
                                 active=self.ini.get(key, "1" if default else "0") == "1")
             if not patch_available(key, have):
                 row.set_sensitive(False)
-                row.set_subtitle(tr("Нужен патч для версии 1.13, его пока нет"))
+                row.set_subtitle(tr("Нужен патч для версии 1.15, его пока нет"))
             self.effect_rows[key] = row
             effects.add(row)
         page.add(effects)
@@ -1257,22 +1224,24 @@ class LauncherWindow(Adw.ApplicationWindow):
             self.alert(tr("Импорт сохранений"), tr("Сначала закройте игру"))
             return
         shadps4 = Path.home() / ".local/share/shadPS4"
-        self.choose_folder(tr("Папка с сохранениями GUNDAM VERSUS"),
+        self.choose_folder(tr("Папка с сохранениями MAXIBOOST ON"),
                            shadps4 if shadps4.is_dir() else Path.home(), self.confirm_import_saves)
 
     def confirm_import_saves(self, folder):
-        found = save_import.find(folder)
+        # The newest progress save (memory.dat) and the newest replays (REPLAY) found.
+        found = save_import.newest(save_import.find(folder))
         if not found:
             self.alert(tr("Импорт сохранений"), tr(
                 "Это копия с PS4 на флешке (sdimg_*): она зашифрована ключами консоли. Экспортируйте "
                 "сохранение без шифрования на PS4 (Apollo Save Tool) или через Save Wizard")
                 if save_import.encrypted_ps4_save(folder)
-                else tr("В этой папке нет сохранений GUNDAM VERSUS (SAVEDATA00 с DATA.BIN)"))
+                else tr("В этой папке нет сохранений MAXIBOOST ON (memory.dat или папка REPLAY)"))
             return
-        source, when = found[0]
+        sources = [source for source, _when in found]
+        when = max(when for _source, when in found)
         dialog = Adw.AlertDialog(heading=tr("Импортировать сохранения?"), body=tr(
             "Из {} (изменены {}). Текущие сохранения сначала копируются в {}").format(
-                source, time.strftime("%Y-%m-%d %H:%M", time.localtime(when)),
+                ", ".join(map(str, sources)), time.strftime("%Y-%m-%d %H:%M", time.localtime(when)),
                 self.user_dir() / "savedata-backups"))
         dialog.add_response("cancel", tr("Отмена"))
         dialog.add_response("import", tr("Импортировать"))
@@ -1284,14 +1253,17 @@ class LauncherWindow(Adw.ApplicationWindow):
             if self.process is not None or save_import.game_running():
                 self.alert(tr("Импорт сохранений"), tr("Сначала закройте игру"))
                 return
-            try:
-                target, backup = save_import.import_saves(
-                    source, self.user_dir(), self.settings["game_dir"] or None)
-            except (save_import.SaveImportError, OSError) as error:
-                self.alert(tr("Не удалось импортировать сохранения"), str(error))
-                return
-            self.append_log(f"Saves imported from {source} into {target}"
-                            + (f"; previous saves in {backup}\n" if backup else "\n"))
+            now = datetime.datetime.now()
+            for source in sources:
+                try:
+                    target, backup = save_import.import_saves(
+                        source, self.user_dir(), self.settings["game_dir"] or None, now=now)
+                except (save_import.SaveImportError, OSError) as error:
+                    self.alert(tr("Не удалось импортировать сохранения"), str(error))
+                    self.update_user_status()
+                    return
+                self.append_log(f"Saves imported from {source} into {target}"
+                                + (f"; previous saves in {backup}\n" if backup else "\n"))
             self.update_user_status()
             self.toasts.add_toast(Adw.Toast(title=tr("Сохранения импортированы")))
 
@@ -1347,13 +1319,13 @@ class LauncherWindow(Adw.ApplicationWindow):
         path = self.game_dir()
         ok = bool(self.settings["game_dir"]) and (path / "eboot.bin").is_file()
         self.game_row.set_subtitle(str(path) if self.settings["game_dir"] else tr("не выбрана"))
-        # The title ID of the release in the folder (CUSA08790), from its param.sfo.
+        # The title ID of the release in the folder (CUSA18758), from its param.sfo.
         try:
             title_id = str(sfo((path / "sce_sys/param.sfo").read_bytes()).get("TITLE_ID", "")) if ok else ""
         except (OSError, ValueError, IndexError):
             title_id = ""
         self.game_row.set_title(tr("Папка игры ({})").format(title_id) if title_id else tr("Папка игры"))
-        # The port's hooks and patches are those of the 1.13 executable (scripts/game_check.py):
+        # The port's hooks and patches are those of the 1.15 executable (scripts/game_check.py):
         # the base game 1.00 needs its update merged in.
         problem = self.game_problem(path) if ok else None
         if not ok:
@@ -1362,23 +1334,23 @@ class LauncherWindow(Adw.ApplicationWindow):
             kind, title, version = problem
             missing = ", ".join(game_check.missing_files(path)) or ", ".join(game_check.REQUIRED_FILES)
             tooltip = {
-                "missing_update": tr("Нужно обновление 1.13: скопируйте файлы дампа обновления 1.13 в папку игры с заменой (найдена версия {})").format(version),
-                "wrong_eboot": tr("eboot.bin не от версии 1.13: скопируйте eboot.bin из дампа обновления 1.13 в папку игры с заменой"),
-                "other_title": tr("Это не GUNDAM VERSUS (найдено {}): нужна GUNDAM VERSUS (CUSA08790) с обновлением 1.13").format(title),
+                "missing_update": tr("Нужно обновление 1.15: скопируйте файлы дампа обновления 1.15 в папку игры с заменой (найдена версия {})").format(version),
+                "wrong_eboot": tr("eboot.bin не от версии 1.15: скопируйте eboot.bin из дампа обновления 1.15 в папку игры с заменой"),
+                "other_title": tr("Это не MAXIBOOST ON (найдено {}): нужна MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON (CUSA18758) с обновлением 1.15").format(title),
                 "unreadable": tr("eboot.bin не читается как расшифрованный исполняемый файл PS4: сделайте дамп заново"),
-                "damaged_files": tr("В папке игры нет: {}. Распакуйте игру и обновление 1.13 заново").format(missing),
+                "damaged_files": tr("В папке игры нет: {}. Распакуйте игру и обновление 1.15 заново").format(missing),
             }.get(kind) or game_check.explain(kind, title, version)
             self.game_row.set_subtitle(f"{path}\n{tooltip}")
         else:
-            tooltip = tr("GUNDAM VERSUS {}, версия 1.13").format(title_id or "")
+            tooltip = tr("MAXIBOOST ON {}, версия 1.15").format(title_id or "")
         self.game_status.set_from_icon_name("object-select-symbolic" if ok and not problem else "dialog-warning-symbolic")
         self.game_status.set_tooltip_text(tooltip)
         self.launch_button.set_sensitive(ok or self.process is not None)
         self.show_game_icon()
 
     def show_game_icon(self):
-        """The header's and the About page's icon: the launcher's own (its cyan on navy goes with
-        the JohnnyCyan theme, as the menu entry's)."""
+        """The header's and the About page's icon: the launcher's own (amber on black, as the menu
+        entry's)."""
         icon = str(LAUNCHER_ICON)
         self.brand_icon.set_from_file(icon)
         if hasattr(self, "about_icon"):
@@ -1536,24 +1508,9 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.display_row.values = [value for _, value in choices]
         self.display_row.set_selected(self.display_row.values.index(current) if current in self.display_row.values else 0)
 
-    def fill_coop_displays(self):
-        """Player 2's monitor: the second one unless chosen, then the connected ones."""
-        current = self.settings.get("coop_display2", "")
-        choices = [(tr("Второй"), "")] + [(label, value) for value, label in connected_displays()]
-        if current and current not in [value for _, value in choices]:
-            choices.append((tr("{} (не подключён)").format(current), current))
-        self.coop_display_row.set_model(Gtk.StringList.new([label for label, _ in choices]))
-        self.coop_display_row.values = [value for _, value in choices]
-        self.coop_display_row.set_selected(
-            self.coop_display_row.values.index(current) if current in self.coop_display_row.values else 0)
-
-    def update_coop_rows(self):
-        on = self.coop_row.get_active()
+    def update_lan_rows(self):
         lan = combo_value(self.lan_row)
-        for row in (self.coop_layout_row, self.coop_audio_row, self.coop_name_rows[1]):
-            row.set_sensitive(on)
-        self.coop_name_rows[0].set_sensitive(on or lan != "off")  # this PC's player online
-        self.coop_display_row.set_sensitive(on and combo_value(self.coop_layout_row) == "displays")
+        self.player_name_row.set_sensitive(lan != "off")  # this PC's player online
         self.lan_server_row.set_visible(lan == "join")
         address = lan_address() if lan == "host" else ""
         self.lan_row.set_subtitle(tr("Адрес этого ПК: {}").format(address) if address else "")
@@ -1588,14 +1545,9 @@ class LauncherWindow(Adw.ApplicationWindow):
         s["vk_validation"] = self.validation_row.get_active()
         s["extra_env"] = self.extra_row.get_text().strip()
         s["trophy_key"] = self.trophy_key_row.get_text().strip()
-        s["coop"] = self.coop_row.get_active()
-        s["coop_layout"] = combo_value(self.coop_layout_row)
-        s["coop_display2"] = combo_value(self.coop_display_row)
-        s["coop_audio2"] = self.coop_audio_row.get_active()
         s["lan"] = combo_value(self.lan_row)
         s["lan_server"] = self.lan_server_row.get_text().strip()
-        s["coop_name1"], s["coop_name2"] = (coop_name(row.get_text(), default) for row, default
-                                            in zip(self.coop_name_rows, ("Player1", "Player2")))
+        s["player_name"] = player_name(self.player_name_row.get_text(), "Player1")
         self.save_patch_profile()
         save_settings(s)
         self.ini.update({
@@ -1697,7 +1649,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     # --- Steam ---------------------------------------------------------------------------
 
     def on_add_to_steam(self, _button):
-        """GUNDAM VERSUS in the Steam library: a non-Steam game that runs --play (no window)."""
+        """MAXIBOOST ON in the Steam library: a non-Steam game that runs --play (no window)."""
         steam = bbport_steam.steam_folder()
         configs = bbport_steam.user_configs(steam) if steam else []
         flatpak = bool(steam) and bbport_steam.is_flatpak(steam)
@@ -1777,14 +1729,14 @@ class LauncherWindow(Adw.ApplicationWindow):
         icon = str(self.steam_icon())
         try:
             for config in configs:
-                bbport_steam.add_shortcut(config / "shortcuts.vdf", "GUNDAM VERSUS", exe,
+                bbport_steam.add_shortcut(config / "shortcuts.vdf", STEAM_NAME, exe,
                                           start_dir, icon, options)
         except (OSError, ValueError) as error:
             self.alert("Steam", tr("Не удалось добавить игру в Steam: {}").format(error))
             return
         if restart:
             bbport_steam.start_steam(bbport_steam.is_flatpak(steam))
-        self.toasts.add_toast(Adw.Toast(title=tr("GUNDAM VERSUS добавлена в библиотеку Steam"), timeout=6))
+        self.toasts.add_toast(Adw.Toast(title=tr("MAXIBOOST ON добавлена в библиотеку Steam"), timeout=6))
 
     def steam_icon(self):
         """The shortcut's icon: a copy of the game's icon0.png kept with the launcher's settings
@@ -1861,7 +1813,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     def build_about_page(self):
         page = Adw.PreferencesPage()
         about = Adw.PreferencesGroup(title=tr("О программе"))
-        app = Adw.ActionRow(title="GUNDAM VERSUS · gvport",
+        app = Adw.ActionRow(title="MAXIBOOST ON · mbport",
                             subtitle=tr("Нативный порт для Linux, версия {}").format(bbport_update.VERSION))
         self.about_icon = Gtk.Image(pixel_size=48)
         app.add_prefix(self.about_icon)
@@ -1890,8 +1842,9 @@ class LauncherWindow(Adw.ApplicationWindow):
         page.add(about)
         # The game's owners, under everything, as plain text.
         owners = Adw.PreferencesGroup()
-        owners.add(Gtk.Label(label=tr("GUNDAM VERSUS © SOTSU · SUNRISE; игра для PS4 издана Bandai Namco "
-                                      "Entertainment. Этот проект с ними не связан."),
+        owners.add(Gtk.Label(label=tr("MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE; игра "
+                                      "для PS4 издана Bandai Namco Entertainment. Этот проект с ними "
+                                      "не связан."),
                              wrap=True, justify=Gtk.Justification.CENTER,
                              css_classes=["dim-label", "caption"]))
         page.add(owners)
@@ -1909,7 +1862,7 @@ class LauncherWindow(Adw.ApplicationWindow):
                 row.connect("activated", lambda _row, link=url: self.open_uri(link))
                 group.add(row)
             page.add(group)
-        page.set_description(tr("Авторы bbport и bloodborne_linux, на которых построен gvport, "
+        page.set_description(tr("Авторы bbport и bloodborne_linux, на которых построен mbport, "
                                 "и все, кто им помогал"))
         dialog = Adw.PreferencesDialog(title=tr("Благодарности"))
         dialog.add(page)
@@ -2036,7 +1989,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     def on_export_log(self, _button):
         text = self.log_text()
         dialog = Gtk.FileDialog(title=tr("Экспорт журнала"))
-        dialog.set_initial_name(f"gvport-{time.strftime('%Y%m%d_%H%M%S')}.log")
+        dialog.set_initial_name(f"mbport-{time.strftime('%Y%m%d_%H%M%S')}.log")
 
         def finish(dialog, result):
             try:
@@ -2385,7 +2338,7 @@ class LauncherWindow(Adw.ApplicationWindow):
 
 class LauncherApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="io.github.gvport.Launcher",
+        super().__init__(application_id="io.github.mbport.Launcher",
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
 
     def do_startup(self):
@@ -2399,7 +2352,7 @@ class LauncherApp(Adw.Application):
 
     def do_activate(self):
         # The launcher's own icons (launcher/icons: GitHub's mark), symbolic like the theme's, and its
-        # application icon (io.github.gvport.Launcher.svg, the same as gundam.svg) for the window
+        # application icon (io.github.mbport.Launcher.svg, the same as maxiboost.svg) for the window
         # when the menu entry is not installed (launcher/install-desktop.sh).
         display = Gdk.Display.get_default()
         if display:
@@ -2415,7 +2368,7 @@ def play():
     # No window sets the launcher's language here, and the in-game menu takes it (BB_MENU_LANGUAGE).
     set_language(settings.get("ui_language", ""))
     if not (Path(settings["game_dir"]).expanduser() / "eboot.bin").is_file():
-        print("gvport: choose the game folder in the launcher first", file=sys.stderr)
+        print("mbport: choose the game folder in the launcher first", file=sys.stderr)
         return 1
     os.chdir(PORT_DIR)
     env = game_environment(settings)

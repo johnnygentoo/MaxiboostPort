@@ -209,11 +209,11 @@ if __name__ == '__main__':  # self-test on a temporary file
     import tempfile
     with tempfile.TemporaryDirectory() as folder:
         vdf = Path(folder) / 'shortcuts.vdf'
-        print(add_shortcut(vdf, 'GUNDAM VERSUS', '/games/gv/launcher/bb-launcher.sh', '/games/gv', 'x.png', '--play'))
+        print(add_shortcut(vdf, 'MAXIBOOST ON', '/games/mb/launcher/bb-launcher.sh', '/games/mb', 'x.png', '--play'))
         print(add_shortcut(vdf, 'Other', '/other/o', '/other', ''))
-        print(add_shortcut(vdf, 'GUNDAM VERSUS', '/games/gv/launcher/bb-launcher.sh', '/games/gv', 'y.png', '--play'))
-        print(add_shortcut(vdf, 'GUNDAM VERSUS', '/apps/GUNDAM-VERSUS-gvport-x86_64.AppImage', '/apps', 'y.png', '--play'))
-        print(add_shortcut(vdf, 'GUNDAM VERSUS', '/shadps4/shadps4', '/shadps4', '', 'CUSA08790'))
+        print(add_shortcut(vdf, 'MAXIBOOST ON', '/games/mb/launcher/bb-launcher.sh', '/games/mb', 'y.png', '--play'))
+        print(add_shortcut(vdf, 'MAXIBOOST ON', '/apps/MAXIBOOST-ON-mbport-x86_64.AppImage', '/apps', 'y.png', '--play'))
+        print(add_shortcut(vdf, 'MAXIBOOST ON', '/shadps4/shadps4', '/shadps4', '', 'CUSA18758'))
         root = parse(vdf.read_bytes())[0]
         print([[f for f in e[2] if f[1] in ('AppName', 'Exe')] for e in root[0][2]])
         assert len(root[0][2]) == 3
