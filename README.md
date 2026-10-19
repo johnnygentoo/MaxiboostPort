@@ -1,62 +1,58 @@
-# GUNDAM VERSUS for Linux (gvport)
+# MAXIBOOST ON for Linux (mbport)
 
-The PlayStation 4 version of *GUNDAM VERSUS* (2017, Bandai Namco Entertainment) running natively
-on Linux. The game's own x86-64 code runs directly on the CPU and its graphics are translated to
-Vulkan. It is not an emulator.
+The PlayStation 4 version of *MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON* (2020, Bandai Namco
+Entertainment) running natively on Linux. The game's own x86-64 code runs directly on the CPU and
+its graphics are translated to Vulkan. It is not an emulator.
 
-gvport is built on [bloodborne_linux](https://github.com/ayozetr/bloodborne_linux), ayozetr's
+mbport is built on [bloodborne_linux](https://github.com/ayozetr/bloodborne_linux), ayozetr's
 Linux fork of [bbport](https://github.com/deadinside28/bloodborne_pc), the native Bloodborne port
-by deadinside28, by way of gzport, the GODZILLA port made from it. The runtime, the GPU
-translation, the upscalers and the launcher come from there; gvport points them at GUNDAM VERSUS.
+by deadinside28, by way of gzport (GODZILLA) and gvport (GUNDAM VERSUS, the same Bandai Namco
+engine). The runtime, the GPU translation, the upscalers and the launcher come from there; mbport
+points them at MAXIBOOST ON.
 
-> **No game files are included.** You need your own decrypted dump of GUNDAM VERSUS, the North
-> American release `CUSA08790`, with update 1.13. This project is not affiliated with Bandai Namco
-> Entertainment, SOTSU, SUNRISE or Sony Interactive Entertainment. GUNDAM VERSUS © SOTSU ·
-> SUNRISE.
+> **No game files are included.** You need your own decrypted dump of MAXIBOOST ON, the North
+> American release `CUSA18758`, with update 1.15. This project is not affiliated with Bandai Namco
+> Entertainment, SOTSU, SUNRISE or Sony Interactive Entertainment. MOBILE SUIT GUNDAM EXTREME VS.
+> MAXIBOOST ON © SOTSU · SUNRISE.
 
 ## Status
 
-**Playable offline.** The game boots through its intro movie, agreements and title screen to the
-main menu (offline), and Free Battle matches play at 60 FPS with sound, the HUD and the CPU
-opponents. Tested on Linux with an AMD Radeon RX 7800 XT (Mesa/RADV) and a DualSense: ten minutes
-of back-to-back battles without an error. The other offline modes, saving over a long session
-and a full play-through are not verified yet.
+**Early, playable offline.** Tested on Linux with an AMD Radeon RX 7800 XT (Mesa/RADV):
 
-- **PS4 Pro mode** (default; `BB_NEO=0`: a base PS4): the game renders its scene at 1920x1080 as
-  on a PS4 Pro, instead of the base console's 1440x1080 stretched to the screen.
-- **Other output sizes** (720p, 1440p, 4K): the game renders natively at them, its scene and its
-  HUD (two sizes it sets at start, patched; `scripts/patches.py`). An RX 7800 XT holds 60 FPS in
-  battle at native 4K.
-- **Memory model:** "Auto" is the model of 0.3 on every GPU: with the new one each of the
-  frame's compute-queue waits is a GPU round trip, and battles ran at ~30 FPS.
-- **Two players on one PC** (launcher: **Two players**; `BB_COOP=1`): GUNDAM VERSUS has no
-  local multiplayer (its versus modes are online only), so the port runs two games, one per
-  player and gamepad, that fight each other through the game's own Player Match on a small
-  matching server started on this PC (`gvnet-server`). See [Two players](#two-players).
-- **Online** otherwise only through such a server (`BB_ONLINE=1`, `BB_SHADNET_SERVER=host:port`,
-  e.g. two PCs on a LAN); without it the port answers as a console not signed in to PSN.
-- **Upscalers (FSR 3.1, FSR 4, DLSS, TAA)**: the scene renders at the output size divided by the
-  preset's scale and the upscaler fills the output where the game would scale its scene into the
-  display buffer; the HUD stays the game's own, at the output size. Camera motion vectors from the
-  game's camera (`gpu/games/gundam.cpp`), object motion from the object vectors setting. Measured
-  at 4K output on an RX 7800 XT in battle: FSR 3 Performance ~60 FPS (17.0 ms average), FSR 4
-  ~48 FPS (its model costs ~8 ms of GPU time a frame at 4K on that card). Preset and output
-  changes need a restart. Not tested yet: DLSS (NVIDIA), FSR 4.1.1, the Steam Deck.
+- The game boots through its intro movie, the agreements and an offline "Server communication
+  failed" notice to the main menu.
+- **Free Battle** plays at 60 FPS, with the beams and explosions drawn.
+- **Two players on one PC**: the game's own split screen. In Free Battle a player slot set to 2P
+  plays with the second gamepad and the game splits the screen (verified with a virtual second
+  pad). See [Two players](#two-players).
+- **Saves** persist across restarts (see [Saves](#saves)).
 
-## What gvport inherits
+Not verified or not done yet:
 
-From gzport, the runtime already implements PS4 libraries that Bloodborne did not use: the
-libSceNgs2 audio renderer with ATRAC9, libSceFont through FreeType, kernel event flags, the common
-dialogs of an offline console and imports resolved by NID for any executable's library layout.
+- **Sound** has not been checked by ear.
+- **Trophies**: the list is read from your dump, but none has been seen unlocking.
+- **DLC** (the add-ons' unlock-key `.pkg` files, see [DLC](#dlc)) has not been checked in the game.
+- **Online and LAN play** through a matching server (`BB_ONLINE=1`, launcher: **Over the
+  network**) are not tested with this game; without a server the port answers as a console not
+  signed in to PSN.
+- **Native resolutions other than the game's own and the upscalers** (FSR 3.1, FSR 4, DLSS, TAA)
+  are pending: the game's frame is not mapped yet, so the launcher keeps the upscaler off.
+- The other modes, long sessions and a full play-through.
+
+## What mbport inherits
+
+From gzport and gvport, the runtime already implements PS4 libraries that Bloodborne did not use:
+the libSceNgs2 audio renderer with ATRAC9, libSceFont through FreeType, kernel event flags, fibers,
+save data memory, the common dialogs of an offline console and imports resolved by NID for any
+executable's library layout.
 
 - **Launcher** (GTK 4 / libadwaita) with every setting in one window, in English, Spanish,
-  Italian, French, German, Portuguese, Russian and Simplified Chinese. It shows your dump's own
-  icon and checks the game folder.
+  Italian, French, German, Portuguese, Russian and Simplified Chinese. It checks the game folder.
 - **Controls:** keyboard and mouse or any SDL gamepad, every button remappable.
 - **Trophies** from your own dump (`sce_sys/trophy`); their names need the PS4's trophy key
   (shadPS4's TrophyKey), entered in the launcher.
 - **Install from PKG**, **save import**, **Add to Steam**, third-party patches in shadPS4's XML
-  format for version 01.13, and an **AppImage** for any distribution.
+  format for version 01.15, and an **AppImage** for any distribution.
 
 ## Requirements
 
@@ -67,15 +63,15 @@ dialogs of an offline console and imports resolved by NID for any executable's l
 
 ### 1. The game folder
 
-Dump the game (`CUSA08790`, version 1.00) and its 1.13 update from your PS4. The game's files are
-at the folder's root: `eboot.bin`, `sce_sys/`, `sce_module/`, `archives/`, the `.nus3audio` sound
-banks and the `.mp4` movies. Then merge the update into the game. On one filesystem, hardlinks
-keep the 45 GB from being copied:
+Dump the game (`CUSA18758`, version 1.00) and its 1.15 update from your PS4. The game's files are
+at the folder's root: `eboot.bin`, `sce_sys/`, `sce_module/`, `archives/`, `raw/` (the movies and
+sound banks) and `sce_discmap.plt`. Then merge the update into the game. On one filesystem,
+hardlinks keep the 30 GB from being copied:
 
 ```bash
-cp -al CUSA08790 CUSA08790-full
-cp -al --remove-destination CUSA08790-patch/. CUSA08790-full/
-python3 scripts/game_check.py CUSA08790-full
+cp -al CUSA18758 CUSA18758-full
+cp -al --remove-destination CUSA18758-patch/. CUSA18758-full/
+python3 scripts/game_check.py CUSA18758-full
 ```
 
 ### 2. Build and run
@@ -96,61 +92,60 @@ launcher/bb-launcher.sh          # or launcher/install-desktop.sh for a menu ent
 With [Nix](https://nixos.org), `bash build.sh` gets every dependency from `shell.nix` by itself.
 
 In the launcher, choose your game folder (the one with `eboot.bin`) and press **Play**. Without the
-launcher: `BB_GAME_DIR=/path/to/CUSA08790-full bash run.sh`.
+launcher: `BB_GAME_DIR=/path/to/CUSA18758-full bash run.sh`.
 
-The launcher keeps its settings in `~/.config/gvport-launcher`. From a checkout, saves, the shader
-cache and `bbport.ini` go to `user/` and the checkout itself; nothing of a Bloodborne or GODZILLA
-install (`~/.config/bbport-launcher`, `~/.config/gzport-launcher`, `~/.local/share/bbport`,
-`~/.local/share/gzport`) is read or written.
+The launcher keeps its settings in `~/.config/mbport-launcher`. From a checkout, saves, the shader
+cache and `bbport.ini` go to `user/` and the checkout itself; nothing of a Bloodborne, GODZILLA or
+GUNDAM VERSUS install (`~/.config/bbport-launcher`, `~/.config/gzport-launcher`,
+`~/.config/gvport-launcher`, `~/.local/share/bbport`, `~/.local/share/gzport`,
+`~/.local/share/gvport`) is read or written.
 
 ### AppImage
 
 Build it with `bash build.sh && bash packaging/appimage-sharun.sh`, then run
-`dist/GUNDAM-VERSUS-gvport-x86_64.AppImage`. Saves and settings go to `~/.local/share/gvport`.
+`dist/MAXIBOOST-ON-mbport-x86_64.AppImage`. Saves and settings go to `~/.local/share/mbport`.
 
 ### Two players
 
-Turn on **Two players on one PC** in the launcher (or run `BB_COOP=1 bash run.sh`) and press
-Play: two game windows open, side by side on one monitor (**Windows**: or each full screen on its
-own monitor), and a matching server runs for as long as they do. Closing either window ends both.
-
-- **Gamepads:** player 1 takes the controller chosen in the launcher (else the first one),
-  player 2 the next one; each window keeps reading its own pad without the focus. With one
-  gamepad, player 2 plays on the keyboard while their window has the focus.
-- **Saves:** player 1 plays from the usual saves, player 2 from `user-p2/`, a copy of player 1's
-  saves made the first time.
-- **Sound:** only player 1's window plays sound unless **Sound of the second window** is on.
-- **In the games:** both go to PLAY > PLAYER MATCH. One picks **Create Room** with
-  **Room type: 1 on 1**; the other picks **Search for Room**, sets the same Room type, and
-  enters the room. Both press Ready (cross) and the battle starts. The default room type
-  ("Free teams") waits for more players than two.
-
-Tested on one PC (RX 7800 XT): two instances in a 1-on-1 Player Match, each at 60 FPS, shots
-from one land on the other. Team modes with more players are not tested.
+MAXIBOOST ON has local multiplayer of its own, so one game is enough. Connect a second gamepad,
+go to **Free Battle**, and under **Mobile Suit Settings** set a player slot to **2P**: the second
+gamepad plays that slot and the game splits the screen. Verified with a virtual second pad; a
+second physical controller and the other modes' 2P are not tested yet.
 
 ### Over the network
 
-Each PC needs its own copy of the game and of the port. One matching server serves them all:
+Not tested with MAXIBOOST ON yet. The port keeps gvport's network play: each PC needs its own copy
+of the game and of the port, and one matching server serves them all.
 
 - **One of the players' PCs:** in the launcher, **Over the network: host** on that PC (its address
   is shown), **join** with that address on the others.
 - **An always-on PC** (a home server, no GPU or game needed): build the server alone with
   `bash tools/gvnet-server/build.sh` (it needs g++ and protobuf), copy
-  `tools/gvnet-server/out/gvnet-server` to `~/gvnet-server/` there and start it by hand with
-  `tools/gvnet-server/gvserver toggle | start | stop | status | log`, or run it as a user service
-  (`tools/gvnet-server/gvnet-server.service`, how to install it is in the file). It listens on
-  port 31323 (TCP, and UDP 31324), so a GODZILLA shadNet server can run on the same PC. Every PC
-  then plays with **join** and the address `<server>:31323`.
-
-The games then meet in PLAY > PLAYER MATCH as with two players on one PC. Each game's own P2P
-port is UDP 3658. Tested (2026-10-18) with two games on one PC joining a server on another PC
-over the LAN: room found, joined, 1-on-1 battle started.
+  `tools/gvnet-server/out/gvnet-server` to `~/mbnet-server/` there and start it by hand with
+  `tools/gvnet-server/mbserver toggle | start | stop | status | log`, or run it as a user service
+  (`tools/gvnet-server/mbnet-server.service`, how to install it is in the file). It listens on
+  port 31323 (TCP, and UDP 31324), so a GODZILLA shadNet server can run on the same PC (a GUNDAM
+  VERSUS port's server uses 31323 too: give one of them another port). Every PC then plays with
+  **join** and the address `<server>:31323`.
 
 ### Saves
 
-Saves go to `user/savedata/1/CUSA08790/`. GUNDAM VERSUS' save folder names are not known yet
-(the game has not saved under the port); **Import saves** in the launcher still expects
-GODZILLA's layout until they are.
+The game keeps its progress in save data memory and its replays in a save folder:
+
+- `user/savedata/1/CUSA18758.memory/memory.dat` (2 MiB, with `param.bin` beside it),
+- `user/savedata/1/CUSA18758/REPLAY/`.
+
+**Import saves** in the launcher (or `scripts/save_import.py`) copies in the newest `memory.dat`
+and `REPLAY` folder it finds, after backing up the ones there to `user/savedata-backups/`. That
+saves from shadPS4 or a decrypted PS4 export look the same and are accepted by the game is not
+verified yet.
+
+### DLC
+
+The add-ons are unlock keys: their data is in the game and its update. Put their `.pkg` files
+(for example `UP0700-CUSA18758_00-GUNDAMVSMBDLC001`, Gundam Barbatos Lupus Rex) in a folder and
+choose it as the launcher's DLC folder; the port reports them to the game as installed. Not
+checked in the game yet.
 
 ## Credits
 
@@ -160,8 +155,9 @@ GODZILLA's layout until they are.
 - [ayozetr/bloodborne_linux](https://github.com/ayozetr/bloodborne_linux): the Linux fork of bbport,
   with its launcher, upscalers, memory models, trophies, PKG install, save import and AppImage, and
   everyone thanked there.
-- **gzport**, the GODZILLA port gvport starts from: imports by NID, game profiles, Ngs2,
-  libSceFont and the dialogs of an offline console.
+- **gzport**, the GODZILLA port: imports by NID, game profiles, Ngs2, libSceFont and the dialogs
+  of an offline console; and **gvport**, the GUNDAM VERSUS port mbport starts from: fibers, the
+  offline NP toolkit, save data memory, the matching server for network play.
 - [Supermedo/bloodborne_pc](https://github.com/Supermedo/bloodborne_pc): the Windows port, whose
   DLSS support and Add to Steam came to Linux in bloodborne_linux.
 - [shadPS4](https://github.com/shadps4-emu/shadPS4): the renderer and shader recompiler.
@@ -181,4 +177,5 @@ Full list of components and licenses: [BBPORT.md](BBPORT.md#credits-and-licenses
 ## License
 
 GNU GPL v2 or later ([LICENSE](LICENSE)). Third-party components keep their own licenses. NVIDIA
-and DLSS are trademarks of NVIDIA Corporation. GUNDAM VERSUS © SOTSU · SUNRISE.
+and DLSS are trademarks of NVIDIA Corporation. MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON ©
+SOTSU · SUNRISE.
