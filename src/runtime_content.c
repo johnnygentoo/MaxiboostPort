@@ -156,11 +156,14 @@ static ABI int32_t addon_info(uint32_t service_label,const char *label,AddonInfo
     info->status=ADDON_INSTALLED;
     return 0;
 }
-/* Entitlement keys decrypt add-on data, which dumps carry decrypted: no key is needed. */
+/* Entitlement keys decrypt add-on data, which dumps carry decrypted (and unlock-key add-ons carry
+ * none): an installed add-on's key is 16 zero bytes, a missing one's is not found. MAXIBOOST ON asks
+ * it for each listed add-on. */
 static ABI int32_t entitlement_key(uint32_t service_label,const char *label,void *key) {
-    (void)service_label; (void)label;
-    if (key) memset(key,0,16);
-    return ERR_ADDCONT_NOT_FOUND;
+    AddonInfo info;
+    if (!label || !key) return (int32_t)0x80D90002; /* PARAMETER */
+    memset(key,0,16);
+    return addon_info(service_label,label,&info);
 }
 uintptr_t runtime_content_resolve(const char *name) {
     if (runtime_nid_is(name,"m47juOmH0VE#G#H")) return (uintptr_t)addon_info;        /* sceAppContentGetAddcontInfo */
