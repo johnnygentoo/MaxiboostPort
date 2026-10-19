@@ -21,12 +21,16 @@ APP_VERSION='01.13'
 BUILTIN_XML=Path(__file__).resolve().parent.parent/'patches/Gundam.xml'
 # BB_FPS presets: patch names from patches/Gundam.xml. The game runs at 60 FPS (flip rate 0).
 FPS_PRESETS={'60':[]}
-# The game renders at 1920x1080. The places in the 1.13 executable that set its frame size are not
-# mapped yet (RESOLUTION_SITES): until they are, every output size shows the 1080p frame scaled
-# by the presenter, and no resolution patch is made.
+# The game renders its scene at 1920x1080 on a PS4 Pro (1440x1080 on a base PS4), scales it into a
+# 1920x1080 display buffer in one pass and draws the HUD over it there. Both sizes are set once,
+# by the renderer's constructor and setup (image offsets): the scene size for a Pro at 0x531709
+# (movabs 1920 | 1080 << 32 into [r13+0xb4], RESOLUTION_SITES), the display size from a 16-byte
+# constant read only by that object (1920, 1080, 1920, 1080 into [r13+0xa4], DISPLAY_SITES). Every
+# scene target, the effects' half-size ones and the bloom chain follow the scene size.
 OUTPUT_SIZE=(1920,1080)
-RESOLUTION_SITES=[]
+RESOLUTION_SITES=[(0x53170b,0x53170f)]
 RESOLUTION_CLAMP=[]
+DISPLAY_SITES=[(0x3ec5670,0x3ec5674),(0x3ec5678,0x3ec567c)]
 
 
 def boot_image(out):
@@ -56,6 +60,19 @@ def resolution_writes(size,image):
     return writes
 
 
+def display_writes(size,image):
+    """Writes that make the game's display buffer (and the HUD drawn into it) size (w, h)."""
+    w,h=size
+    if not (256<=w<=7680 and 144<=h<=4320) or w%2 or h%2:
+        raise ValueError(f'unsupported display size {w}x{h}')
+    writes=[]
+    for wa,ha in DISPLAY_SITES:
+        if struct.unpack_from('<I',image,wa)[0]!=1920 or struct.unpack_from('<I',image,ha)[0]!=1080:
+            raise ValueError(f'the executable has no 1920x1080 at {wa:#x}: not GUNDAM VERSUS 1.13')
+        writes+=[(wa,struct.pack('<I',w)),(ha,struct.pack('<I',h))]
+    return writes
+
+
 # Upscaler presets (bbport.ini "preset": Native AA, Quality, Balanced, Performance, Ultra
 # Performance): output / render size ratio. The temporal upscalers take the scene at the reduced
 # size, the HUD is drawn at the output size (the GPU library's UI composition).
@@ -75,8 +92,10 @@ def scaled_sizes(settings):
         preset=int(settings.get('preset','0') or 0)
         scale=PRESET_SCALES[max(0,min(preset,len(PRESET_SCALES)-1))]
     render=tuple(max(2,round(v/scale/2)*2) for v in out)
-    if render==out==OUTPUT_SIZE:
+    if render==out==OUTPUT_SIZE and settings.get('upscaler','off') not in TEMPORAL_UPSCALERS|{'taa'}:
         return None
+    # With a temporal upscaler or TAA the GPU library takes the scene from the game's pass scaling
+    # it into the display buffer, also at 1080p (Native AA): a scaled session (BB_RENDER_RES).
     return render,out
 
 
@@ -263,6 +282,11 @@ def main():
         if (w,h)!=OUTPUT_SIZE:
             writes+=resolution_writes((w,h),boot_image(a.out))
             print(f'Patches: the game renders at {w}x{h}')
+    if a.output_res and DISPLAY_SITES:
+        w,h=(int(v) for v in a.output_res.lower().split('x'))
+        if (w,h)!=OUTPUT_SIZE:
+            writes+=display_writes((w,h),boot_image(a.out))
+            print(f'Patches: the game displays at {w}x{h}')
     if a.patches_dir:
         # After the built-in ones: an external patch of the same bytes wins.
         writes+=compile_external(external_selection(external_patches(a.patches_dir,a.app_version,a.xml),

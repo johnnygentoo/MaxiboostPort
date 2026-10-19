@@ -54,6 +54,11 @@ public:
     [[nodiscard]] VideoCore::ImageId Depth() const noexcept {
         return depth_id;
     }
+    /// gvport: the scene depth of the last frame, until the G-buffer pass names this frame's
+    /// (a depth pre-pass draws into it first and is jittered like the scene).
+    [[nodiscard]] VideoCore::ImageId SceneDepth() const noexcept {
+        return depth_id ? depth_id : last_depth_id;
+    }
     /// The render size in the scene constants (the game's viewport; its targets may be
     /// allocated larger, e.g. 1916x1080 for a 1916x1078 scene), or zero before the first camera.
     [[nodiscard]] std::array<u32, 2> RenderSize() const noexcept {
@@ -144,6 +149,7 @@ private:
     std::array<float, 2> jitter{}, previous_jitter{};
     std::array<u32, 2> render_size{};
     VideoCore::ImageId depth_id{};
+    VideoCore::ImageId last_depth_id{};
     float gbuffer_x_sign = 1.0f; ///< bbport: signs of the G-buffer viewport scales (OnGBufferPass)
     float gbuffer_y_sign = 1.0f;
     float gbuffer_z_scale = 1.0f, gbuffer_z_offset = 0.0f;

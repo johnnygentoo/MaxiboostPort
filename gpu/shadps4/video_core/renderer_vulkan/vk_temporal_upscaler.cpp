@@ -200,6 +200,9 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
         frame_copy_vs = hooks->frame_copy_vertex_shader;
         hud_vs = hooks->hud_vertex_shaders;
     }
+    if (const Game::UpscalerHooks* hooks = Game::Upscaler()) {
+        scene_into_display = hooks->scene_scaled_into_display;
+    }
     if (const char* hash = std::getenv("BB_UI_TRIGGER_VS")) {
         ui_trigger_vs = std::strtoull(hash, nullptr, 16);
     }
@@ -418,7 +421,8 @@ bool TemporalUpscaler::OnFrameStart() {
                     (unsigned long long)BbStats::frame_number.load(std::memory_order_relaxed),
                     frame_draws, int(last_redirect), int(relay.valid));
     }
-    display_redirect = ui_phase || repeat;
+    // gvport: a game drawing its HUD into a display buffer of the output size shows that one.
+    display_redirect = (ui_phase || repeat) && !scene_into_display;
     relay_active = relay_guest && relay.valid && (ui_phase || (repeat && relay_active));
     last_redirect = display_redirect;
     frame_draws = 0;
@@ -1512,6 +1516,21 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
                     int(ui_phase), int(scene_done), int(color == ldr_target),
                     int(color == ui_color), int(color == relay_guest), int(camera_motion.Ready()));
     }
+    if (scene_into_display) {
+        // gvport: the first draw into the display buffer is the game's pass scaling the finished
+        // scene (ldr_target, the scene size) into it; the HUD follows there at the display size.
+        // The upscaled scene (ui_image, the output size) is what that pass reads instead.
+        if (!ui_phase && !done_this_frame && color && ldr_target && Scaled() &&
+            FrameCapture::IsDisplayBuffer(texture_cache.GetImage(color).info.guest_address)) {
+            if (camera_motion.Ready() && Active() && !failed) {
+                RunScaled(false);
+            } else {
+                reset = true;
+            }
+            done_this_frame = true;
+        }
+        return;
+    }
     if (!Scaled() && vs_hash == ui_trigger_vs) done_this_frame = true;
     // bbport (issue #67, patch by bmy): a UI draw without a color target (a Scaleform mask, color
     // writes off) writes the stencil the UI's next draws test, so it must go into the UI's
@@ -1796,7 +1815,7 @@ void TemporalUpscaler::RunUiOnly(VideoCore::ImageId color_id, VideoCore::ImageId
     ui_depth = depth_id;
 }
 
-void TemporalUpscaler::RunScaled() {
+void TemporalUpscaler::RunScaled(bool hud_depth) {
     if (auto* profiler = GpuProfiler::Get()) {
         const char* label = BbSettings::Get().upscaler == BbSettings::UpscalerTaa
             ? "upscaler RunScaled (TAA)" : "upscaler RunScaled (FSR)";
@@ -1817,7 +1836,7 @@ void TemporalUpscaler::RunScaled() {
         return;
     }
     EnsureUiResources(ow, oh, color.info.pixel_format, depth.info.pixel_format);
-    PrepareUiDepth(camera_motion.Depth());
+    if (hud_depth) PrepareUiDepth(camera_motion.Depth()); // the HUD's, when the port draws it
     const auto depth_format = depth.info.pixel_format;
     // Views kept across frames: FSR 4 registers images by view in a registry of eight.
     vk::Image depth_image = depth.GetImage(), color_image = color.GetImage();
@@ -2303,7 +2322,8 @@ TemporalUpscaler::SampledSource TemporalUpscaler::SampledRedirect(VideoCore::Ima
     }
     // The upscaled image is read by the display pass, or (gzport) by the game's copy of the
     // frame while the HUD is drawn.
-    if ((display_redirect || (ui_phase && relay_guest)) && same(image, ui_color)) {
+    if ((display_redirect || (ui_phase && (relay_guest || scene_into_display))) &&
+        same(image, ui_color)) {
         return SampledSource::Composed;
     }
     return SampledSource::Guest;

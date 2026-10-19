@@ -206,6 +206,11 @@ target_compile_options(camera-motion-test PRIVATE -UNDEBUG -fPIC)
 target_link_libraries(camera-motion-test PRIVATE bbgpu)
 add_dependencies(camera-motion-test host_shaders)
 
+# Game profile cameras parsed from captured constant blocks (no GPU library needed).
+add_executable(game-camera-test EXCLUDE_FROM_ALL ../tests/test_game_cameras.cpp games/gundam.cpp)
+target_include_directories(game-camera-test PRIVATE games)
+target_compile_options(game-camera-test PRIVATE -UNDEBUG)
+
 add_executable(translation-memory-test EXCLUDE_FROM_ALL ../tests/test_translation_memory.cpp
     ../tests/test_gpu_runtime_stubs.cpp)
 target_include_directories(translation-memory-test PRIVATE shim shadps4 third_party/gcn/include)

@@ -637,6 +637,7 @@ void RunCopyData(Vulkan::Rasterizer& rasterizer, const u8* data) {
 }
 
 void SignalFlip(Vulkan::Rasterizer& rasterizer, const u8*) {
+    rasterizer.OnFlip();
     rasterizer.WaitDeferredSignals();
     Platform::IrqC::Instance()->Signal(Platform::InterruptId::GfxFlip);
 }

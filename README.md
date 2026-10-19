@@ -24,8 +24,9 @@ and a full play-through are not verified yet.
 
 - **PS4 Pro mode** (default; `BB_NEO=0`: a base PS4): the game renders its scene at 1920x1080 as
   on a PS4 Pro, instead of the base console's 1440x1080 stretched to the screen.
-- **Other output sizes** (1440p, 4K) are scaled from the game's 1080p frame by the GPU library;
-  the game does not render natively at them yet (its frame size is not mapped).
+- **Other output sizes** (720p, 1440p, 4K): the game renders natively at them, its scene and its
+  HUD (two sizes it sets at start, patched; `scripts/patches.py`). An RX 7800 XT holds 60 FPS in
+  battle at native 4K.
 - **Memory model:** "Auto" is the model of 0.3 on every GPU: with the new one each of the
   frame's compute-queue waits is a GPU round trip, and battles ran at ~30 FPS.
 - **Two players on one PC** (launcher: **Two players**; `BB_COOP=1`): GUNDAM VERSUS has no
@@ -34,8 +35,13 @@ and a full play-through are not verified yet.
   matching server started on this PC (`gvnet-server`). See [Two players](#two-players).
 - **Online** otherwise only through such a server (`BB_ONLINE=1`, `BB_SHADNET_SERVER=host:port`,
   e.g. two PCs on a LAN); without it the port answers as a console not signed in to PSN.
-- **Upscalers (FSR 3.1/4, DLSS, TAA) are off**: they need the game's scene color, depth and
-  motion, and the frame of GUNDAM VERSUS is not mapped yet.
+- **Upscalers (FSR 3.1, FSR 4, DLSS, TAA)**: the scene renders at the output size divided by the
+  preset's scale and the upscaler fills the output where the game would scale its scene into the
+  display buffer; the HUD stays the game's own, at the output size. Camera motion vectors from the
+  game's camera (`gpu/games/gundam.cpp`), object motion from the object vectors setting. Measured
+  at 4K output on an RX 7800 XT in battle: FSR 3 Performance ~60 FPS (17.0 ms average), FSR 4
+  ~48 FPS (its model costs ~8 ms of GPU time a frame at 4K on that card). Preset and output
+  changes need a restart. Not tested yet: DLSS (NVIDIA), FSR 4.1.1, the Steam Deck.
 
 ## What gvport inherits
 

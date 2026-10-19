@@ -1633,6 +1633,38 @@ static void TraceVsDraw(const char* where, const AmdGpu::Regs& regs) {
     std::fflush(stdout);
 }
 
+bool Rasterizer::FramesEndAtFlip() {
+    const Game::UpscalerHooks* hooks = Game::Upscaler();
+    return hooks && hooks->scene_scaled_into_display;
+}
+
+void Rasterizer::StartFrame(VideoCore::ImageId frame) {
+    scene_started = false;
+    camera_motion->OnDisplayPass(frame);
+    if (upscaler->OnFrameStart()) {
+        object_motion->InvalidateHistory();
+        camera_motion->InvalidateHistory();
+    }
+    camera_motion->SetJitter(upscaler->Jitter());
+    object_motion->OnFrameStart();
+    NoteFrameStart();
+    static const char* scene_debug = std::getenv("BB_SCENE_DEBUG");
+    scene_debug_frame = scene_debug && std::remove(scene_debug) == 0;
+    scene_targets->debug = scene_debug_frame;
+}
+
+VideoCore::ImageId Rasterizer::JitteredDepth() const {
+    // gvport: frames ending at the flip start with a depth pre-pass, before the G-buffer pass
+    // names the scene depth: the last frame's.
+    return FramesEndAtFlip() ? camera_motion->SceneDepth() : camera_motion->Depth();
+}
+
+void Rasterizer::OnFlip() {
+    if (FramesEndAtFlip() && camera_motion->Enabled()) {
+        StartFrame({});
+    }
+}
+
 void Rasterizer::Draw(bool is_indexed, u32 index_offset, const PreparedDraw* prepared) {
     TraceVsDraw("enter", Regs());
     RENDERER_TRACE;
@@ -1697,21 +1729,11 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     }
     const auto& regs = Regs();
     // bbport: the pass copying a finished frame to a display buffer; the previous draw's
-    // target is that frame.
+    // target is that frame. gvport: a game drawing its HUD into the display buffer ends its
+    // frames at the flip instead (OnFlip).
     if (camera_motion->Enabled() && regs.color_buffers[0] &&
-        FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address())) {
-        scene_started = false;
-        camera_motion->OnDisplayPass(cb_descs[0].first);
-        if (upscaler->OnFrameStart()) {
-            object_motion->InvalidateHistory();
-            camera_motion->InvalidateHistory();
-        }
-        camera_motion->SetJitter(upscaler->Jitter());
-        object_motion->OnFrameStart();
-        NoteFrameStart();
-        static const char* scene_debug = std::getenv("BB_SCENE_DEBUG");
-        scene_debug_frame = scene_debug && std::remove(scene_debug) == 0;
-        scene_targets->debug = scene_debug_frame;
+        FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address()) && !FramesEndAtFlip()) {
+        StartFrame(cb_descs[0].first);
     }
     bind_prepared = used_prepared;
     motion_draw = pipeline->GetGraphicsKey().motion_vectors;
@@ -1850,7 +1872,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     // bbport: jitter geometry drawn with the scene depth, not full-screen passes (a shifted
     // full-screen quad leaves an edge column unwritten).
     draw_jitter = {};
-    if (upscaler->Enabled() && db_desc.first && db_desc.first == camera_motion->Depth() &&
+    if (upscaler->Enabled() && db_desc.first && db_desc.first == JitteredDepth() &&
         (regs.num_indices > 6 || regs.num_instances.NumInstances() > 1)) {
         draw_jitter = upscaler->Jitter();
     }
@@ -1990,7 +2012,7 @@ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_in
     pipeline->BindResources(set_writes, push_data, {image_infos.data(), image_infos.size()},
                             {buffer_infos.data(), buffer_infos.size()});
     draw_jitter = {};
-    if (upscaler->Enabled() && db_desc.first && db_desc.first == camera_motion->Depth()) {
+    if (upscaler->Enabled() && db_desc.first && db_desc.first == JitteredDepth()) {
         draw_jitter = upscaler->Jitter();
     }
     UpdateDynamicState(pipeline, is_indexed);

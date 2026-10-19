@@ -132,42 +132,25 @@ fi
 # names ("a;b").
 fps=${BB_FPS:-60}
 # bbport.ini output_res other than 1080p (720p for the Steam Deck, 1440p, 2160p), or a temporal
-# upscaler: the whole game renders at the output size divided by the preset's scale (a patch:
-# scripts/patches.py resolution_writes); the upscaler fills the output, the HUD is
-# drawn at the output size. Preset and output changes need a restart.
-# Live resolution changes keep the guest at 1920x1080 and scale host targets at run time instead
-# (output and presets change in the menu without a restart, but post-processing stays at 1080p
-# and scene targets are copied back: much slower on the Steam Deck and older GPUs). Chosen by
-# BB_LIVE_RES=0/1, else bbport.ini live_resolution=0/1/auto (auto: the GPU check, strong
-# discrete GPUs get them); off when unset. 1080p output and TAA always use the live path.
-# The GPU tools (bb-gpu-capabilities: the game's GPU, its live resolution support).
+# upscaler or TAA: the game renders its scene at the output size divided by the preset's scale and
+# its display buffer (the HUD) at the output size, both patched at start (scripts/patches.py
+# RESOLUTION_SITES, DISPLAY_SITES). The upscaler takes the place of the game's pass scaling the
+# scene into the display buffer. Preset and output changes need a restart (the in-game menu offers
+# it). bbport.ini live_resolution (Bloodborne's host-side scaling) does not apply to GUNDAM VERSUS;
+# BB_LIVE_RES=1 still selects it for comparisons.
+# The GPU tools (bb-gpu-capabilities: the game's GPU, below).
 if [[ -n ${BB_PROBE:-} ]]; then caps=$(dirname -- "$BB_PROBE")/bb-gpu-capabilities
 elif [[ -n ${BB_PREBUILT:-} ]]; then caps=bin/bb-gpu-capabilities
 else caps=out/bb-gpu-capabilities; fi
 if [[ -z ${BB_RENDER_RES:-} ]]; then
     read -r scaled_render scaled_output < <("$PYTHON" scripts/patches.py --print-scaled --settings "$BB_CONFIG") || true
 fi
-live=0
-if [[ -n ${scaled_output:-} ]]; then
-    live=${BB_LIVE_RES:-}
-    # Bash builtins only: the AppImage's PATH has no sed/grep (a missing one ended run.sh silently).
-    if [[ -z $live && -f $BB_CONFIG ]]; then
-        while IFS= read -r line || [[ -n $line ]]; do
-            [[ $line =~ ^live_resolution=([01]|auto)$ ]] && live=${BASH_REMATCH[1]}
-        done < "$BB_CONFIG"
-    fi
-    if [[ $live == auto ]]; then
-        live=$("$caps" --live-resolution 2> >(while IFS= read -r line; do
-            [[ $line == *MANGOHUD* ]] || printf '%s\n' "$line"; done >&2)) || live=0
-    fi
-    [[ $live == 1 ]] || live=0
-fi
-if [[ $live == 1 ]]; then
-    echo "Output ${scaled_output}: live resolution changes (live_resolution=0: startup patch)"
+if [[ ${BB_LIVE_RES:-0} == 1 && -n ${scaled_output:-} ]]; then
+    echo "Output ${scaled_output}: live resolution changes (BB_LIVE_RES=1)"
 elif [[ -n ${scaled_output:-} ]]; then
     export BB_RENDER_RES=$scaled_render BB_OUTPUT_RES=$scaled_output BB_AUTO_RENDER_RES=1
     export BB_DMEM_MB=${BB_DMEM_MB:-9152}
-    echo "Output ${scaled_output}: scene ${scaled_render}, direct memory ${BB_DMEM_MB} MiB (live_resolution=1: live changes)"
+    echo "Output ${scaled_output}: scene ${scaled_render}, direct memory ${BB_DMEM_MB} MiB"
 fi
 # An explicit render size above 1080p skips the scaled path above, but patches.py still grows the
 # graphics heap: the direct memory has to follow, or the game stops at start (exit 139).

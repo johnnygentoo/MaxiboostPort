@@ -61,6 +61,10 @@ public:
     }
 
     void Draw(bool is_indexed, u32 index_offset = 0, const PreparedDraw* prepared = nullptr);
+    /// gvport: the flip packet, in order with the draws (its task on the draw recording thread):
+    /// the frame ends there for a game whose HUD is drawn into the display buffer
+    /// (FramesEndAtFlip).
+    void OnFlip();
 
     /// bbport: draw preparation workers (vk_draw_prep.h), fed and consumed by Liverpool.
     DrawPreparation& GetDrawPreparation() {
@@ -414,6 +418,13 @@ private:
 
     /// Display pass: counts the frame (BbStats::gpu_frames) and, with BB_BUFFER_STATS, the lag.
     void NoteFrameStart();
+    /// A new frame for the motion vectors, the upscaler and the scene targets; `frame`: the
+    /// finished one, when the pass copying it to the display buffer is known.
+    void StartFrame(VideoCore::ImageId frame);
+    /// The game's frames end at the flip rather than at a pass into the display buffer.
+    static bool FramesEndAtFlip();
+    /// The depth whose geometry the upscaler's jitter shifts: the scene depth.
+    [[nodiscard]] VideoCore::ImageId JitteredDepth() const;
     /// BB_GPU_PROFILE: a timestamp where a render pass starts (vk_gpu_profiler.h).
     void MarkPass(const GraphicsPipeline* pipeline, const RenderState& state);
     void BindVertexBuffers(const GraphicsPipeline* pipeline,

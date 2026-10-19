@@ -157,7 +157,7 @@ private:
     u64 view_uses = 0;
 
     void Run();
-    void RunScaled();
+    void RunScaled(bool hud_depth = true);
     void RunUiOnly(VideoCore::ImageId color, VideoCore::ImageId depth);
     void EnsureUiResources(u32 width, u32 height, vk::Format color, vk::Format depth);
     void PrepareUiDepth(VideoCore::ImageId depth);
@@ -239,6 +239,10 @@ private:
     /// gzport: the game profile's end of the scene (every later draw into it is the HUD) and its
     /// copy of the finished frame, kept at the output size in `relay` for the display pass.
     u64 scene_done_vs = 0, frame_copy_vs = 0;
+    /// gvport: the game's own pass scales the scene into its display-size display buffer
+    /// (Game::UpscalerHooks::scene_scaled_into_display): the upscaler's output takes the scene's
+    /// place in that pass.
+    bool scene_into_display = false;
     std::array<u64, 4> hud_vs{};
     bool scene_done = false;
     /// The target the scene was finished in (the HUD's), and the last render-size RGBA8 target

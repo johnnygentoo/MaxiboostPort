@@ -431,6 +431,7 @@ void CameraMotion::OnDisplayPass(VideoCore::ImageId frame) {
     pass_has_camera = false;
     committed = false;
     frame_gbuffer_passes = 0;
+    if (depth_id) last_depth_id = depth_id;
     depth_id = {};
 }
 

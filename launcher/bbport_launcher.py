@@ -104,9 +104,9 @@ UI_LANGUAGES = [("Как в системе", ""), ("Русский", "ru"), ("En
                 ("Español", "es"), ("Italiano", "it"), ("Français", "fr"), ("Deutsch", "de"),
                 ("简体中文", "zh_CN")]
 # The temporal upscalers need the game's scene color, depth and motion, which the GPU library learns
-# from the game profile (gpu/games). GUNDAM VERSUS' frame is not mapped yet (its camera, scene pass
-# and HUD), so they stay off until it is (docs/upscaler.md); other outputs render natively.
-UPSCALERS_AVAILABLE = False
+# from the game profile (gpu/games/gundam.cpp: its camera, G-buffer pass and the pass scaling the
+# scene into the display buffer, where the game draws its HUD at the output size).
+UPSCALERS_AVAILABLE = True
 UPSCALERS = [("FSR 4", "fsr4"), ("FSR 4.1.1", "fsr411"), ("FSR 3", "fsr3"),
              ("DLSS (NVIDIA RTX)", "dlss"),
              ("TAA (нативное сглаживание)", "taa"), ("Выключен", "off")]
@@ -194,8 +194,8 @@ DEFAULTS = {
 
 # bbport.ini keys the launcher edits; the rest of the file is kept.
 INI_DEFAULTS = {
-    # Off while this game's frame is not mapped for them (UPSCALERS_AVAILABLE).
-    "upscaler": "fsr4" if UPSCALERS_AVAILABLE else "off",
+    # Off: GUNDAM VERSUS renders natively at the output size (60 FPS at 4K on an RX 7800 XT).
+    "upscaler": "off",
     "preset": "4",
     "sharpen": "1",
     "sharpness": "0.50",
@@ -867,6 +867,8 @@ class LauncherWindow(Adw.ApplicationWindow):
                                   tr("Без перезапуска, но медленнее на Steam Deck и старых GPU"),
                                   LIVE_RESOLUTION, self.ini.get("live_resolution", "0"))
         screen.add(self.live_row)
+        # Bloodborne's host-side scaling: GUNDAM VERSUS renders at the patched sizes (run.sh).
+        self.live_row.set_visible(False)
         self.fullscreen_row = Adw.SwitchRow(title=tr("Полноэкранный режим"),
                                             active=self.settings["fullscreen"])
         screen.add(self.fullscreen_row)

@@ -54,6 +54,11 @@ struct UpscalerHooks {
     /// The vertex shader of a pass copying the finished frame (scene and HUD) into another image
     /// the display pass reads later: that image is kept at the output size (a relay).
     std::uint64_t frame_copy_vertex_shader = 0;
+    /// The game scales its finished scene into the display buffer in one pass and draws the HUD
+    /// there itself, at the display size (GUNDAM VERSUS; both sizes patched at start). Its frames
+    /// end at the flip (draws into the display buffer are most of its HUD), the upscaler's output
+    /// is what that pass reads, and nothing of the display is redirected.
+    bool scene_scaled_into_display = false;
 };
 
 struct Profile {
