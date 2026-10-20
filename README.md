@@ -26,9 +26,10 @@ points them at MAXIBOOST ON.
   plays with the second gamepad and the game splits the screen (verified with a virtual second
   pad). See [Two players](#two-players).
 - **Saves** persist across restarts (see [Saves](#saves)).
-- **Online Player Match**: two games signed in to our matching server (two instances on one PC)
-  played a 1-on-1 room: created, found, joined, both Ready, the battle with hits landing both
-  ways, and back to the room together when the timer ran out. See [Over the network](#over-the-network).
+- **Online Player Match**: two games signed in to our matching server played a 1-on-1 room:
+  created, found, joined, both Ready, the battle at 60 FPS with hits landing both ways, and back
+  to the room together when the timer ran out. Played twice: two instances on one PC, and two PCs
+  on Wi-Fi (an RX 580 and an RTX 3050) joined to a server on a third PC. See [Over the network](#over-the-network).
 - **DLC**: Gundam Barbatos Lupus Rex (its `.pkg` in the launcher's DLC folder) is offered in
   Machine Select and plays, offline and online (see [DLC](#dlc)).
 - **Other output sizes** (720p, 1440p, 4K): the game renders natively at them, its 3D scene, its
@@ -47,9 +48,9 @@ Not verified or not done yet:
 - **Online and LAN play**: signed in to a matching server of our own the game reaches its online
   main menu (the ONLINE badge, the Online Battle list); its configuration is answered by the port
   (`data/maxiboost_env.json`, also as its PSN title storage; the publisher's server is never
-  contacted). A 1-on-1 Player Match was played between two instances on one PC; a match between
-  two PCs, the other room types and Ranked Match are not tried yet, nor the game's own
-  **LAN Battle** (Options).
+  contacted). A 1-on-1 Player Match was played on one PC and between two PCs; the other room
+  types (Free, Shuffle), more than two players, Ranked Match and Casual Match are not tried yet,
+  nor the game's own **LAN Battle** (Options).
 - **Upscalers in motion** (ghosting of the player's mech, effects), DLSS and FSR 4.1.1, and the
   upscalers or other sizes in split screen.
 - The other modes, long sessions and a full play-through.
@@ -129,10 +130,11 @@ second physical controller and the other modes' 2P are not tested yet.
 
 ### Over the network
 
-**Partly verified with MAXIBOOST ON**: a 1-on-1 Player Match between two games on one PC was
-played to its end (one picks **Create Room** with **Room type: 1-on-1**, the other **Search for
-Room** with the same Room type, both take a side of a line and press Ready); a match between two
-PCs has not been played yet (see [Status](#status)). Each PC needs its own copy of the
+**Partly verified with MAXIBOOST ON**: a 1-on-1 Player Match was played to its end, between two
+games on one PC and between two PCs joined to a server on a third (one picks **Create Room** with
+**Room type: 1-on-1**, the other **Search for Room** with the same Room type, both take a side of
+a line and press Ready); other room types and more players are not tried yet (see
+[Status](#status)). Each PC needs its own copy of the
 game and of the port, and one matching server serves them all.
 
 - **One of the players' PCs:** in the launcher, **Over the network: host** on that PC (its address
