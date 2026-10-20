@@ -13,6 +13,7 @@
 #include <vector>
 
 #ifdef __linux__
+#include <ifaddrs.h>
 #include <sys/eventfd.h>
 #endif
 
@@ -34,6 +35,7 @@ namespace Libraries::Net {
 namespace {
 
 constexpr u16 kSignalingVPortNbo = 0xffff;
+constexpr u16 kStandardP2PPort = 3658;
 constexpr size_t kVPortHeaderSize = 4;
 constexpr size_t kMaxUdpPayload = 65507;
 constexpr size_t kMaxP2PPayload = kMaxUdpPayload - kVPortHeaderSize;
@@ -263,6 +265,31 @@ public:
         return physical_port;
     }
 
+    // A loopback address, one of this PC's interface addresses, or the address the matching
+    // server saw (behind a NAT, the router's).
+    static bool IsOwnAddress(u32 addr_nbo) {
+        if ((ntohl(addr_nbo) >> 24) == 127) {
+            return true;
+        }
+        if (addr_nbo == Common::Singleton<NetUtil::NetUtilInternal>::Instance()->GetExternalIp()) {
+            return true;
+        }
+        bool own = false;
+#ifdef __linux__
+        ifaddrs* list = nullptr;
+        if (getifaddrs(&list) == 0) {
+            for (const ifaddrs* it = list; it != nullptr && !own; it = it->ifa_next) {
+                if (it->ifa_addr != nullptr && it->ifa_addr->sa_family == AF_INET) {
+                    own = reinterpret_cast<const sockaddr_in*>(it->ifa_addr)->sin_addr.s_addr ==
+                          addr_nbo;
+                }
+            }
+            freeifaddrs(list);
+        }
+#endif
+        return own;
+    }
+
     bool RegisterSocket(P2PSocket* socket, u16 requested_vport_nbo, u16* actual_vport_nbo) {
         if (socket == nullptr || actual_vport_nbo == nullptr) {
             return false;
@@ -320,6 +347,20 @@ public:
                     sizeof(dest_vport_nbo));
         if (len != 0) {
             std::memcpy(framed.data() + kVPortHeaderSize, data, len);
+        }
+
+        // bbport: MAXIBOOST ON checks its own address after creating a room: it sends to the
+        // address sceNpMatching2SignalingGetLocalNetInfo gave it at the standard P2P port 3658,
+        // about 60 times a second, and waits at "Creating room." until one arrives. Unless this
+        // transport is pinned to 3658 (SHADPS4_P2P_PORT, the launcher's LAN modes), such a send
+        // goes to the port it really has.
+        if (dest_port_nbo == htons(kStandardP2PPort) && physical_port != kStandardP2PPort &&
+            IsOwnAddress(dest_addr_nbo)) {
+            if (!self_redirect_logged.exchange(true)) {
+                LOG_INFO(Lib_Net, "P2P: sends to our own address at port {} go to our port {}",
+                         kStandardP2PPort, physical_port);
+            }
+            dest_port_nbo = htons(physical_port);
         }
 
         sockaddr_in dest{};
@@ -467,6 +508,12 @@ private:
             P2PDatagram packet{};
             packet.source_addr = from.sin_addr.s_addr;
             packet.source_port = from.sin_port;
+            // The other half of the redirect in SendFrame: what this transport sent to itself
+            // comes from the port the game sent it to.
+            if (from.sin_port == htons(physical_port) && physical_port != kStandardP2PPort &&
+                IsOwnAddress(from.sin_addr.s_addr)) {
+                packet.source_port = htons(kStandardP2PPort);
+            }
             packet.source_vport = source_vport_nbo;
             packet.payload.assign(payload, payload + payload_size);
             it->second->EnqueuePacket(std::move(packet));
@@ -480,6 +527,7 @@ private:
 
     net_socket host_socket{kInvalidSocket};
     u16 physical_port{0};
+    std::atomic<bool> self_redirect_logged{false};
 
     std::mutex registry_mutex;
     std::unordered_map<u16, P2PSocket*> game_sockets;
