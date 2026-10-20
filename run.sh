@@ -275,8 +275,10 @@ else
 fi
 # MAXIBOOST ON's server configuration (maintenance, the add-on schedule, ...), which it asks its
 # publisher's service for when signed in: answered by the online module from this file (the
-# service itself is never contacted).
+# service itself is never contacted). The game also reads it from its PSN title storage, slot 1
+# (BB_GAME_ENV_TSS_SLOT): with that slot empty it went back to its title screen after signing in.
 export BB_GAME_ENV=${BB_GAME_ENV:-$PWD/data/maxiboost_env.json}
+export BB_GAME_ENV_TSS_SLOT=${BB_GAME_ENV_TSS_SLOT:-1}
 # Online play (BB_ONLINE=1; the online module gpu/bbnet): MAXIBOOST ON's PSN matching goes to a
 # shadNet server, gvnet-server (gpu/bbnet/server): BB_SHADNET_SERVER host:port, default one on
 # this PC, started for this launch when none listens there. BB_SHADNET_NPID: the player's name.

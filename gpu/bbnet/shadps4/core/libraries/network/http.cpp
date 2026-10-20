@@ -497,6 +497,18 @@ static std::vector<u8> EncodeGameEnv(const std::string& text) {
     return out;
 }
 
+// The same configuration, encoded, for other places the game reads it from (np_tus.cpp: its TSS
+// slot, BB_GAME_ENV_TSS_SLOT). Empty without BB_GAME_ENV or when the file cannot be read.
+std::vector<u8> GameEnvBlob() {
+    const char* file = std::getenv("BB_GAME_ENV");
+    std::ifstream in(file ? file : "", std::ios::binary);
+    std::string text;
+    if (in) {
+        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    return text.empty() ? std::vector<u8>{} : EncodeGameEnv(text);
+}
+
 static bool LocalGameServiceResponse(const SendRequestPlan& plan, HttpResponse& res,
                                      u32& event_bits) {
     static const std::string host = [] {

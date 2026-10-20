@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include <mutex>
 #include "common/types.h"
 #include "core/libraries/network/ssl.h"
@@ -142,6 +144,9 @@ using OrbisHttpsCallback = int(PS4_SYSV_ABI*)(int libsslCtxId, u32 verifyErr, vo
                                               int certNum, void* userArg);
 
 using OrbisHttpsCaList = Libraries::Ssl::OrbisSslCaList;
+
+// mbport: the game's configuration (BB_GAME_ENV) encoded as its get_env answer (http.cpp).
+std::vector<u8> GameEnvBlob();
 
 // Functions
 int PS4_SYSV_ABI sceHttpAddCookie(int libhttpCtxId, const char* url, const char* cookie,

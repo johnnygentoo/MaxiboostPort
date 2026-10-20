@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -14,6 +16,7 @@
 #include "core/libraries/np/np_error.h"
 #include "core/libraries/np/np_manager.h"
 #include "core/libraries/np/np_tus.h"
+#include "core/libraries/network/http.h"
 #include "core/libraries/np/np_types.h"
 #include "core/libraries/np/object_manager.h"
 #include "core/libraries/system/userservice.h"
@@ -532,12 +535,45 @@ s32 PS4_SYSV_ABI sceNpTssGetDataAsync(int reqId, OrbisNpTssSlotId slotId,
         return ret;
     }
 
-    req->Start([=]() {
-        if (dataStatus) {
-            dataStatus->status = OrbisNpTssStatus::Ok;
-            dataStatus->contentLength = 0;
+    // mbport: the slot named by BB_GAME_ENV_TSS_SLOT holds the game's configuration (BB_GAME_ENV,
+    // encoded as its get_env answer): MAXIBOOST ON reads it from TSS slot 1 after signing in, first
+    // its size, then the data, and with an empty slot it goes back to its title screen. Other slots
+    // stay empty.
+    static const int env_slot = [] {
+        const char* v = std::getenv("BB_GAME_ENV_TSS_SLOT");
+        return v && *v ? std::atoi(v) : -1;
+    }();
+    std::vector<u8> content;
+    if (slotId == env_slot) {
+        content = Libraries::Http::GameEnvBlob();
+    }
+    const u64 offset = option && option->offset ? *option->offset : 0;
+    req->Start([=, content = std::move(content)]() {
+        const u64 total = content.size();
+        const u64 from = offset < total ? offset : total;
+        const u64 count = data ? std::min<u64>(dataSize, total - from) : 0;
+        if (count) {
+            std::memcpy(data, content.data() + from, count);
         }
-        return 0;
+        if (dataStatus) {
+            // Modified: now, in RTC ticks (microseconds since year 1), so the game takes the data
+            // as newer than what it has.
+            const u64 unix_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                                    std::chrono::system_clock::now().time_since_epoch())
+                                    .count();
+            dataStatus->modified.tick = total ? unix_us + 62135596800ull * 1000000ull : 0;
+            dataStatus->status = from + count < total && data ? OrbisNpTssStatus::Partial
+                                                               : OrbisNpTssStatus::Ok;
+            dataStatus->contentLength = total;
+        }
+        if (option && option->last) {
+            *option->last = total ? from + count - (count ? 1 : 0) : 0;
+        }
+        if (slotId == env_slot) {
+            LOG_INFO(Lib_NpTus, "TSS slot {}: game configuration, {} bytes ({} copied)", slotId,
+                     total, count);
+        }
+        return static_cast<s32>(count);
     });
 
     return ORBIS_OK;
