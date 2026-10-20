@@ -5,4 +5,15 @@
     <TitleID>
         <ID>CUSA18758</ID>
     </TitleID>
+    <!-- An installed add-on is owned. The game takes an add-on (Barbatos Lupus Rex,
+         GUNDAMVSMBDLC001) as owned when the entitlement key sceAppContentGetEntitlementKey gives
+         matches the key in its own data; a PS4 reads that key from the add-on's license, which the
+         port does not have. With these two bytes (guest+0x32e22b, the jne after the comparison) an
+         add-on that sceAppContentGetAddcontInfoList lists as installed (the user's data folder,
+         addcont/) is owned whatever its key; one not installed stays locked. -->
+    <Metadata Title="MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON" Name="Installed add-ons" Author="mbport" PatchVer="1.0" AppVer="01.15" AppElf="eboot.bin">
+        <PatchList>
+            <Line Type="bytes" Address="0x72e22b" Value="9090"/>
+        </PatchList>
+    </Metadata>
 </Patch>

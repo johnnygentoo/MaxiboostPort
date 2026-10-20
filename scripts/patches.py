@@ -21,6 +21,8 @@ APP_VERSION='01.15'
 BUILTIN_XML=Path(__file__).resolve().parent.parent/'patches/Maxiboost.xml'
 # BB_FPS presets: patch names from patches/Maxiboost.xml. The game runs at 60 FPS (flip rate 0).
 FPS_PRESETS={'60':[]}
+# Built-in patches applied on every start (patches/Maxiboost.xml): installed add-ons count as owned.
+ALWAYS=['Installed add-ons']
 # Sizes (MAXIBOOST ON 1.15, image offsets). The game renders its 3D scene and draws its 2D layer
 # (menus, HUD) at 1920x1080 and makes its render targets with the sizes as immediates
 # (SCENE_SITES, the scene size); the display buffers' size is a 16-byte constant (DISPLAY_SITES) and
@@ -392,7 +394,7 @@ def main():
         return
     if a.print_preset_size:
         return  # no upscaler presets for this game yet
-    names=FPS_PRESETS[a.fps]+[n.strip() for n in a.extra.split(';') if n.strip()]
+    names=ALWAYS+FPS_PRESETS[a.fps]+[n.strip() for n in a.extra.split(';') if n.strip()]
     names+=[n for n in effect_patches(read_settings(a.settings)) if n not in names]
     names=available(a.xml,names,a.app_version)
     segments=eboot_segments((a.out/'eboot.elf').read_bytes())

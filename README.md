@@ -26,6 +26,8 @@ points them at MAXIBOOST ON.
   plays with the second gamepad and the game splits the screen (verified with a virtual second
   pad). See [Two players](#two-players).
 - **Saves** persist across restarts (see [Saves](#saves)).
+- **DLC**: Gundam Barbatos Lupus Rex (its `.pkg` in the launcher's DLC folder) is offered in
+  Machine Select and plays, offline and online (see [DLC](#dlc)).
 - **Other output sizes** (720p, 1440p, 4K): the game renders natively at them, its 3D scene, its
   menus and its HUD (sizes patched at start, `scripts/patches.py`; above 1080p its GPU memory pools
   grow). Native 4K holds 60 FPS on an RX 7800 XT.
@@ -39,13 +41,11 @@ Not verified or not done yet:
 
 - **Sound** has not been checked by ear (the game's mix comes out; nothing was listened to).
 - **Trophies**: the list is read from your dump, but none has been seen unlocking.
-- **DLC**: the add-on (`.pkg` unlock key, see [DLC](#dlc)) is seen by the game, but its mobile
-  suit is not offered offline: the game unlocks add-ons through a release schedule it reads from
-  its publisher's server only when signed in.
-- **Online and LAN play**: signed in to a matching server of our own the game gets through its
-  sign-in, its configuration (answered by the port, `data/maxiboost_env.json`; the publisher's
-  server is never contacted) and the matching context, then starts over at its title screen; the
-  cause is not found yet. The game's own **LAN Battle** (Options) needs the same.
+- **Online and LAN play**: signed in to a matching server of our own the game reaches its online
+  main menu (the ONLINE badge, the Online Battle list); its configuration is answered by the port
+  (`data/maxiboost_env.json`, also as its PSN title storage; the publisher's server is never
+  contacted). No match against another player has been played yet, and the game's own
+  **LAN Battle** (Options) is not tried.
 - **Upscalers in motion** (ghosting of the player's mech, effects), DLSS and FSR 4.1.1, and the
   upscalers or other sizes in split screen.
 - The other modes, long sessions and a full play-through.
@@ -125,10 +125,9 @@ second physical controller and the other modes' 2P are not tested yet.
 
 ### Over the network
 
-**Not working yet with MAXIBOOST ON**: signed in, the game returns to its title screen after its
-online start (see [Status](#status)). The setup below is gvport's network play, kept for when it
-does: each PC needs its own copy of the game and of the port, and one matching server serves them
-all.
+**Partly verified with MAXIBOOST ON**: signed in, the game reaches its online menus; a match
+between two PCs has not been played yet (see [Status](#status)). Each PC needs its own copy of the
+game and of the port, and one matching server serves them all.
 
 - **One of the players' PCs:** in the launcher, **Over the network: host** on that PC (its address
   is shown), **join** with that address on the others.
@@ -158,8 +157,11 @@ verified yet.
 
 The add-ons are unlock keys: their data is in the game and its update. Put their `.pkg` files
 (for example `UP0700-CUSA18758_00-GUNDAMVSMBDLC001`, Gundam Barbatos Lupus Rex) in a folder and
-choose it as the launcher's DLC folder; the port reports them to the game as installed. Not
-checked in the game yet.
+choose it as the launcher's DLC folder; the port reports them to the game as installed.
+Verified with Barbatos Lupus Rex, offline and online: it is in Machine Select (Iron-Blooded
+Orphans) and plays in Free Battle. The game checks an add-on's entitlement key against its own
+data, a key a PS4 reads from the add-on's license; the built-in patch "Installed add-ons" makes an
+installed add-on owned whatever its key. Without the add-on installed the unit is not offered.
 
 ## Credits
 
