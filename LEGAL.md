@@ -14,8 +14,13 @@ releases and its AppImages ship none of the following, and never will:
 - updates or add-ons (DLC), as `.pkg` files or extracted;
 - save data, PSN title storage or user data of any player;
 - console keys of any kind, including the trophy key, and PS4 firmware or system libraries;
-- AMD's FSR 4 DLLs and model data, and NVIDIA's DLSS SDK and libraries (their licenses don't
-  allow it; you supply them yourself if you want them).
+- AMD's FSR 4.1.1 DLLs and the assets made from them, and NVIDIA's DLSS SDK and libraries (their
+  licenses don't allow it; you supply them yourself if you want them).
+
+The AppImage does include the FSR 4 **v07** model (`fsr4_shaders/`, built by the
+[Q2RTX](https://github.com/FireBurn/Q2RTX) project from AMD's FidelityFX SDK source, which AMD
+published under the MIT license), with that license next to it (`LICENSE-FSR4-v07.txt`). The
+repository itself doesn't contain it: `tools/fetch_fsr4_assets.sh` downloads it.
 
 ## You must supply your own legal dump
 

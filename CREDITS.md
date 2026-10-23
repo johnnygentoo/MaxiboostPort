@@ -70,7 +70,11 @@ contains code from shadPS4 (GPL-2.0-or-later). The third-party components keep t
 - [ps4-pkg-extractor](https://github.com/paulomanrique/ps4-pkg-extractor) (Unlicense), fetched by
   the build, not stored here.
 
-AMD's FSR 4 DLLs and model data and NVIDIA's DLSS SDK and libraries are not distributed here.
+- The FSR 4 v07 model assets, built by [Q2RTX](https://github.com/FireBurn/Q2RTX) from AMD's
+  FidelityFX SDK source (MIT): downloaded by `tools/fetch_fsr4_assets.sh` and included in the
+  AppImage with their license, not stored here.
+
+AMD's FSR 4.1.1 DLLs and NVIDIA's DLSS SDK and libraries are not distributed here.
 
 ## People of bbport and bloodborne_linux
 
