@@ -5,15 +5,15 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting. Before you start, [docs/TROUBLESHOOTING.md](https://github.com/ayozetr/bloodborne_linux/blob/main/docs/TROUBLESHOOTING.md) covers the common problems.
+        Thanks for reporting.
 
-        Only your own dump of the game with the 1.09 update is supported. Do not ask for or link game files.
+        Only your own dump of MAXIBOOST ON (CUSA18758) with the 1.15 update is supported. Do not ask for, attach or link game files, saves or keys: such issues are closed and deleted (see LEGAL.md).
   - type: input
     id: version
     attributes:
       label: Version
       description: The launcher's **About** page shows it.
-      placeholder: 0.51-linux.2
+      placeholder: 0.1 (or the commit, git rev-parse --short HEAD)
     validations:
       required: true
   - type: dropdown
@@ -52,17 +52,17 @@ body:
       label: How to make it happen
       description: Where in the game, and what you did right before. Say if it happens every time.
       placeholder: |
-        1. Load the save at the Cathedral Ward lamp
-        2. Walk towards Old Yharnam
-        3. The game closes during the load
+        1. Free Battle, Side 7, Gundam against two CPUs
+        2. Fire the beam rifle
+        3. The game closes
   - type: dropdown
     id: online
     attributes:
       label: Online
       options:
         - Offline
-        - Online, shadPS4's public server
-        - Online, my own server
+        - Online, the matching server on this PC
+        - Online, a matching server on another PC
   - type: textarea
     id: log
     attributes:
@@ -78,7 +78,7 @@ body:
     attributes:
       label: Checks
       options:
-        - label: I use my own dump of Bloodborne with the 1.09 update.
+        - label: I use my own dump of MAXIBOOST ON (CUSA18758) with the 1.15 update, and attached no game files, saves or keys.
           required: true
         - label: I searched the existing issues for the same problem.
           required: true

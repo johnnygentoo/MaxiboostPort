@@ -10,10 +10,13 @@ by deadinside28, by way of gzport (GODZILLA) and gvport (GUNDAM VERSUS, the same
 engine). The runtime, the GPU translation, the upscalers and the launcher come from there; mbport
 points them at MAXIBOOST ON.
 
-> **No game files are included.** You need your own decrypted dump of MAXIBOOST ON, the North
-> American release `CUSA18758`, with update 1.15. This project is not affiliated with Bandai Namco
-> Entertainment, SOTSU, SUNRISE or Sony Interactive Entertainment. MOBILE SUIT GUNDAM EXTREME VS.
-> MAXIBOOST ON © SOTSU · SUNRISE.
+> **No game files are included, and none will ever be.** You need your own dump of MAXIBOOST ON,
+> the North American release `CUSA18758`, with update 1.15, made from a copy you own. Don't ask for
+> game files, saves or keys, and don't share them: see [LEGAL.md](LEGAL.md). This project is not
+> affiliated with Bandai Namco Entertainment, SOTSU, SUNRISE or Sony Interactive Entertainment.
+> MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON © SOTSU · SUNRISE.
+
+[Build instructions](BUILD.md) · [Legal notice](LEGAL.md) · [Credits](CREDITS.md)
 
 ## Status
 
@@ -92,7 +95,8 @@ python3 scripts/game_check.py CUSA18758-full
 
 ### 2. Build and run
 
-On Arch Linux (or CachyOS, Manjaro…):
+The full instructions, with the packages for Gentoo, Arch and Nix and the optional parts, are in
+[BUILD.md](BUILD.md). In short, on Arch Linux (or CachyOS, Manjaro…):
 
 ```bash
 sudo pacman -S --needed base-devel cmake ninja python python-gobject gtk4 libadwaita sdl3 \
@@ -173,12 +177,17 @@ installed add-on owned whatever its key. Without the add-on installed the unit i
 
 ## Credits
 
+Everyone whose work is in mbport, the people of bbport and bloodborne_linux among them, is listed
+in [CREDITS.md](CREDITS.md). In short:
+
 - [deadinside28/bloodborne_pc](https://github.com/deadinside28/bloodborne_pc): **bbport**, the
   native port everything here is built on, and almost all of the work behind it. Its README, with
   the technical details, is in [BBPORT.md](BBPORT.md).
-- [ayozetr/bloodborne_linux](https://github.com/ayozetr/bloodborne_linux): the Linux fork of bbport,
-  with its launcher, upscalers, memory models, trophies, PKG install, save import and AppImage, and
-  everyone thanked there.
+- [ayozetr/bloodborne_linux](https://github.com/ayozetr/bloodborne_linux): the Linux fork of bbport
+  the later ports start from, with its own improvements and those of everyone thanked there.
+- [Wozzardman](https://github.com/Wozzardman): the network and PSN libraries of the online module
+  ([shadp2p](https://github.com/Wozzardman/shadp2p)) and the shadNet server whose room logic the
+  matching server follows ([shadnet-p2p](https://github.com/Wozzardman/shadnet-p2p)).
 - **gzport**, the GODZILLA port: imports by NID, game profiles, Ngs2, libSceFont and the dialogs
   of an offline console; and **gvport**, the GUNDAM VERSUS port mbport starts from: fibers, the
   offline NP toolkit, save data memory, the matching server for network play.
@@ -200,6 +209,6 @@ Full list of components and licenses: [BBPORT.md](BBPORT.md#credits-and-licenses
 
 ## License
 
-GNU GPL v2 or later ([LICENSE](LICENSE)). Third-party components keep their own licenses. NVIDIA
+GNU GPL v2 or later ([LICENSE](LICENSE)). Read the [legal notice](LEGAL.md) too. Third-party components keep their own licenses. NVIDIA
 and DLSS are trademarks of NVIDIA Corporation. MOBILE SUIT GUNDAM EXTREME VS. MAXIBOOST ON ©
 SOTSU · SUNRISE.

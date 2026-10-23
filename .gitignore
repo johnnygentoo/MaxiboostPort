@@ -1,50 +1,83 @@
-out/
-__pycache__/
-user/
+# mbport never ships anything that belongs to the game, the console or a player. Everything below
+# stays on your own disk. LEGAL.md says why.
+
+# --- Game files, updates, add-ons and dumps ------------------------------------------------------
+# Game folders (CUSA18758, CUSA18758-full, CUSA18758-patch, ...), also when they are symlinks
+/CUSA*
+CUSA*/
+*.pkg
+eboot.bin
+param.sfo
+sce_discmap.plt
+sce_sys/
+sce_module/
+*.prx
+*.sprx
+*.self
+*.elf
+*.at9
+*.trp
+*.dcx
+*.7z
+*.zip
 *.mp4
+# Memory images and frame dumps taken while debugging
+*.raw
+img.bin
+/addcont/
+
+# --- Saves, players' data and keys --------------------------------------------------------------
+# A checkout's own user folder (saves, title storage, trophies, shader cache) and scratch copies
+user/
+/user*/
+savedata/
+tus/
+*.sav
+# Settings and environment files: they can hold paths, names and keys (the trophy key)
 bbport.ini
-fsr4_shaders/
+*.ini
+.env
+.env.*
+*.env
+*.key
+*keys.txt
+mods.json
+patches.json
+/mods/
+
+# --- Build outputs --------------------------------------------------------------------------------
+out/
+/dist/
 pgo/
-*.png
-last_run.log
-dist/
+__pycache__/
+*.AppImage
+/tools/gvnet-server/out/
 packaging/runtime-paths.nix
-fsr4_411/
 vkd3d-proton.cache
-tools/fsr4cap/*.exe
 perf.data
-# Local leftovers: patch backups, generated SPIR-V, analysis outputs, test saves and routes
-*.orig
 /*.spv
+*.orig
+
+# --- Vendor files you supply yourself -------------------------------------------------------------
+# AMD FidelityFX DLLs and the FSR 4.1.1 assets built from them, NVIDIA's DLSS libraries
+*.dll
+/fsr4_411/
+/fsr4_shaders/
+tools/fsr4cap/*.exe
+
+# --- Logs, screenshots and local notes ------------------------------------------------------------
+/logs/
+*.log
+frames.csv
+*.png
+/message*.txt
+/START_PROMPT.md
+/PICKUP.md
+/devkit/
+/.claude/
 /1060/
 /docs/savedata_route/
 /docs/route*.txt
 /docs/route_run.log
-/bloodborne_upscalers_*.md
-mods.json
-patches.json
-# The mods folder of runs from source (the launcher's default, DATA_DIR/mods)
-/mods/
-# Local: game logs, messages and archives from users, internal plans
-/logs/
-/message*.txt
-/*.zip
 /docs/ISSUE_ACTION_PLAN_*.md
-# AMD FidelityFX DLLs (FSR 4.1.1 is built from the user's own): never in the repository
-*.dll
-# Game files and dumps: never in the repository
-eboot.bin
-param.sfo
-*.pkg
-*.dcx
-*.7z
-/CUSA*/
-/fsr4_411
-/fsr4_shaders
-
-# Godzilla dumps (never committed)
-/CUSA*/
-/fsr4_411
-/fsr4_shaders
-/.claude/
-/tools/gvnet-server/out/
+/bloodborne_upscalers_*.md
