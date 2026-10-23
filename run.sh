@@ -65,8 +65,7 @@ if [[ -z ${PYTHON:-} ]]; then echo 'Install Python 3 or set PYTHON.' >&2; exit 1
 game=${BB_GAME_DIR:-CUSA18758-full}
 if [[ ! -f $game/eboot.bin ]]; then echo "No eboot.bin in $game (set BB_GAME_DIR)." >&2; exit 1; fi
 original_game=$game
-# Bloodborne's button prompts and gestures menu (scripts/menu_prompts.py) are edits of its
-# dvdroot_ps4/menu files; MAXIBOOST ON has none of them, so nothing is laid under the mods.
+# No edits of the game's menus are laid under the mods.
 ui_mods=
 game=$("$PYTHON" scripts/mods.py "$game" --out "$out" \
     --mods-dir "${BB_MODS_DIR:-$data/mods}" --config "${BB_MODS_CONFIG:-$data/mods.json}" \

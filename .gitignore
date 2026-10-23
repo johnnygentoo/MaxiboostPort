@@ -81,3 +81,17 @@ frames.csv
 /docs/route_run.log
 /docs/ISSUE_ACTION_PLAN_*.md
 /bloodborne_upscalers_*.md
+
+# --- Bloodborne-only parts of the ports mbport comes from -----------------------------------------
+# Kept on disk for reference, not published: bbport's README and design notes, the Hunter's Dream
+# bridge, Bloodborne's menu button prompts and the Docker shadNet server for Bloodborne co-op.
+/docs/
+/BBPORT.md
+/BBPORT.ru.md
+/bbbridge/
+/assets/
+/scripts/menu_prompts.py
+/scripts/menu_textures.py
+/tests/test_menu_prompts.py
+/tools/extract_prompt_assets.py
+/tools/shadnet-server/

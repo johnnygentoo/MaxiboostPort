@@ -181,8 +181,7 @@ Everyone whose work is in mbport, the people of bbport and bloodborne_linux amon
 in [CREDITS.md](CREDITS.md). In short:
 
 - [deadinside28/bloodborne_pc](https://github.com/deadinside28/bloodborne_pc): **bbport**, the
-  native port everything here is built on, and almost all of the work behind it. Its README, with
-  the technical details, is in [BBPORT.md](BBPORT.md).
+  native port everything here is built on, and almost all of the work behind it.
 - [ayozetr/bloodborne_linux](https://github.com/ayozetr/bloodborne_linux): the Linux fork of bbport
   the later ports start from, with its own improvements and those of everyone thanked there.
 - [Wozzardman](https://github.com/Wozzardman): the network and PSN libraries of the online module
@@ -205,7 +204,7 @@ in [CREDITS.md](CREDITS.md). In short:
 - [ps4-pkg-extractor](https://github.com/paulomanrique/ps4-pkg-extractor) by paulomanrique
   (Unlicense): the launcher's *Install from PKG*.
 
-Full list of components and licenses: [BBPORT.md](BBPORT.md#credits-and-licenses).
+Full list of components and licenses: [CREDITS.md](CREDITS.md#components-and-licenses).
 
 ## License
 

@@ -73,9 +73,6 @@ what the launcher and releases use. Options, as environment variables:
   `pgo/` when it exists.
 - `DLSS_SDK_ROOT=...`: also build the DLSS bridge (see above).
 
-`build.sh` also builds bbbridge (a Bloodborne co-op bridge from the projects mbport comes from)
-when libcurl is installed. MAXIBOOST ON doesn't use it.
-
 ## Run
 
 ```bash

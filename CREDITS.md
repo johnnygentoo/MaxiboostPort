@@ -5,8 +5,8 @@ it. Almost everything that makes a PS4 game run here was written for Bloodborne 
 runtime, the Vulkan renderer, the upscalers, the launcher, the online module. mbport points that
 work at MAXIBOOST ON. Thank you all.
 
-Components and their licenses: [BBPORT.md](BBPORT.md#credits-and-licenses) and the license files
-in each third-party folder.
+Components and their licenses: [below](#components-and-licenses), and the license files in each
+third-party folder.
 
 ## The line of ports
 
@@ -14,7 +14,7 @@ in each third-party folder.
    **[deadinside28](https://github.com/deadinside28)**: the native port of Bloodborne that
    everything here is built on. The game's own code runs on the CPU, a runtime replaces the PS4's
    libraries, and a renderer derived from shadPS4 turns its graphics into Vulkan. Its README, with
-   the technical details, is kept as [BBPORT.md](BBPORT.md).
+   the technical details, is in its own repository.
 2. **[bloodborne_linux](https://github.com/ayozetr/bloodborne_linux)** by
    **[ayozetr](https://github.com/ayozetr)**: the Linux fork of bbport that the later ports start
    from. It adds improvements of its own and from the community: online play, trophies, any
@@ -43,12 +43,34 @@ in each third-party folder.
 | [FireBurn/FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) | FSR 3.1 and the FSR 4 provider on Vulkan, with the AMD FidelityFX SDK (MIT). |
 | [NVIDIA DLSS SDK](https://github.com/NVIDIA/DLSS) | DLSS (not distributed: you supply it). |
 | [KytyPS5](https://github.com/KytyPS5/KytyPS5), [AnyPS5](https://github.com/boykopovar/AnyPS5) | The NGS2 parameter IDs and rendering semantics the runtime's Ngs2 follows (GPL-2.0). |
-| [MaskZeus/bbbridge](https://github.com/MaskZeus/bbbridge) | bbbridge (`bbbridge/`, GPL-3.0-or-later), kept from bloodborne_linux. |
 | [Thealexbarney/LibAtrac9](https://github.com/Thealexbarney/LibAtrac9) | ATRAC9 audio decoding (MIT). |
 | [Dear ImGui](https://github.com/ocornut/imgui), [sirit](https://github.com/shadps4-emu/sirit), [half](https://half.sourceforge.net/), [cpp-httplib](https://github.com/yhirose/cpp-httplib), [FreeType](https://freetype.org), DejaVu fonts | The overlay, SPIR-V generation, half floats, HTTP, fonts. |
 | [pkgforge-dev/Anylinux-AppImages](https://github.com/pkgforge-dev/Anylinux-AppImages) | quick-sharun, which builds the AppImage. |
 | [paulomanrique/ps4-pkg-extractor](https://github.com/paulomanrique/ps4-pkg-extractor) | The launcher's *Install from PKG* (Unlicense), fetched at build time. |
-| [Nexus Mods: Bloodborne mod 30](https://www.nexusmods.com/bloodborne/mods/30) | Dommo's Xbox and Switch button prompts, uploaded by goomab ([assets/menu_prompts](assets/menu_prompts)), kept from bloodborne_linux. |
+
+## Components and licenses
+
+mbport is licensed under the **GNU GPL v2 or later** ([LICENSE](LICENSE)), as bbport is: it
+contains code from shadPS4 (GPL-2.0-or-later). The third-party components keep their own licenses:
+
+- [shadPS4](https://github.com/shadps4-emu/shadPS4)'s video core and shader recompiler, and the
+  network and PSN code of the online module (`gpu/bbnet`, from Wozzardman's shadp2p):
+  GPL-2.0-or-later.
+- [sirit](https://github.com/shadps4-emu/sirit) and [half](https://half.sourceforge.net/).
+- [FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) by FireBurn (MIT; FSR 3.1 on Vulkan and the
+  FSR 4 v07 provider) and the AMD FidelityFX SDK (MIT).
+- [dxil-spirv](https://github.com/HansKristian-Work/dxil-spirv) (MIT), used to build the FSR 4.1.1
+  assets.
+- [LibAtrac9](https://github.com/Thealexbarney/LibAtrac9) (MIT), [Dear ImGui](https://github.com/ocornut/imgui)
+  (MIT), [cpp-httplib](https://github.com/yhirose/cpp-httplib) (MIT), [FreeType](https://freetype.org)
+  and the DejaVu fonts.
+- The DLSS bridge (`gpu/dlss_bridge`, MIT) and loader, from
+  [Supermedo's Windows port](https://github.com/Supermedo/bloodborne_pc), adapted from
+  [IFreemz/shadPS4-Bloodborne-DLSS-FSR](https://github.com/IFreemz/shadPS4-Bloodborne-DLSS-FSR).
+- [ps4-pkg-extractor](https://github.com/paulomanrique/ps4-pkg-extractor) (Unlicense), fetched by
+  the build, not stored here.
+
+AMD's FSR 4 DLLs and model data and NVIDIA's DLSS SDK and libraries are not distributed here.
 
 ## People of bbport and bloodborne_linux
 

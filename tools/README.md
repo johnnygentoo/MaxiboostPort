@@ -13,8 +13,6 @@ and plays the port; the rest are deadinside28's development tools.
 | `fsr4_optimize.sh` | Run by `run.sh`: faster, bit-exact versions of FSR 4 passes, rewritten with `fsr4_post_lds.pl`, `fsr4_pass11_guard.pl` and `Fsr4SpirvCrossFixes.pm`. |
 | `fsr4cap/` | FSR 4.1.1 from your own AMD DLL: records the DLL under Proton and extracts its passes (`fsr4_411/`). The launcher's **Choose DLL…** button runs `fsr4cap/build_assets.sh`. |
 | `build_dlss.sh` | DLSS on NVIDIA RTX: fetches what it needs from NVIDIA's DLSS SDK and builds the bridge. Run once after `build.sh` (this fork). |
-| `shadnet-server/` | A private shadNet server for co-op, in Docker: [docs/SERVER.md](../docs/SERVER.md) (this fork). |
-| `extract_prompt_assets.py` | Rebuilds `assets/menu_prompts/` (the Xbox and Switch button prompts) from Dommo's mods; only needed to update them (this fork). |
 
 ## Development: running and measuring the game
 
