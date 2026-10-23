@@ -42,6 +42,23 @@ chmod +x "$quick"
 d=$appdir/share/bbport
 cp run.sh "$d/"
 cp -r scripts patches fsr4_shaders launcher "$d/"
+# The licenses of what is compiled into the port travel with it: mbport's GPL, the legal notice and
+# credits, and each third-party component's license (the FSR 4 v07 one is in fsr4_shaders/).
+l=$d/licenses
+install -Dm644 LICENSE "$l/LICENSE"
+install -Dm644 LEGAL.md "$l/LEGAL.md"
+install -Dm644 CREDITS.md "$l/CREDITS.md"
+install -Dm644 gpu/shadps4/LICENSE "$l/shadPS4-LICENSE"
+install -Dm644 gpu/third_party/sirit/LICENSE.txt "$l/sirit-LICENSE.txt"
+install -Dm644 gpu/third_party/sirit/externals/SPIRV-Headers/LICENSE "$l/SPIRV-Headers-LICENSE"
+install -Dm644 gpu/third_party/half/LICENSE.txt "$l/half-LICENSE.txt"
+install -Dm644 gpu/third_party/httplib/LICENSE "$l/cpp-httplib-LICENSE"
+install -Dm644 gpu/third_party/fonts/LICENSE-DejaVu.txt "$l/DejaVu-LICENSE.txt"
+install -Dm644 gpu/third_party/imgui/LICENSE.txt "$l/imgui-LICENSE.txt"
+install -Dm644 gpu/third_party/fsr-vulkan/LICENSE.txt "$l/FSR-Vulkan-LICENSE.txt"
+install -Dm644 gpu/third_party/fsr-vulkan/NOTICE.md "$l/FSR-Vulkan-NOTICE.md"
+install -Dm644 third_party/LibAtrac9/LICENSE "$l/LibAtrac9-LICENSE"
+install -Dm644 gpu/dlss_bridge/LICENSE.txt "$l/dlss_bridge-LICENSE.txt"
 mkdir -p "$d/tools"
 cp -r tools/fsr4cap "$d/tools/"
 find "$d" -name __pycache__ -type d -prune -exec rm -rf {} +

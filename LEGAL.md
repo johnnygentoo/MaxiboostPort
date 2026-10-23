@@ -63,8 +63,10 @@ These names are used only to say which game and hardware mbport works with.
 
 mbport's own code is licensed under the **GNU General Public License, version 2 or later**
 ([LICENSE](LICENSE)). The third-party components it contains keep their own licenses (see
-[CREDITS.md](CREDITS.md#components-and-licenses)). As the GPL says, the
-software comes **without any warranty**. You use it at your own risk, including the risk to your
-saves. Back them up.
+[CREDITS.md](CREDITS.md#components-and-licenses)). The AppImage carries all of these licenses
+in `share/bbport/licenses/`, and its source code is this repository at the release's tag.
+
+As the GPL says, the software comes **without any warranty**. You use it at your own risk,
+including the risk to your saves. Back them up.
 
 This notice is not legal advice.
