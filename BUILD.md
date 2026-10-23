@@ -51,8 +51,8 @@ paru -S magic_enum vulkan-memory-allocator xbyak   # from the AUR
 ## Get the source
 
 ```bash
-git clone --recursive https://github.com/<owner>/<repo>.git mbport
-cd mbport
+git clone --recursive https://github.com/johnnygentoo/MaxiboostPort.git
+cd MaxiboostPort
 ```
 
 If you cloned without `--recursive`, `build.sh` runs `git submodule update --init --recursive`

@@ -24,9 +24,9 @@ in each third-party folder.
    dialogs of an offline console.
 4. **gvport**, the GUNDAM VERSUS port (the same Bandai Namco engine): fibers, the offline NP
    toolkit, save data memory, the matching server for network play.
-5. **mbport**, this port, by **[johnnygentoo](https://github.com/johnnygentoo)** (commits as
-   nnywadd), the author of gzport and gvport: MAXIBOOST ON's boot, native resolutions, upscaler
-   profile, DLC, and online Player Match through a server of your own.
+5. **mbport**, this port, by **[johnnygentoo](https://github.com/johnnygentoo)**, the author of
+   gzport and gvport: MAXIBOOST ON's boot, native resolutions, upscaler profile, DLC, and online
+   Player Match through a server of your own.
 
 ## Projects
 
